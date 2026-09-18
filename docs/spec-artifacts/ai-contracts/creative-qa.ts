@@ -1,11 +1,17 @@
 import { z } from "zod";
-import { UuidSchema } from "./shared";
+import {
+  ConceptVersionSnapshotSchema,
+  CreativePlanVersionSnapshotSchema,
+  ScriptVersionSnapshotSchema,
+  UuidSchema,
+} from "./shared";
+import { EditingPlanSpecSchema } from "../editing-intelligence/schema";
 
 export const CreativeQAInputSchema = z.object({
-  concept: z.unknown(),
-  script: z.unknown(),
-  creativePlan: z.unknown(),
-  editingPlan: z.unknown(),
+  concept: ConceptVersionSnapshotSchema,
+  script: ScriptVersionSnapshotSchema,
+  creativePlan: CreativePlanVersionSnapshotSchema,
+  editingPlan: EditingPlanSpecSchema,
 
   renderTechnicalReport: z.object({
     durationMs: z.number().int().positive(),
@@ -13,8 +19,14 @@ export const CreativeQAInputSchema = z.object({
     height: z.number().int().positive(),
     fps: z.number().positive(),
     audioPresent: z.boolean(),
-    blackFrameSignals: z.unknown().optional(),
-    silenceSignals: z.unknown().optional(),
+    blackFrameSignals: z.object({
+      catastrophic: z.boolean(),
+      affectedDurationMs: z.number().int().nonnegative(),
+    }).strict().optional(),
+    silenceSignals: z.object({
+      catastrophic: z.boolean(),
+      affectedDurationMs: z.number().int().nonnegative(),
+    }).strict().optional(),
   }).strict(),
 
   renderInspection: z.object({
@@ -41,30 +53,32 @@ export const CreativeQAInputSchema = z.object({
       endMs: z.number().int().positive(),
       text: z.string(),
     }).strict()).optional(),
-    productVisibilitySignals: z.unknown().optional(),
-    audioSignals: z.unknown().optional(),
+    productVisibilitySignals: z.object({
+      firstVisibleAtMs: z.number().int().nonnegative().optional(),
+      totalVisibleMs: z.number().int().nonnegative().optional(),
+      readabilityWarnings: z.array(z.string()),
+    }).strict().optional(),
+    audioSignals: z.object({
+      voicePresent: z.boolean(),
+      musicPresent: z.boolean(),
+      clippingDetected: z.boolean().optional(),
+      warnings: z.array(z.string()),
+    }).strict().optional(),
   }).strict(),
 }).strict();
 
 export const CreativeQAOutputSchema = z.object({
-  result: z.enum(["PASS", "PASS_WITH_WARNINGS", "FAIL"]),
+  result: z.enum(["PASS","PASS_WITH_WARNINGS","FAIL"]),
   evaluatedDimensions: z.array(z.string()),
   notEvaluatedDimensions: z.array(z.string()),
   issues: z.array(z.object({
     code: z.enum([
-      "PACING_TOO_SLOW",
-      "PACING_TOO_FAST",
-      "CUTS_TOO_MECHANICAL",
-      "CAPTIONS_TOO_BUSY",
-      "PRODUCT_NOT_VISIBLE_ENOUGH",
-      "HOOK_VISUALLY_WEAK",
-      "SOUND_TOO_BUSY",
-      "CTA_TOO_LONG",
-      "GREEN_SCREEN_BAD_PLACEMENT",
-      "SCRIPT_VISUAL_MISMATCH",
-      "OTHER",
+      "PACING_TOO_SLOW","PACING_TOO_FAST","CUTS_TOO_MECHANICAL",
+      "CAPTIONS_TOO_BUSY","PRODUCT_NOT_VISIBLE_ENOUGH",
+      "HOOK_VISUALLY_WEAK","SOUND_TOO_BUSY","CTA_TOO_LONG",
+      "GREEN_SCREEN_BAD_PLACEMENT","SCRIPT_VISUAL_MISMATCH","OTHER",
     ]),
-    severity: z.enum(["WARNING", "ERROR"]),
+    severity: z.enum(["WARNING","ERROR"]),
     startMs: z.number().int().nonnegative().optional(),
     endMs: z.number().int().positive().optional(),
     explanation: z.string().min(1),

@@ -38,6 +38,14 @@ enum IdeaStatus {
   ARCHIVED
 }
 
+enum SourceReferenceType {
+  INTERNAL_PRODUCT
+  INTERNAL_PRICING
+  OFFICIAL_DOCUMENTATION
+  PUBLIC_WEB
+  MANUAL_REFERENCE
+}
+
 enum PatternStatus {
   DRAFT
   ACTIVE
@@ -110,6 +118,7 @@ enum AssetKind {
   IMAGE
   VIDEO
   AUDIO
+  FONT
   SUBTITLE
   JSON
   OTHER
@@ -249,6 +258,13 @@ enum AttributionConfidenceType {
   DIRECT
   INFERRED
   UNKNOWN
+}
+
+enum AttributionSourceSystem {
+  UMAMI
+  VISION_APP
+  STRIPE
+  MANUAL
 }
 
 enum MetricCollectionMethod {
@@ -434,16 +450,54 @@ model Idea {
   title             String
   description       String?
   sourceType        IdeaSourceType
-  sourceReferenceId String?
+  sourceReferenceId String?        @db.Uuid
   status            IdeaStatus     @default(DRAFT)
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
-  brief             Brief?         @relation(fields: [briefId], references: [id], onDelete: SetNull)
+  brief             Brief?             @relation(fields: [briefId], references: [id], onDelete: SetNull)
+  sourceReference   SourceReference?   @relation(fields: [sourceReferenceId], references: [id], onDelete: SetNull)
   concepts          Concept[]
 
   @@index([briefId])
+  @@index([sourceReferenceId])
   @@index([status, sourceType])
+}
+
+model SourceReference {
+  id           String              @id @default(uuid(7)) @db.Uuid
+  sourceType   SourceReferenceType
+  title        String
+  url          String?
+  publisher    String?
+  observedAt   DateTime?
+  retrievedAt  DateTime?
+  contentHash  String?
+  metadataJson Json?
+  createdAt    DateTime            @default(now())
+
+  ideas        Idea[]
+
+  @@index([sourceType, createdAt])
+  @@index([url])
+}
+
+model KnowledgeSnapshot {
+  id          String           @id @default(uuid(7)) @db.Uuid
+  key         String
+  version     Int
+  contentHash String
+  status      DefinitionStatus @default(DRAFT)
+  effectiveAt DateTime
+  payloadJson Json
+  createdAt   DateTime         @default(now())
+  createdBy   String?
+
+  modelInvocations ModelInvocation[]
+
+  @@unique([key, version])
+  @@unique([key, contentHash])
+  @@index([key, status, effectiveAt])
 }
 
 model Pattern {
@@ -525,6 +579,7 @@ model ConceptVersion {
   creatorModelInvocation   ModelInvocation? @relation("ConceptCreatorInvocation", fields: [creatorModelInvocationId], references: [id], onDelete: SetNull)
   approvals                Approval[]
   experimentArms           ExperimentArm[]
+  scriptVersions           ScriptVersion[]
 
   @@unique([conceptId, version])
   @@index([briefVersionId])
@@ -545,6 +600,7 @@ model Script {
 model ScriptVersion {
   id                  String           @id @default(uuid(7)) @db.Uuid
   scriptId            String           @db.Uuid
+  conceptVersionId    String           @db.Uuid
   version             Int
   language            String           @default("fr")
   fullText            String
@@ -556,10 +612,12 @@ model ScriptVersion {
   modelInvocationId   String?          @db.Uuid
 
   script              Script           @relation(fields: [scriptId], references: [id], onDelete: Restrict)
+  conceptVersion      ConceptVersion   @relation(fields: [conceptVersionId], references: [id], onDelete: Restrict)
   modelInvocation     ModelInvocation? @relation("ScriptInvocation", fields: [modelInvocationId], references: [id], onDelete: SetNull)
   creativePlanVersions CreativePlanVersion[]
 
   @@unique([scriptId, version])
+  @@index([conceptVersionId])
 }
 
 model CreativePlan {
@@ -581,8 +639,8 @@ model CreativePlanVersion {
   scriptVersionId            String           @db.Uuid
   targetDurationMs           Int?
   primaryFormat              String
-  templateFamily             String?
-  editingProfileKey          String?
+  templateVersionId          String           @db.Uuid
+  editingProfileVersionId    String           @db.Uuid
   scenePlanJson              Json
   requiredRecordingsJson     Json?
   requiredCapturesJson       Json?
@@ -592,15 +650,19 @@ model CreativePlanVersion {
   modelInvocationId          String?          @db.Uuid
   createdAt                  DateTime         @default(now())
 
-  creativePlan               CreativePlan     @relation(fields: [creativePlanId], references: [id], onDelete: Restrict)
-  scriptVersion              ScriptVersion    @relation(fields: [scriptVersionId], references: [id], onDelete: Restrict)
-  modelInvocation            ModelInvocation? @relation("CreativePlanInvocation", fields: [modelInvocationId], references: [id], onDelete: SetNull)
+  creativePlan               CreativePlan          @relation(fields: [creativePlanId], references: [id], onDelete: Restrict)
+  scriptVersion              ScriptVersion         @relation(fields: [scriptVersionId], references: [id], onDelete: Restrict)
+  templateVersion            TemplateVersion       @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
+  editingProfileVersion      EditingProfileVersion @relation(fields: [editingProfileVersionId], references: [id], onDelete: Restrict)
+  modelInvocation            ModelInvocation?      @relation("CreativePlanInvocation", fields: [modelInvocationId], references: [id], onDelete: SetNull)
   recordingRequests          RecordingRequest[]
   captureRuns                CaptureRun[]
   editingPlanVersions        EditingPlanVersion[]
 
   @@unique([creativePlanId, version])
   @@index([scriptVersionId])
+  @@index([templateVersionId])
+  @@index([editingProfileVersionId])
 }
 
 model RecordingRequest {
@@ -786,6 +848,7 @@ model TemplateVersion {
 
   template                  Template               @relation(fields: [templateId], references: [id], onDelete: Restrict)
   assets                    TemplateVersionAsset[]
+  creativePlanVersions      CreativePlanVersion[]
   editingPlanVersions       EditingPlanVersion[]
 
   @@unique([templateId, version])
@@ -832,6 +895,7 @@ model EditingProfileVersion {
   createdAt            DateTime               @default(now())
 
   editingProfile       EditingProfile         @relation(fields: [editingProfileId], references: [id], onDelete: Restrict)
+  creativePlanVersions CreativePlanVersion[]
   editingPlanVersions  EditingPlanVersion[]
 
   @@unique([editingProfileId, version])
@@ -924,17 +988,20 @@ model RenderAttempt {
   outputAssetId     String?          @db.Uuid
   diagnosticAssetId String?          @db.Uuid
   technicalQaJson   Json?
-  creativeQaResult  CreativeQaResult?
-  creativeQaJson    Json?
-  createdAt         DateTime         @default(now())
+  creativeQaResult            CreativeQaResult?
+  creativeQaJson              Json?
+  creativeQaModelInvocationId String?          @db.Uuid
+  createdAt                   DateTime         @default(now())
 
   render            Render           @relation(fields: [renderId], references: [id], onDelete: Restrict)
-  outputAsset       Asset?           @relation("RenderOutputAsset", fields: [outputAssetId], references: [id], onDelete: SetNull)
-  diagnosticAsset   Asset?           @relation("RenderDiagnosticAsset", fields: [diagnosticAssetId], references: [id], onDelete: SetNull)
-  costEntries       CostEntry[]
+  outputAsset              Asset?           @relation("RenderOutputAsset", fields: [outputAssetId], references: [id], onDelete: SetNull)
+  diagnosticAsset          Asset?           @relation("RenderDiagnosticAsset", fields: [diagnosticAssetId], references: [id], onDelete: SetNull)
+  creativeQaModelInvocation ModelInvocation? @relation("CreativeQaInvocation", fields: [creativeQaModelInvocationId], references: [id], onDelete: SetNull)
+  costEntries              CostEntry[]
 
   @@unique([renderId, attemptNumber])
   @@index([status, createdAt])
+  @@index([creativeQaModelInvocationId])
 }
 
 model Approval {
@@ -963,7 +1030,7 @@ model PlatformAccount {
   displayName      String
   remoteAccountId  String
   status           PlatformAccountStatus @default(ACTIVE)
-  credentialsRef   String
+  credentialsRef   String?
   capabilitiesJson Json?
   createdAt        DateTime              @default(now())
   updatedAt        DateTime              @updatedAt
@@ -979,8 +1046,8 @@ model Publication {
   renderId          String            @db.Uuid
   platformAccountId String            @db.Uuid
   operationId       String                    @default(uuid(7)) @unique @db.Uuid
-  trackingCode      String                    @unique
-  deliveryMode      PublicationDeliveryMode     @default(API_AUTOMATED)
+  trackingCode      String                    @default(uuid(7)) @unique @db.Uuid
+  deliveryMode      PublicationDeliveryMode
   status            PublicationStatus           @default(DRAFT)
   scheduledAt       DateTime?
   publishedAt       DateTime?
@@ -1051,7 +1118,7 @@ model MetricSnapshotRaw {
 model MetricSnapshotNormalized {
   id                   String             @id @default(uuid(7)) @db.Uuid
   publicationId        String             @db.Uuid
-  rawSnapshotId        String?            @db.Uuid
+  rawSnapshotId        String             @db.Uuid
   collectedAt          DateTime
   views                BigInt?
   engagedViews         BigInt?
@@ -1076,7 +1143,7 @@ model MetricSnapshotNormalized {
   createdAt            DateTime           @default(now())
 
   publication          Publication        @relation(fields: [publicationId], references: [id], onDelete: Restrict)
-  rawSnapshot          MetricSnapshotRaw? @relation(fields: [rawSnapshotId], references: [id], onDelete: SetNull)
+  rawSnapshot          MetricSnapshotRaw  @relation(fields: [rawSnapshotId], references: [id], onDelete: Restrict)
 
   @@unique([rawSnapshotId, normalizerVersion])
   @@index([publicationId, collectedAt])
@@ -1089,8 +1156,8 @@ model AttributionEvent {
   eventType         AttributionEventType
   occurredAt        DateTime
   source            String?
-  sourceSystem      String
-  externalEventId   String?
+  sourceSystem      AttributionSourceSystem
+  externalEventId   String
   confidenceType    AttributionConfidenceType
   externalVisitorId String?
   userId            String?
@@ -1234,15 +1301,20 @@ model OutboxEvent {
 model ModelInvocation {
   id                   String                @id @default(uuid(7)) @db.Uuid
   purpose              String
-  provider             String
-  model                String
+  requestedProvider    String?
+  requestedModel       String?
+  reasoningLevel       String?
   promptKey            String
   promptVersion        String
+  promptContentHash    String
+  knowledgeSnapshotId  String                @db.Uuid
   inputSchemaVersion   String
   outputSchemaVersion  String
+  policyJson           Json?
   status               ModelInvocationStatus @default(RUNNING)
   inputHash            String
   outputHash           String?
+  attemptCount         Int                   @default(0)
   inputTokens          Int?
   outputTokens         Int?
   cachedInputTokens    Int?
@@ -1251,22 +1323,57 @@ model ModelInvocation {
   costCurrency         String?
   relatedEntityType    String?
   relatedEntityId      String?
+  validationJson       Json?
   startedAt            DateTime
   finishedAt           DateTime?
   failureCode          String?
   createdAt            DateTime              @default(now())
 
+  knowledgeSnapshot    KnowledgeSnapshot      @relation(fields: [knowledgeSnapshotId], references: [id], onDelete: Restrict)
+  attempts             ModelInvocationAttempt[]
   conceptVersions      ConceptVersion[]       @relation("ConceptCreatorInvocation")
   scriptVersions       ScriptVersion[]        @relation("ScriptInvocation")
   creativePlanVersions CreativePlanVersion[]  @relation("CreativePlanInvocation")
   editingPlanVersions  EditingPlanVersion[]   @relation("EditingPlanInvocation")
+  creativeQaAttempts   RenderAttempt[]        @relation("CreativeQaInvocation")
   insights             Insight[]              @relation("InsightInvocation")
   costEntries          CostEntry[]
 
   @@index([purpose, createdAt])
+  @@index([knowledgeSnapshotId, createdAt])
   @@index([relatedEntityType, relatedEntityId])
 }
 
+model ModelInvocationAttempt {
+  id                   String                @id @default(uuid(7)) @db.Uuid
+  modelInvocationId    String                @db.Uuid
+  attemptNumber        Int
+  provider             String
+  model                String
+  reasoningLevel       String?
+  status               ModelInvocationStatus @default(RUNNING)
+  requestHash          String
+  responseHash         String?
+  requestPayloadRef    String?
+  responsePayloadRef   String?
+  rawPayloadExpiresAt  DateTime?
+  inputTokens          Int?
+  outputTokens         Int?
+  cachedInputTokens    Int?
+  latencyMs            Int?
+  costAmount           Decimal?              @db.Decimal(18, 8)
+  costCurrency         String?
+  validationJson       Json?
+  failureCode          String?
+  startedAt            DateTime
+  finishedAt           DateTime?
+  createdAt            DateTime              @default(now())
+
+  modelInvocation      ModelInvocation       @relation(fields: [modelInvocationId], references: [id], onDelete: Restrict)
+
+  @@unique([modelInvocationId, attemptNumber])
+  @@index([status, createdAt])
+}
 model CostEntry {
   id                String       @id @default(uuid(7)) @db.Uuid
   category          CostCategory

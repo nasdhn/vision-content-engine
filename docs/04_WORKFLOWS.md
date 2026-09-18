@@ -1,7 +1,7 @@
 # 04 — Workflows
 
 **Status:** ACCEPTED  
-**Specification version:** spec-v0.5  
+**Specification version:** spec-v0.4  
 **Scope:** Vision Content Engine V1  
 **Depends on:** Architecture ACCEPTED, Domain Model ACCEPTED, Prisma structural review ACCEPTED
 **Accepted:** 2026-09-18
@@ -197,7 +197,8 @@ Version history, not status mutation, expresses most revisions.
 ```text
 DRAFT
 READY
-WAITING_FOR_INPUTS
+BLOCKED_ON_RECORDING
+BLOCKED_ON_CAPTURE
 READY_FOR_EDITING
 SUPERSEDED
 ARCHIVED
@@ -211,24 +212,16 @@ After CreativePlanVersion is created:
 DRAFT
  ↓ validate
 READY
- ├─ missing required human recording(s) ┐
- ├─ missing required product capture(s) ├→ WAITING_FOR_INPUTS
- ├─ missing required asset(s)           ┘
- └─ all required inputs satisfied        → READY_FOR_EDITING
+ ├─ needs human recordings → BLOCKED_ON_RECORDING
+ ├─ needs product capture  → BLOCKED_ON_CAPTURE
+ ├─ needs both             → blocked until both satisfied
+ └─ needs neither          → READY_FOR_EDITING
 ```
 
-`WAITING_FOR_INPUTS` is deliberately generic because a content item may be missing several input types at once.
-
-The exact blockers are derived from relational state:
-
-- `RecordingRequest`
-- `CaptureRun`
-- required `Asset` relations
-
-When all required inputs are satisfied:
+When both required recordings and capture outputs become accepted/ready:
 
 ```text
-WAITING_FOR_INPUTS → READY_FOR_EDITING
+BLOCKED_* → READY_FOR_EDITING
 ```
 
 If a new CreativePlanVersion materially changes requirements:
@@ -459,16 +452,24 @@ If a later version is generated:
 
 # 15. Publication lifecycle
 
-Confirmed/refined:
+Final V1 lifecycle:
 
 ```text
 DRAFT
 SCHEDULED
+READY_FOR_MANUAL_PUBLISH
 PUBLISHING
 PUBLISHING_UNKNOWN
 PUBLISHED
 FAILED
 CANCELLED
+```
+
+Every Publication has an explicit delivery mode:
+
+```text
+API_AUTOMATED
+MANUAL_HANDOFF
 ```
 
 ### Creation
@@ -481,23 +482,17 @@ Initial:
 DRAFT
 ```
 
-### Scheduling
+Before leaving DRAFT:
+
+- exact `mediaAssetId` resolved;
+- platform metadata valid;
+- delivery mode explicit;
+- platform-account/capability preconditions valid for the chosen mode.
+
+### Automated scheduling/publish
 
 ```text
-DRAFT → SCHEDULED
-```
-
-Requires:
-
-- platform account ACTIVE;
-- metadata valid;
-- scheduledAt present;
-- approved render asset present.
-
-### Publish
-
-```text
-SCHEDULED → PUBLISHING
+DRAFT → SCHEDULED → PUBLISHING
 ```
 
 Worker outcomes:
@@ -506,7 +501,7 @@ Worker outcomes:
 success → PUBLISHED
 
 known transient failure:
-  PUBLISHING → SCHEDULED or remains retryable via attempts
+  bounded attempt/retry while side effect is known safe
 
 known permanent failure:
   PUBLISHING → FAILED
@@ -515,27 +510,45 @@ ambiguous side effect:
   PUBLISHING → PUBLISHING_UNKNOWN
 ```
 
+### Manual handoff
+
+```text
+DRAFT
+→ SCHEDULED
+→ READY_FOR_MANUAL_PUBLISH
+→ PUBLISHED
+```
+
+`READY_FOR_MANUAL_PUBLISH` means the package is complete and a human must finish the native-platform action.
+
+TikTok uses this path in internal V1.
+
+No fake PublicationAttempt is created for the human native action.
+
 ### Unknown reconciliation
 
 `PUBLISHING_UNKNOWN` means:
-- do not blindly retry upload;
-- query/reconcile remote state.
+
+- a remote side effect may have happened;
+- ordinary retry is forbidden;
+- reconciliation must inspect provider identifiers/state.
 
 Possible outcomes:
 
 ```text
 remote post found → PUBLISHED
-confirmed absent  → SCHEDULED / retry eligible
-cannot determine  → manual attention
+confirmed absent  → retry becomes eligible
+cannot determine  → Needs Attention / remain UNKNOWN
 ```
 
 ### Cancellation
 
 ```text
 DRAFT/SCHEDULED → CANCELLED
+READY_FOR_MANUAL_PUBLISH → CANCELLED
 ```
 
-A published remote post is not "cancelled" in V1. Deletion/unpublishing is a separate future workflow.
+A published remote post is not "cancelled" in V1.
 
 ---
 
@@ -692,7 +705,7 @@ Policy:
 
 # 23. AI invocation lifecycle
 
-Confirmed:
+`ModelInvocation` is the logical capability call:
 
 ```text
 RUNNING
@@ -701,10 +714,30 @@ FAILED
 REJECTED_SCHEMA
 ```
 
-AI schema failure:
-- does not advance business workflow;
-- may retry under bounded policy;
-- repeated schema failure becomes workflow attention/failure.
+One logical invocation may contain multiple immutable `ModelInvocationAttempt` rows.
+
+Each attempt records:
+
+```text
+provider/model
+attempt number
+request/response hashes
+usage/cost/latency
+validation outcome
+optional bounded raw-payload refs
+```
+
+A schema-invalid provider response may create a `REJECTED_SCHEMA` attempt while the logical invocation remains RUNNING for a bounded repair attempt.
+
+The logical invocation becomes terminal only when:
+
+```text
+a validated output is accepted
+or
+the configured retry/repair/fallback budget is exhausted
+```
+
+AI validation failure never advances the business workflow.
 
 ---
 
@@ -990,7 +1023,7 @@ The workflow spec can move to ACCEPTED when:
 - [x] Render/RenderAttempt behavior accepted.
 - [x] Creative QA behavior accepted.
 - [x] Human approval gates accepted.
-- [x] Publication/PUBLISHING_UNKNOWN reconciliation accepted.
+- [x] Automated/manual Publication lifecycles and PUBLISHING_UNKNOWN reconciliation accepted.
 - [x] Analytics collection lifecycle accepted.
 - [x] Weekly analysis workflow accepted.
 - [x] WorkflowRun WAITING semantics accepted.

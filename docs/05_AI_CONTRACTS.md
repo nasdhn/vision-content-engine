@@ -194,7 +194,7 @@ AI must not reconstruct Vision facts from memory.
 
 ```ts
 type BrandKnowledgeSnapshot = {
-  version: string;
+  version: number;
   contentHash: string;
   effectiveAt: string;
 
@@ -241,22 +241,30 @@ The exact snapshot version/hash used by a ModelInvocation must remain recoverabl
 
 # 8. Knowledge persistence decision
 
-V1 may implement Knowledge Snapshots as:
-
-- versioned repository artifacts; or
-- immutable DB-backed versions.
-
-Whichever implementation is chosen, it must provide:
+Final V1 decision:
 
 ```text
-stable version
-content hash
-immutable historical retrieval
+KnowledgeSnapshot is DB-backed and immutable.
 ```
 
-A mutable settings row without historical snapshots is not acceptable.
+Canonical model:
 
-This storage choice is finalized during implementation planning, but the versioned contract is mandatory.
+```text
+KnowledgeSnapshot
+  id
+  key
+  version
+  contentHash
+  status
+  effectiveAt
+  payloadJson
+```
+
+Every production `ModelInvocation` has a required FK to the exact KnowledgeSnapshot used.
+
+The Dashboard may edit Brand/Product Knowledge only by creating and activating a **new** snapshot. Historical payloads are never mutated.
+
+The migration enforces at most one ACTIVE snapshot per `key`.
 
 ---
 
@@ -288,6 +296,10 @@ type ForbiddenClaim = {
 ```
 
 Unsourced numerical/external claims are not allowed in autonomous generation.
+
+`VerifiedClaim.sourceIds` must reference existing `SourceReference` IDs.
+
+V1 `SourceReference` supports curated internal product/pricing sources, official documentation, public web references and manual references. Automatic Researcher/crawling remains deferred.
 
 ---
 
@@ -1387,12 +1399,23 @@ No in-place mutation of an already-used prompt.
 
 # 45. Prompt storage
 
-V1 may store prompt artifacts:
+Final V1 decision:
 
-- in repository files; or
-- in DB.
+```text
+Prompt Registry = immutable repository artifacts.
+```
 
-Requirements are the same:
+Prompts are versioned files shipped with the application build. A production `ModelInvocation` stores:
+
+```text
+promptKey
+promptVersion
+promptContentHash
+```
+
+Runtime prompt editing is out of scope V1.
+
+Requirements:
 
 - immutable version;
 - exact retrieval;
@@ -1460,32 +1483,69 @@ ModelInvocation records real cost when provider usage data allows it.
 
 ---
 
-# 49. Raw request/response retention
+# 49. ModelInvocation and provider-attempt retention
 
-Exact raw AI bodies can contain internal data.
+A `ModelInvocation` is one logical capability call.
 
-V1 must explicitly configure:
+A logical call may create multiple `ModelInvocationAttempt` rows for:
 
 ```text
-retention mode
-redaction rules
-retention duration
-provider policy
+initial provider call
+schema repair
+transient retry
+allowed fallback
 ```
 
-At minimum retain:
+Every attempt stores actual:
 
 ```text
-input hash
-output hash
-prompt version/hash
-knowledge version/hash
-model/provider
-tokens/cost
+provider
+model
+reasoning level
+request hash
+response hash
+tokens
 latency
+cost
 validation outcome
-related entity IDs
+failure code
 ```
+
+The logical ModelInvocation stores aggregate usage/cost and exact:
+
+```text
+prompt key/version/hash
+KnowledgeSnapshot FK
+input/output schema versions
+input/output hashes
+policy
+```
+
+### Raw payloads
+
+Exact canonical request/response bodies may be retained temporarily in a restricted diagnostic store through:
+
+```text
+requestPayloadRef
+responsePayloadRef
+rawPayloadExpiresAt
+```
+
+They are:
+
+- optional;
+- encrypted/private;
+- never placed in normal logs;
+- subject to redaction/provider policy;
+- deleted according to retention.
+
+Indefinite exact raw-body retention is **not** required for V1.
+
+Long-term auditability relies on hashes + immutable prompt/knowledge/version lineage + attempt metadata.
+
+### Creative QA traceability
+
+Every AI Creative QA execution is a normal ModelInvocation and is linked from the corresponding RenderAttempt.
 
 ---
 
@@ -1564,6 +1624,12 @@ The AI contract specification can move to ACCEPTED when:
 - [x] deterministic dedup boundary accepted.
 - [x] cost controls accepted.
 - [x] autonomy boundaries accepted.
+- [x] DB-backed immutable KnowledgeSnapshot persistence accepted.
+- [x] curated SourceReference provenance accepted.
+- [x] repository-backed Prompt Registry accepted.
+- [x] logical ModelInvocation vs provider attempts accepted.
+- [x] bounded raw request/response retention accepted.
+- [x] Creative QA ModelInvocation linkage accepted.
 
 After acceptance:
 

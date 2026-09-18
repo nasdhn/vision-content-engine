@@ -5,6 +5,13 @@ export const MetricCollectionMethodSchema = z.enum([
   "MANUAL_ENTRY",
 ]);
 
+export const AttributionSourceSystemSchema = z.enum([
+  "UMAMI",
+  "VISION_APP",
+  "STRIPE",
+  "MANUAL",
+]);
+
 export const InsightConfidenceSchema = z.enum([
   "INSUFFICIENT_DATA",
   "WEAK_SIGNAL",
@@ -29,7 +36,7 @@ export const NormalizedMetricSnapshotSchema = z.object({
 
   watchTimeMs: z.number().int().nonnegative().nullable(),
   avgWatchDurationMs: z.number().int().nonnegative().nullable(),
-  avgWatchPercentage: z.number().nonnegative().nullable(),
+  avgWatchPercentage: z.number().min(0).max(100).nullable(),
   completionRate: z.number().min(0).max(1).nullable(),
 
   profileVisits: z.number().int().nonnegative().nullable(),
@@ -46,7 +53,7 @@ export const NormalizedMetricSnapshotSchema = z.object({
 
 export const AttributionEventInputSchema = z.object({
   externalEventId: z.string().min(1),
-  sourceSystem: z.enum(["UMAMI", "VISION_APP", "STRIPE", "MANUAL"]),
+  sourceSystem: AttributionSourceSystemSchema,
   eventType: z.enum([
     "WEBSITE_VISIT",
     "SIGNUP",

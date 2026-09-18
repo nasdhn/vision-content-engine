@@ -1,0 +1,13 @@
+{
+  "version": "spec-v0.16",
+  "order": [
+    "docs/18_FINAL_RECONCILIATION.md",
+    "docs/spec-artifacts/schema.prisma",
+    "current accepted domain-specific specs",
+    "docs/DECISIONS.md and accepted ADRs",
+    "historical 03A/03B Prisma design records"
+  ],
+  "legacyDelete": [
+    "docs/13_SECURITY_OBSERVABILITY.md"
+  ]
+}

@@ -1,5 +1,8 @@
 # 03A — Prisma Schema Draft
 
+> **Historical design record — not final implementation authority.**  
+> Final field-level authority after spec-v0.16 is `docs/spec-artifacts/schema.prisma` plus `docs/18_FINAL_RECONCILIATION.md`.
+
 **Status:** PROPOSED  
 **Specification version:** spec-v0.3 candidate  
 **Purpose:** translate the accepted Domain Model into an implementation-shaped relational schema before workflows are frozen.

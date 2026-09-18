@@ -144,7 +144,10 @@ WorkflowRun
 JobAttempt
 OutboxEvent
 AuditEvent
+KnowledgeSnapshot
+SourceReference
 ModelInvocation
+ModelInvocationAttempt
 CostEntry
 ```
 
@@ -455,6 +458,7 @@ Fields:
 ```text
 id
 scriptId
+conceptVersionId
 version
 language
 fullText
@@ -465,6 +469,8 @@ createdAt
 createdByType
 modelInvocationId?
 ```
+
+`conceptVersionId` pins the exact immutable ConceptVersion that the script realizes. `Script.conceptId` remains the stable-root grouping; application validation must ensure both refer to the same Concept root.
 
 `segmentsJson` contains semantic script segments, not final subtitle timing.
 
@@ -510,8 +516,8 @@ version
 scriptVersionId
 targetDurationMs
 primaryFormat
-templateFamily
-editingProfileKey
+templateVersionId
+editingProfileVersionId
 scenePlanJson
 requiredRecordingsJson
 requiredCapturesJson
@@ -521,6 +527,8 @@ platformConsiderationsJson
 modelInvocationId?
 createdAt
 ```
+
+`templateVersionId` and `editingProfileVersionId` are exact immutable selections made by the Creative Director. EditingPlanVersion pins them again for render reproducibility and must match the CreativePlanVersion selections.
 
 Example primary formats:
 
@@ -644,6 +652,7 @@ Kinds:
 IMAGE
 VIDEO
 AUDIO
+FONT
 SUBTITLE
 JSON
 OTHER
@@ -675,6 +684,33 @@ Constraints:
 - `objectKey` unique;
 - checksum stored when available;
 - referenced approved/published assets are not overwritten.
+
+
+## 10.2 AssetDerivation
+
+Explicit provenance for a derived media Asset.
+
+Fields:
+
+```text
+id
+sourceAssetId
+derivedAssetId
+type
+platform?
+transformationProfileKey
+transformationProfileVersion
+metadataJson?
+createdAt
+```
+
+V1 type:
+
+```text
+PLATFORM_DERIVATIVE
+```
+
+`derivedAssetId` is unique: one derived Asset has one immediate parent derivation in V1. Chained derivations are represented by repeated AssetDerivation rows.
 
 ---
 
@@ -1052,7 +1088,7 @@ platform
 displayName
 remoteAccountId
 status
-credentialsRef
+credentialsRef?
 capabilitiesJson
 createdAt
 updatedAt
@@ -1082,11 +1118,14 @@ id
 renderId
 platformAccountId
 operationId
+trackingCode
+deliveryMode
 status
 scheduledAt?
 publishedAt?
 remotePostId?
 remoteUrl?
+mediaAssetId?
 metadataJson
 createdAt
 updatedAt
@@ -1097,6 +1136,7 @@ Statuses:
 ```text
 DRAFT
 SCHEDULED
+READY_FOR_MANUAL_PUBLISH
 PUBLISHING
 PUBLISHING_UNKNOWN
 PUBLISHED
@@ -1104,7 +1144,7 @@ FAILED
 CANCELLED
 ```
 
-A Publication references the exact approved Render.
+A Publication references the approved Render and the exact `mediaAssetId` actually delivered/handed off. `deliveryMode` is explicit (`API_AUTOMATED` or `MANUAL_HANDOFF`) and has no implicit platform default.
 
 ---
 
@@ -1180,6 +1220,8 @@ publicationId
 platform
 collectedAt
 providerSchemaVersion?
+collectionMethod
+collectionOperationId
 payloadJson
 payloadHash?
 createdAt
@@ -1198,9 +1240,12 @@ Fields:
 ```text
 id
 publicationId
-rawSnapshotId?
+rawSnapshotId
 collectedAt
 views?
+engagedViews?
+reach?
+impressions?
 likes?
 comments?
 shares?
@@ -1211,12 +1256,16 @@ avgWatchPercentage?
 completionRate?
 profileVisits?
 websiteClicks?
+follows?
 otherMetricsJson?
+availabilityJson?
+comparabilityJson?
 normalizerVersion
+metricSemanticsVersion
 createdAt
 ```
 
-All unavailable values remain `NULL`.
+`rawSnapshotId` is required: every normalized snapshot derives from one immutable raw/API/manual observation. All unavailable values remain `NULL`; observed zero remains `0`. `avgWatchPercentage` uses canonical 0–100 percentage units, while `completionRate` uses a 0–1 ratio.
 
 ---
 
@@ -1234,10 +1283,14 @@ publicationId?
 campaignId?
 eventType
 occurredAt
-source
+source?
+sourceSystem
+externalEventId
 confidenceType
 externalVisitorId?
 userId?
+valueAmountMinor?
+valueCurrency?
 metadataJson?
 createdAt
 ```
@@ -1260,7 +1313,7 @@ INFERRED
 UNKNOWN
 ```
 
-V1 must not present inferred attribution as deterministic truth.
+`sourceSystem` is typed (`UMAMI`, `VISION_APP`, `STRIPE`, `MANUAL`) and `(sourceSystem, externalEventId)` is idempotent. REVENUE events require typed minor-unit amount and ISO currency. V1 must not present inferred attribution as deterministic truth.
 
 ---
 
@@ -1511,24 +1564,76 @@ Consumers use event/operation identifiers for idempotency.
 
 # 24. AI model invocation
 
-## 24.1 ModelInvocation
+## 24.1 KnowledgeSnapshot
 
-Every production AI call.
+Immutable runtime Brand/Product knowledge supplied to production AI calls.
+
+Fields:
+
+```text
+id
+key
+version
+contentHash
+status
+effectiveAt
+payloadJson
+createdAt
+createdBy?
+```
+
+For V1 the canonical key is expected to be the Vision Brand/Product knowledge profile.
+
+The initial migration must enforce at most one ACTIVE snapshot per `key` using a PostgreSQL partial unique index.
+
+---
+
+## 24.2 SourceReference
+
+Immutable provenance record usable by VerifiedClaim `sourceIds` and Ideas.
+
+Fields:
+
+```text
+id
+sourceType
+title
+url?
+publisher?
+observedAt?
+retrievedAt?
+contentHash?
+metadataJson?
+createdAt
+```
+
+Automatic external research remains deferred; SourceReference exists in V1 so manually curated/internal/official claims have auditable provenance.
+
+---
+
+## 24.3 ModelInvocation
+
+One logical AI capability call, potentially containing multiple provider attempts.
 
 Fields:
 
 ```text
 id
 purpose
-provider
-model
+requestedProvider?
+requestedModel?
+reasoningLevel?
 promptKey
 promptVersion
+promptContentHash
+knowledgeSnapshotId
 inputSchemaVersion
 outputSchemaVersion
+policyJson?
 status
 inputHash
 outputHash?
+attemptCount
 inputTokens?
 outputTokens?
 cachedInputTokens?
@@ -1537,22 +1642,56 @@ costAmount?
 costCurrency?
 relatedEntityType?
 relatedEntityId?
+validationJson?
 startedAt
 finishedAt?
 failureCode?
 createdAt
 ```
 
-Statuses:
+The token/cost fields on ModelInvocation are logical-call aggregates. Actual provider/model truth for each call is stored on ModelInvocationAttempt.
+
+---
+
+## 24.4 ModelInvocationAttempt
+
+One concrete provider request/repair/fallback attempt.
+
+Fields:
 
 ```text
-RUNNING
-SUCCEEDED
-FAILED
-REJECTED_SCHEMA
+id
+modelInvocationId
+attemptNumber
+provider
+model
+reasoningLevel?
+status
+requestHash
+responseHash?
+requestPayloadRef?
+responsePayloadRef?
+rawPayloadExpiresAt?
+inputTokens?
+outputTokens?
+cachedInputTokens?
+latencyMs?
+costAmount?
+costCurrency?
+validationJson?
+failureCode?
+startedAt
+finishedAt?
+createdAt
 ```
 
-Raw prompts/responses may be stored separately or redacted depending on security/privacy policy.
+Raw request/response bodies are optional restricted retention artifacts referenced by opaque refs, never permanent canonical truth. Long-term reproducibility retains hashes, prompt hash/version, KnowledgeSnapshot FK, schemas, policy and per-attempt provider/model metadata.
+
+Unique:
+
+```text
+(modelInvocationId, attemptNumber)
+```
 
 ---
 
@@ -1853,6 +1992,8 @@ Campaign
 Brief
 BriefVersion
 Idea
+SourceReference
+KnowledgeSnapshot
 Pattern
 PatternVersion
 Concept
@@ -1864,6 +2005,7 @@ CreativePlanVersion
 RecordingRequest
 Recording
 Asset
+AssetDerivation
 CaptureScenario
 CaptureScenarioVersion
 CaptureRun
@@ -1890,6 +2032,7 @@ WorkflowRun
 JobAttempt
 OutboxEvent
 ModelInvocation
+ModelInvocationAttempt
 CostEntry
 AuditEvent
 ```
@@ -1996,3 +2139,24 @@ The five open review questions are resolved as follows:
    - Inferred attribution must never be presented as deterministic truth.
 
 With these decisions, the Domain Model is accepted and may be translated into a Prisma schema draft.
+
+
+---
+
+# 39. Final reconciliation amendments — spec-v0.16
+
+The following later accepted specifications supersede any earlier field lists in this document:
+
+- Video Engine: exact Publication media Asset and AssetDerivation;
+- Distribution: delivery mode and manual TikTok lifecycle;
+- Analytics: trackingCode, collection provenance, metric semantics and typed attribution;
+- AI final reconciliation: KnowledgeSnapshot, SourceReference and ModelInvocationAttempt;
+- exact version lineage: ConceptVersion → ScriptVersion → CreativePlanVersion → EditingPlanVersion.
+
+The canonical relational implementation source is:
+
+```text
+docs/spec-artifacts/schema.prisma
+```
+
+Historical Prisma draft/review documents remain design history, not implementation authority.

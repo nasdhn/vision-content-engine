@@ -1,0 +1,29 @@
+{
+  "version": "spec-v0.16",
+  "resolved": [
+    "ScriptVersion exact ConceptVersion FK",
+    "CreativePlanVersion exact TemplateVersion FK",
+    "CreativePlanVersion exact EditingProfileVersion FK",
+    "DB-backed immutable KnowledgeSnapshot",
+    "V1 SourceReference provenance",
+    "repository Prompt Registry",
+    "ModelInvocation vs ModelInvocationAttempt",
+    "bounded AI request/response refs",
+    "Creative QA ModelInvocation lineage",
+    "nullable credentialsRef for manual handoff",
+    "required rawSnapshotId for normalized metrics",
+    "typed AttributionSourceSystem + required externalEventId",
+    "explicit Publication.deliveryMode",
+    "AssetKind.FONT",
+    "repository structure reconciliation"
+  ],
+  "deferredButNotDebt": [
+    "identity provider vendor",
+    "observability vendor",
+    "speech alignment vendor",
+    "host concurrency tuning",
+    "backup tooling",
+    "S3 provider",
+    "external provider minor versions/licensing recheck"
+  ]
+}

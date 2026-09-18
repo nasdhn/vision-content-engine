@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   BrandKnowledgeSnapshotSchema,
   ContentMemoryItemSchema,
+  JsonRecordSchema,
   PlatformSchema,
   PrimaryFormatSchema,
   ProposedClaimSchema,
@@ -11,7 +12,7 @@ import {
 export const CreatorInputSchema = z.object({
   briefVersion: z.object({
     id: UuidSchema,
-    payload: z.unknown(),
+    payload: JsonRecordSchema,
   }).strict(),
 
   ideas: z.array(z.object({
@@ -25,10 +26,10 @@ export const CreatorInputSchema = z.object({
     name: z.string().min(1),
     description: z.string().min(1),
     whenToUse: z.string().min(1),
-    hookStructure: z.unknown(),
-    storyStructure: z.unknown(),
-    visualStructure: z.unknown(),
-    ctaStyle: z.unknown(),
+    hookStructure: JsonRecordSchema,
+    storyStructure: JsonRecordSchema,
+    visualStructure: JsonRecordSchema,
+    ctaStyle: JsonRecordSchema,
   }).strict()),
 
   brandKnowledge: BrandKnowledgeSnapshotSchema,

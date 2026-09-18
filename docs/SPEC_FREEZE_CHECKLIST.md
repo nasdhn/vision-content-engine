@@ -86,24 +86,35 @@ Mark an item `[x]` only after explicit validation.
 ## Analytics & learning
 - [x] raw metric model
 - [x] normalized metric model
-- [ ] attribution scope
+- [x] attribution scope
 - [x] experiment model
-- [ ] confidence language
-- [ ] weekly report contract
+- [x] confidence language
+- [x] weekly report contract
 
 ## Operations
-- [ ] secrets
-- [ ] logs/tracing
-- [ ] cost tracking
-- [ ] backups
-- [ ] tests
+- [x] secrets
+- [x] logs/tracing
+- [x] cost tracking
+- [x] backups
+- [x] tests
 - [x] deployment
-- [ ] rollback
+- [x] rollback
+
+## Final reconciliation
+- [x] exact immutable content lineage
+- [x] KnowledgeSnapshot persistence
+- [x] SourceReference provenance
+- [x] ModelInvocation attempt model
+- [x] Creative QA invocation lineage
+- [x] manual/automated platform account consistency
+- [x] raw → normalized analytics lineage
+- [x] canonical repository structure
+- [x] historical document precedence
 
 ## Codex handoff
-- [ ] implementation phases
+- [x] implementation phases
 - [x] acceptance criteria for every phase
-- [ ] stop conditions
-- [ ] inspection-first rules
+- [x] stop conditions
+- [x] inspection-first rules
 - [ ] Master Prompt
 - [ ] final spec tag `spec-v1.0`

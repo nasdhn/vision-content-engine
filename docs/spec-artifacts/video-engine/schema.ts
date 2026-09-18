@@ -1,3 +1,4 @@
+import { EditingPlanSpecSchema, RenderSettingsSchema } from "../editing-intelligence/schema";
 import { z } from "zod";
 
 export const UuidSchema = z.string().uuid();
@@ -118,9 +119,9 @@ export const ResolvedRenderAssetSchema = z.object({
 export const RenderPayloadSchema = z.object({
   renderAttemptId: UuidSchema,
   template: TemplateRuntimeContractSchema,
-  editingPlan: z.unknown(),
+  editingPlan: EditingPlanSpecSchema,
   resolvedAssets: z.array(ResolvedRenderAssetSchema),
-  renderSettings: z.unknown(),
+  renderSettings: RenderSettingsSchema,
   provenance: z.object({
     editingPlanVersionId: UuidSchema,
     templateVersionId: UuidSchema,

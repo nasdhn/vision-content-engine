@@ -1,5 +1,8 @@
 # 03A — Prisma Schema Draft Review
 
+> **Historical design record — not final implementation authority.**  
+> Final field-level authority after spec-v0.16 is `docs/spec-artifacts/schema.prisma` plus `docs/18_FINAL_RECONCILIATION.md`.
+
 **Status:** ACCEPTED  
 **Specification version:** spec-v0.3  
 **Scope:** relational translation of the accepted Domain Model  

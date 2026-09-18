@@ -17,21 +17,46 @@ export const AnalystPublicationSchema = z.object({
   }).strict(),
   normalizedMetrics: z.object({
     views: z.number().nullable().optional(),
+    engagedViews: z.number().nullable().optional(),
+    reach: z.number().nullable().optional(),
+    impressions: z.number().nullable().optional(),
     likes: z.number().nullable().optional(),
     comments: z.number().nullable().optional(),
     shares: z.number().nullable().optional(),
     saves: z.number().nullable().optional(),
     watchTimeMs: z.number().nullable().optional(),
     avgWatchDurationMs: z.number().nullable().optional(),
-    avgWatchPercentage: z.number().nullable().optional(),
-    completionRate: z.number().nullable().optional(),
+    avgWatchPercentage: z.number().min(0).max(100).nullable().optional(),
+    completionRate: z.number().min(0).max(1).nullable().optional(),
     profileVisits: z.number().nullable().optional(),
     websiteClicks: z.number().nullable().optional(),
+    follows: z.number().nullable().optional(),
   }).strict(),
   comparability: z.object({
     comparableMetricKeys: z.array(z.string()),
     limitations: z.array(z.string()),
   }).strict(),
+}).strict();
+
+const AnalystExperimentSchema = z.object({
+  experimentId: UuidSchema,
+  hypothesis: z.string().min(1),
+  primaryMetric: z.string().min(1),
+  status: z.enum(["DRAFT","RUNNING","COMPLETED","CANCELLED"]),
+  arms: z.array(z.object({
+    label: z.string().min(1),
+    publicationIds: z.array(UuidSchema),
+    variables: z.record(z.string(), z.unknown()),
+  }).strict()),
+}).strict();
+
+const PriorInsightSchema = z.object({
+  insightId: UuidSchema,
+  statement: z.string().min(1),
+  confidence: z.enum([
+    "INSUFFICIENT_DATA","WEAK_SIGNAL","INTERESTING_SIGNAL","FAIRLY_SOLID",
+  ]),
+  limitations: z.array(z.string()),
 }).strict();
 
 export const AnalystInputSchema = z.object({
@@ -40,13 +65,15 @@ export const AnalystInputSchema = z.object({
     to: z.string().datetime(),
   }).strict(),
   publications: z.array(AnalystPublicationSchema),
-  experiments: z.array(z.unknown()),
-  priorInsights: z.array(z.unknown()),
+  experiments: z.array(AnalystExperimentSchema),
+  priorInsights: z.array(PriorInsightSchema),
   attributionSignals: z.object({
     websiteVisits: z.number().nullable().optional(),
     signups: z.number().nullable().optional(),
     activations: z.number().nullable().optional(),
     customers: z.number().nullable().optional(),
+    revenueAmountMinor: z.number().nullable().optional(),
+    revenueCurrency: z.string().length(3).nullable().optional(),
     directPublicationLinks: z.number().nullable().optional(),
     inferredSignals: z.number().nullable().optional(),
   }).strict(),
@@ -60,10 +87,7 @@ export const AnalystOutputSchema = z.object({
   insights: z.array(z.object({
     statement: z.string().min(1),
     confidence: z.enum([
-      "INSUFFICIENT_DATA",
-      "WEAK_SIGNAL",
-      "INTERESTING_SIGNAL",
-      "FAIRLY_SOLID",
+      "INSUFFICIENT_DATA","WEAK_SIGNAL","INTERESTING_SIGNAL","FAIRLY_SOLID",
     ]),
     evidencePublicationIds: z.array(UuidSchema),
     limitations: z.array(z.string()),
@@ -82,6 +106,7 @@ export const AnalystOutputSchema = z.object({
       change: z.string().min(1),
       keepConstant: z.array(z.string()),
       primaryMetric: z.string().min(1),
+      measurementWindow: z.string().min(1),
     }).strict(),
   }).strict()),
 }).strict();

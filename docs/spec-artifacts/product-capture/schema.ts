@@ -111,24 +111,26 @@ const WaitForStep = z.object({
   timeoutMs: z.number().int().positive().optional(),
 }).strict();
 
+export const CaptureAssertionSchema = z.union([
+  z.object({
+    kind: z.literal("VISIBLE"),
+    locator: CaptureLocatorSchema,
+  }).strict(),
+  z.object({
+    kind: z.literal("TEXT_CONTAINS"),
+    locator: CaptureLocatorSchema,
+    valueFromInput: z.string().optional(),
+    literal: z.string().optional(),
+  }).strict(),
+  z.object({
+    kind: z.literal("URL_MATCHES"),
+    pattern: z.string().min(1),
+  }).strict(),
+]);
+
 const AssertStep = z.object({
   type: z.literal("ASSERT"),
-  assertion: z.union([
-    z.object({
-      kind: z.literal("VISIBLE"),
-      locator: CaptureLocatorSchema,
-    }).strict(),
-    z.object({
-      kind: z.literal("TEXT_CONTAINS"),
-      locator: CaptureLocatorSchema,
-      valueFromInput: z.string().optional(),
-      literal: z.string().optional(),
-    }).strict(),
-    z.object({
-      kind: z.literal("URL_MATCHES"),
-      pattern: z.string().min(1),
-    }).strict(),
-  ]),
+  assertion: CaptureAssertionSchema,
 }).strict();
 
 const ScreenshotStep = z.object({
@@ -205,11 +207,11 @@ export const CaptureScenarioVersionSpecSchema = z.object({
     authProfileKey: z.string().min(1),
   }).strict(),
   browser: BrowserProfileSchema,
-  inputSchema: z.unknown(),
+  inputSchema: z.record(z.string(), z.unknown()),
   fixturePolicy: CaptureFixturePolicySchema,
   steps: z.array(CaptureStepSchema).min(1),
   outputs: z.array(CaptureOutputSpecSchema),
-  assertions: z.array(z.unknown()),
+  assertions: z.array(CaptureAssertionSchema),
   safety: CaptureSafetyPolicySchema,
   timeouts: CaptureTimeoutPolicySchema,
 }).strict();

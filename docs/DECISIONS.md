@@ -488,3 +488,51 @@ Toute modification significative doit ajouter une entrée datée.
 
 ## D-162 — V1 acceptance report
 **Décision :** premier go-live conserve commit/build, migrations, test matrix, provider capabilities, backup/restore, flags et limitations connues.
+
+## D-163 — ScriptVersion pins exact ConceptVersion
+**Décision :** `ScriptVersion.conceptVersionId` est un FK obligatoire; le Script root reste le groupement stable.
+
+## D-164 — CreativePlanVersion pins exact Template/Profile versions
+**Décision :** `templateVersionId` et `editingProfileVersionId` sont relationnels et obligatoires; les anciens string hints ne sont plus source de vérité.
+
+## D-165 — KnowledgeSnapshot DB-backed
+**Décision :** connaissance Vision runtime stockée en snapshots DB immuables; ModelInvocation a un FK obligatoire vers le snapshot exact.
+
+## D-166 — SourceReference V1 sans Researcher autonome
+**Décision :** provenance claims/ideas first-class; crawler/research automatique reste différé.
+
+## D-167 — Prompt Registry repository-backed
+**Décision :** prompts immuables versionnés dans le repo; runtime editing hors scope V1.
+
+## D-168 — ModelInvocation logique + ModelInvocationAttempt
+**Décision :** retries/repairs/fallbacks sont des attempts distincts avec provider/model/usage exacts.
+
+## D-169 — Raw AI payload retention bornée
+**Décision :** refs opaques temporaires possibles; hashes/version lineage long terme, pas de raw bodies permanents requis.
+
+## D-170 — Creative QA invocation relationnelle
+**Décision :** RenderAttempt référence le ModelInvocation exact de Creative QA.
+
+## D-171 — CredentialsRef nullable
+**Décision :** PlatformAccount sans API credentials est valide pour un adapter MANUAL_HANDOFF.
+
+## D-172 — Normalized metrics require raw evidence
+**Décision :** `MetricSnapshotNormalized.rawSnapshotId` obligatoire.
+
+## D-173 — Attribution source/idempotence typés
+**Décision :** AttributionSourceSystem enum + externalEventId obligatoire; revenue amount/currency typés.
+
+## D-174 — Publication delivery mode explicit
+**Décision :** aucun default DB pour deliveryMode; trackingCode UUIDv7 auto-généré.
+
+## D-175 — AssetKind FONT
+**Décision :** font asset first-class pour Template/renderer.
+
+## D-176 — Repository conventions reconciled
+**Décision :** structure `apps/* workers` + packages de `02_SYSTEM_ARCHITECTURE` est canonique.
+
+## D-177 — Historical Prisma docs are non-authoritative
+**Décision :** 03A/03B restent historique; schema.prisma + final reconciliation priment.
+
+## D-178 — Legacy security spec removed
+**Décision :** `13_SECURITY_OBSERVABILITY.md` supprimé au profit de `13_SECURITY_OBSERVABILITY_OPERATIONS.md`.
