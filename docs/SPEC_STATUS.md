@@ -3,10 +3,11 @@
 ## Current stage
 Product direction validated.  
 System architecture accepted.  
-Domain model specification is the next active design task.
+Domain model accepted.  
+Prisma schema draft is the next active validation task.
 
 ## Version
-Draft: `spec-v0.2`
+Draft: `spec-v0.3`
 
 ## Validated product decisions
 - internal tool for Vision first
@@ -41,13 +42,34 @@ Draft: `spec-v0.2`
 - initial Docker Compose deployment on one dedicated Content Engine host
 - scale-out path for heavy workers without domain rewrite
 
+## Accepted domain model
+- stable root entities + immutable versions
+- first-class Idea entity
+- Pattern/PatternVersion
+- Script/ScriptVersion
+- CreativePlan/CreativePlanVersion
+- EditingPlan/EditingPlanVersion
+- multiple recording takes
+- explicit Asset provenance
+- CaptureScenario/CaptureRun
+- Template and EditingProfile versioning
+- Render/RenderAttempt
+- Approval
+- Publication/PublicationAttempt
+- raw/normalized metric snapshots
+- AttributionEvent with confidence
+- Experiment/Insight/Recommendation
+- WorkflowRun/JobAttempt
+- OutboxEvent
+- ModelInvocation
+- CostEntry
+- AuditEvent
+
 ## Still to freeze before Codex implementation
-- exact domain model
-- exact relationships/versioning rules
 - Prisma schema draft
 - exact workflow state transitions
 - exact AI JSON contracts
-- exact Pattern schema
+- exact Pattern schema details
 - exact EditingPlan schema
 - exact template/render contracts
 - exact Playwright capture contract
@@ -61,4 +83,4 @@ Draft: `spec-v0.2`
 Codex implementation is **NOT authorized** until all required items are validated and this document reaches `spec-v1.0`.
 
 ## Next specification
-`docs/03_DOMAIN_MODEL.md`
+`docs/03A_PRISMA_SCHEMA_DRAFT.md`

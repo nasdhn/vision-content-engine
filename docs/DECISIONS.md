@@ -60,3 +60,27 @@ Toute modification significative doit ajouter une entrée datée.
 
 ## D-019 — Baseline runtime
 **Décision :** V1 cible Node.js 24 LTS, TypeScript strict, React/Vite, NestJS, Prisma/PostgreSQL, Redis/BullMQ, Zod, Playwright, Remotion, FFmpeg/ffprobe, stockage S3-compatible, pnpm workspaces et Docker Compose initialement.
+
+## D-020 — Entités racines + versions immuables
+**Décision :** les objets métier évolutifs utilisent une identité stable et des versions immuables (Script/ScriptVersion, Pattern/PatternVersion, etc.).
+
+## D-021 — Idea est une entité de première classe
+**Décision :** `Idea` reste distinct de `Brief` et `Concept` afin de permettre plusieurs concepts par idée et de préserver la provenance.
+
+## D-022 — Plusieurs prises par RecordingRequest
+**Décision :** un `RecordingRequest` peut recevoir plusieurs `Recording`/takes.
+
+## D-023 — Scheduling porté par Publication
+**Décision :** pas d'agrégat `Schedule` séparé en V1 ; `Publication.scheduledAt` est canonique.
+
+## D-024 — Insights et Recommendations persistants
+**Décision :** `Insight` et `Recommendation` sont des entités persistantes afin de constituer une mémoire d'apprentissage durable.
+
+## D-025 — Attribution prudente en V1
+**Décision :** `AttributionEvent` existe dès la V1 avec une confiance explicite `DIRECT / INFERRED / UNKNOWN`.
+
+## D-026 — Raw metrics séparées des normalized metrics
+**Décision :** les snapshots bruts des plateformes sont immuables et séparés des métriques normalisées.
+
+## D-027 — Coûts et audit comme données métier
+**Décision :** `CostEntry`, `ModelInvocation` et `AuditEvent` sont persistés et non laissés uniquement dans les logs.

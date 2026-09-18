@@ -21,12 +21,12 @@ Mark an item `[x]` only after explicit validation.
 - [x] Failure/retry strategy
 
 ## Domain
-- [ ] Entity list
-- [ ] Relationships
-- [ ] Versioning rules
+- [x] Entity list
+- [x] Relationships
+- [x] Versioning rules
 - [ ] Prisma schema draft
-- [ ] audit model
-- [ ] cost model
+- [x] audit model
+- [x] cost model
 
 ## Workflows
 - [ ] Content workflow
