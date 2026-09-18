@@ -62,10 +62,10 @@ Toute modification significative doit ajouter une entrée datée.
 **Décision :** V1 cible Node.js 24 LTS, TypeScript strict, React/Vite, NestJS, Prisma/PostgreSQL, Redis/BullMQ, Zod, Playwright, Remotion, FFmpeg/ffprobe, stockage S3-compatible, pnpm workspaces et Docker Compose initialement.
 
 ## D-020 — Entités racines + versions immuables
-**Décision :** les objets métier évolutifs utilisent une identité stable et des versions immuables (Script/ScriptVersion, Pattern/PatternVersion, etc.).
+**Décision :** les objets métier évolutifs utilisent une identité stable et des versions immuables.
 
 ## D-021 — Idea est une entité de première classe
-**Décision :** `Idea` reste distinct de `Brief` et `Concept` afin de permettre plusieurs concepts par idée et de préserver la provenance.
+**Décision :** `Idea` reste distinct de `Brief` et `Concept`.
 
 ## D-022 — Plusieurs prises par RecordingRequest
 **Décision :** un `RecordingRequest` peut recevoir plusieurs `Recording`/takes.
@@ -74,7 +74,7 @@ Toute modification significative doit ajouter une entrée datée.
 **Décision :** pas d'agrégat `Schedule` séparé en V1 ; `Publication.scheduledAt` est canonique.
 
 ## D-024 — Insights et Recommendations persistants
-**Décision :** `Insight` et `Recommendation` sont des entités persistantes afin de constituer une mémoire d'apprentissage durable.
+**Décision :** `Insight` et `Recommendation` sont des entités persistantes.
 
 ## D-025 — Attribution prudente en V1
 **Décision :** `AttributionEvent` existe dès la V1 avec une confiance explicite `DIRECT / INFERRED / UNKNOWN`.
@@ -83,4 +83,25 @@ Toute modification significative doit ajouter une entrée datée.
 **Décision :** les snapshots bruts des plateformes sont immuables et séparés des métriques normalisées.
 
 ## D-027 — Coûts et audit comme données métier
-**Décision :** `CostEntry`, `ModelInvocation` et `AuditEvent` sont persistés et non laissés uniquement dans les logs.
+**Décision :** `CostEntry`, `ModelInvocation` et `AuditEvent` sont persistés.
+
+## D-028 — Prisma 7 pour la V1
+**Décision :** Prisma ORM 7 est explicitement retenu pour la V1 ; pas de dépendance à une version RC/preview.
+
+## D-029 — UUID v7 comme ID canonique
+**Décision :** les entités canoniques utilisent des UUID v7 cohérents.
+
+## D-030 — Lineage média explicite
+**Décision :** ajouter des relations explicites `CaptureRunAsset`, `RenderInputAsset` et `TemplateVersionAsset` pour garantir la reproductibilité.
+
+## D-031 — Approval relationnel explicite
+**Décision :** une table `Approval` unique avec FKs explicites vers les sujets V1 et contrainte DB garantissant un seul sujet valide.
+
+## D-032 — Snapshot Brief conservé
+**Décision :** conserver les champs éditables de `Brief` et un `BriefVersion` immuable pour la reproductibilité.
+
+## D-033 — Prisma Migrate autoritaire
+**Décision :** Prisma Migrate est le workflow de schéma ; `db push` n'est pas la source de vérité de production.
+
+## D-034 — Enums de workflow différés
+**Décision :** les enums de lifecycle non encore figés appartiennent à `04_WORKFLOWS.md`, pas au draft Prisma.
