@@ -1,0 +1,143 @@
+{
+  "identity": {
+    "patternVersionId": "018f0000-0000-7000-8000-000000000007",
+    "patternKey": "LIVE_PRODUCT_PROOF",
+    "name": "Live Product Proof",
+    "version": 1,
+    "category": "DEMONSTRATION",
+    "tags": [
+      "live-proof",
+      "product-demo",
+      "vision"
+    ]
+  },
+  "thesis": {
+    "description": "Use actual Vision behavior as the primary evidence and narrative anchor.",
+    "psychologicalMechanism": "Direct demonstration reduces the distance between claim and proof.",
+    "whyItMayWork": "It is strongest when the product action/result is understandable with minimal narration.",
+    "whenToUse": [
+      "A controlled Vision scenario reliably demonstrates the value.",
+      "Capture quality is high."
+    ],
+    "whenNotToUse": [
+      "The product path is slow, unstable or visually unreadable.",
+      "The scenario requires risky production interaction."
+    ]
+  },
+  "structure": {
+    "hook": {
+      "objective": "Start inside the product proof.",
+      "shape": "LIVE_PROOF",
+      "formula": "Start with Vision actively producing or revealing something useful, then explain only what is needed.",
+      "timingGuidance": {
+        "targetFirstBeatMs": 500,
+        "maxSetupMs": 1800
+      },
+      "originalExamples": [
+        "Je lui demande ça, et regarde ce qu’il me sort."
+      ]
+    },
+    "story": [
+      {
+        "order": 0,
+        "role": "HOOK",
+        "objective": "Start inside the product proof.",
+        "optional": false,
+        "durationWeight": 1.0
+      },
+      {
+        "order": 1,
+        "role": "DEMO",
+        "objective": "Let the product behavior carry the story.",
+        "optional": false,
+        "durationWeight": 1.6
+      },
+      {
+        "order": 2,
+        "role": "EXPLANATION",
+        "objective": "Clarify the important mechanism.",
+        "optional": true,
+        "durationWeight": 0.7
+      },
+      {
+        "order": 3,
+        "role": "PROOF",
+        "objective": "Land on the useful output.",
+        "optional": false,
+        "durationWeight": 1.0
+      },
+      {
+        "order": 4,
+        "role": "CTA",
+        "objective": "Invite discovery.",
+        "optional": true,
+        "durationWeight": 0.4
+      }
+    ],
+    "visual": {
+      "openingVisualIntent": "Vision UI or result visible immediately.",
+      "recommendedVisualModes": [
+        "PRODUCT_SCREEN",
+        "GREEN_SCREEN_PRESENTER"
+      ],
+      "proofMoment": "Actual output from the controlled product scenario.",
+      "recommendedRevealWindow": {
+        "minMs": 0,
+        "maxMs": 1000
+      },
+      "visualFailureModes": [
+        "Slow loading.",
+        "Unreadable UI.",
+        "Demo feels staged or misleading."
+      ]
+    },
+    "cta": {
+      "preferredTypes": [
+        "TRY_PRODUCT",
+        "SOFT_DISCOVERY"
+      ],
+      "tone": "Product-led.",
+      "placementGuidance": "END",
+      "avoid": [
+        "Pretending mocked data is live production",
+        "Hiding failed steps"
+      ]
+    }
+  },
+  "adaptation": {
+    "suitableVisionUseCases": [
+      "Product demos",
+      "Feature proof",
+      "Natural-language prospect search"
+    ],
+    "suitableAudiences": [
+      "Prospective Vision users",
+      "Sales teams",
+      "Agencies"
+    ],
+    "compatiblePrimaryFormats": [
+      "PRODUCT_DEMO"
+    ],
+    "compatibleEditingProfileKeys": [
+      "FAST_PRODUCT_DEMO"
+    ]
+  },
+  "constraints": {
+    "forbiddenMoves": [
+      "Using fake output as real product proof."
+    ],
+    "commonFailureModes": [
+      "Product too small on screen.",
+      "Too much presenter, not enough proof."
+    ],
+    "requiresProductProof": true,
+    "requiresHumanPresence": false,
+    "requiresExternalClaimEvidence": false
+  },
+  "provenance": {
+    "sourceType": "INTERNAL_SYNTHESIS",
+    "sourceReferenceIds": [],
+    "createdBy": "HUMAN",
+    "abstractionNotes": "Initial Vision V1 seed defined during product specification."
+  }
+}

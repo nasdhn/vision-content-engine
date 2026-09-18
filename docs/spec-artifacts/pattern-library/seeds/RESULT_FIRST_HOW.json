@@ -1,0 +1,146 @@
+{
+  "identity": {
+    "patternVersionId": "018f0000-0000-7000-8000-000000000005",
+    "patternKey": "RESULT_FIRST_HOW",
+    "name": "Result First → How",
+    "version": 1,
+    "category": "PROOF",
+    "tags": [
+      "result-first",
+      "proof",
+      "workflow"
+    ]
+  },
+  "thesis": {
+    "description": "Show a useful output first, then explain how it was produced.",
+    "psychologicalMechanism": "Immediate evidence creates curiosity about the mechanism and reduces abstract setup.",
+    "whyItMayWork": "It is strong when the output is visually legible and useful without lengthy context.",
+    "whenToUse": [
+      "A compelling output already exists.",
+      "The result can be understood quickly."
+    ],
+    "whenNotToUse": [
+      "The result needs too much context.",
+      "The output is weak or ambiguous."
+    ]
+  },
+  "structure": {
+    "hook": {
+      "objective": "Show the result immediately.",
+      "shape": "RESULT_FIRST",
+      "formula": "Open on the finished result, then answer the implied question: how did this happen?",
+      "timingGuidance": {
+        "targetFirstBeatMs": 500,
+        "maxSetupMs": 1800
+      },
+      "originalExamples": [
+        "Voilà la liste que j’ai obtenue en partant d’une seule phrase."
+      ]
+    },
+    "story": [
+      {
+        "order": 0,
+        "role": "HOOK",
+        "objective": "Show the result immediately.",
+        "optional": false,
+        "durationWeight": 1.0
+      },
+      {
+        "order": 1,
+        "role": "CONTEXT",
+        "objective": "Explain what the viewer is looking at.",
+        "optional": false,
+        "durationWeight": 0.6
+      },
+      {
+        "order": 2,
+        "role": "DEMO",
+        "objective": "Show the short path that produced it.",
+        "optional": false,
+        "durationWeight": 1.4
+      },
+      {
+        "order": 3,
+        "role": "EXPLANATION",
+        "objective": "Clarify the mechanism.",
+        "optional": true,
+        "durationWeight": 0.7
+      },
+      {
+        "order": 4,
+        "role": "CTA",
+        "objective": "Offer product discovery.",
+        "optional": true,
+        "durationWeight": 0.4
+      }
+    ],
+    "visual": {
+      "openingVisualIntent": "The final result should be readable in the first beat.",
+      "recommendedVisualModes": [
+        "PRODUCT_SCREEN",
+        "GREEN_SCREEN_PRESENTER",
+        "TEXT_LED"
+      ],
+      "proofMoment": "The result itself is the proof.",
+      "recommendedRevealWindow": {
+        "minMs": 0,
+        "maxMs": 1200
+      },
+      "visualFailureModes": [
+        "Unreadable result.",
+        "Too much explanation before the how.",
+        "Result selected only because it looks impressive."
+      ]
+    },
+    "cta": {
+      "preferredTypes": [
+        "TRY_PRODUCT",
+        "SOFT_DISCOVERY"
+      ],
+      "tone": "Proof-led and concise.",
+      "placementGuidance": "END",
+      "avoid": [
+        "Misrepresenting output quality",
+        "Hiding limitations"
+      ]
+    }
+  },
+  "adaptation": {
+    "suitableVisionUseCases": [
+      "Prospect search outputs",
+      "Qualification results",
+      "Product workflow"
+    ],
+    "suitableAudiences": [
+      "Sales teams",
+      "Agencies",
+      "Freelancers"
+    ],
+    "compatiblePrimaryFormats": [
+      "PRODUCT_DEMO",
+      "MANUAL_TO_VISION"
+    ],
+    "compatibleEditingProfileKeys": [
+      "FAST_PRODUCT_DEMO",
+      "HIGH_ENERGY_SHORT"
+    ]
+  },
+  "constraints": {
+    "forbiddenMoves": [
+      "Showing a result not actually produced by Vision."
+    ],
+    "commonFailureModes": [
+      "Tiny UI.",
+      "Result needs explanation before it makes sense."
+    ],
+    "requiresProductProof": true,
+    "requiresHumanPresence": false,
+    "requiresExternalClaimEvidence": false
+  },
+  "provenance": {
+    "sourceType": "INTERNAL_SYNTHESIS",
+    "sourceReferenceIds": [],
+    "createdBy": "HUMAN",
+    "abstractionNotes": "Initial Vision V1 seed defined during product specification."
+  }
+}

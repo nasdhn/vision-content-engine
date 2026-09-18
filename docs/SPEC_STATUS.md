@@ -7,10 +7,11 @@ Domain model accepted.
 Prisma specification accepted.  
 Workflows accepted.  
 AI contracts accepted.  
-Media/Pattern specification is now the active design task.
+Pattern Library accepted.  
+Editing Intelligence is now the active design task.
 
 ## Version
-Draft: `spec-v0.6`
+Draft: `spec-v0.7`
 
 ## Foundation status
 - Product: ACCEPTED
@@ -19,29 +20,30 @@ Draft: `spec-v0.6`
 - Prisma: ACCEPTED
 - Workflows: ACCEPTED
 - AI Contracts: ACCEPTED
+- Pattern Library: ACCEPTED
 
-## Accepted AI contract principles
-- five logical capabilities, not autonomous agents
-- centralized AIProviderGateway
-- strict versioned request/output contracts
-- versioned Knowledge Snapshot
-- prompt key/version/hash provenance
-- strict schema validation
-- deterministic reference validation
-- business-rule validation
-- claim validation
-- evidence-bound Creative QA
-- conservative Analyst confidence/comparability
-- deterministic deduplication boundary
-- bounded retries/timeouts/token/cost policies
-- Zod-shaped specification artifacts under `docs/spec-artifacts/ai-contracts/`
+## Accepted Pattern Library principles
+- Pattern distinct from Angle / Template / EditingProfile
+- stable Pattern root + immutable PatternVersion
+- stable primary category
+- performance evidence separated from PatternVersion
+- no universal pattern score
+- deterministic bounded candidate selection before Creator
+- explicit eligibility rules
+- configurable exploration/exploitation
+- fatigue evaluated from content combinations
+- deliberate variants tracked explicitly
+- initial seed limited to 8 distinct mechanisms
+- semantic-overlap gate before activating new patterns
+- Researcher remains deferred
 
-## Important
-The Zod files are specification artifacts only.
-They are not application code until implementation is authorized.
+## Canonical Pattern spec artifacts
+- `docs/spec-artifacts/pattern-library/schema.ts`
+- `docs/spec-artifacts/pattern-library/seeds/*.json`
+
+These are specification artifacts only until implementation authorization.
 
 ## Still to freeze before Codex implementation
-- Pattern Library schema and initial pattern seed set
 - Template contract
 - EditingProfile contract
 - EditingPlan/media details
@@ -58,4 +60,4 @@ They are not application code until implementation is authorized.
 Codex implementation is **NOT authorized** until all required items are validated and this document reaches `spec-v1.0`.
 
 ## Next specification
-`docs/06_PATTERN_LIBRARY_SPEC.md`
+`docs/07_EDITING_INTELLIGENCE.md`

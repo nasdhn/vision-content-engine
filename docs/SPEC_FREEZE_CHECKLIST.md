@@ -48,7 +48,7 @@ Mark an item `[x]` only after explicit validation.
 - [x] prompt/version registry
 
 ## Media
-- [ ] Pattern schema
+- [x] Pattern schema
 - [ ] Template schema
 - [ ] EditingProfile schema
 - [ ] EditingPlan schema

@@ -167,3 +167,27 @@ Toute modification significative doit ajouter une entrée datée.
 
 ## D-055 — Coûts IA bornés
 **Décision :** chaque capability a timeout, retries, token/cost ceilings et fallback sous même contrat.
+
+## D-056 — Pattern distinct de Angle / Template / EditingProfile
+**Décision :** Pattern = mécanisme marketing/narratif ; Angle = idée spécifique ; Template = rendu visuel ; EditingProfile = comportement de montage.
+
+## D-057 — Catégorie primaire stable
+**Décision :** la catégorie primaire appartient au Pattern root et reste stable. Un changement de catégorie/mécanisme majeur crée un nouveau Pattern.
+
+## D-058 — PatternVersion sans performance mutable
+**Décision :** aucune performance contextuelle n'est stockée comme vérité dans PatternVersion. Les preuves/performance sont dérivées séparément dans le temps.
+
+## D-059 — Pas de score global de Pattern
+**Décision :** aucune note universelle type 92/100. L'évidence reste contextualisée par audience, plateforme, format, fenêtre et échantillon.
+
+## D-060 — Pattern Selector déterministe
+**Décision :** le Creator ne voit qu'un ensemble borné de PatternVersion éligibles préparé avant l'appel IA.
+
+## D-061 — Exploration/exploitation configurable
+**Décision :** mode BALANCED par défaut ; répartition exploration/exploitation configurable, non codée comme vérité métier permanente.
+
+## D-062 — Fatigue par combinaison, pas par Pattern seul
+**Décision :** répétition évaluée via Pattern + audience + topic + angle + hook + proof + format + plateforme.
+
+## D-063 — Seed V1 limité à 8 Patterns
+**Décision :** démarrage avec huit mécanismes distincts ; variantes proches restent des angles jusqu'à preuve d'un mécanisme réellement différent.

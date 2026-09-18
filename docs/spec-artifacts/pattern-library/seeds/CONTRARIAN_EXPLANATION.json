@@ -1,0 +1,148 @@
+{
+  "identity": {
+    "patternVersionId": "018f0000-0000-7000-8000-000000000004",
+    "patternKey": "CONTRARIAN_EXPLANATION",
+    "name": "Contrarian → Explanation",
+    "version": 1,
+    "category": "CONTRARIAN",
+    "tags": [
+      "contrarian",
+      "opinion",
+      "education"
+    ]
+  },
+  "thesis": {
+    "description": "Challenge a familiar assumption, qualify it, then explain a defensible alternative.",
+    "psychologicalMechanism": "A credible disagreement creates curiosity when the viewer expects a common answer.",
+    "whyItMayWork": "It can differentiate Vision/founder thinking without relying on artificial controversy.",
+    "whenToUse": [
+      "There is a real defensible viewpoint.",
+      "The nuance can be explained within short-form constraints."
+    ],
+    "whenNotToUse": [
+      "The statement is exaggerated for engagement.",
+      "The claim requires evidence that is unavailable."
+    ]
+  },
+  "structure": {
+    "hook": {
+      "objective": "State the counter-position.",
+      "shape": "CONTRARIAN_CLAIM",
+      "formula": "State a defensible disagreement, immediately qualify the context, then explain and demonstrate.",
+      "timingGuidance": {
+        "targetFirstBeatMs": 500,
+        "maxSetupMs": 1800
+      },
+      "originalExamples": [
+        "Le problème, ce n’est pas de ne pas avoir assez de prospects. C’est souvent d’en chercher trop mal ciblés."
+      ]
+    },
+    "story": [
+      {
+        "order": 0,
+        "role": "HOOK",
+        "objective": "State the counter-position.",
+        "optional": false,
+        "durationWeight": 1.0
+      },
+      {
+        "order": 1,
+        "role": "CONTEXT",
+        "objective": "Qualify when the statement applies.",
+        "optional": false,
+        "durationWeight": 0.8
+      },
+      {
+        "order": 2,
+        "role": "EXPLANATION",
+        "objective": "Explain the reasoning.",
+        "optional": false,
+        "durationWeight": 1.3
+      },
+      {
+        "order": 3,
+        "role": "PROOF",
+        "objective": "Use an example or product proof.",
+        "optional": true,
+        "durationWeight": 1.0
+      },
+      {
+        "order": 4,
+        "role": "CTA",
+        "objective": "Close with a thoughtful next step.",
+        "optional": true,
+        "durationWeight": 0.4
+      }
+    ],
+    "visual": {
+      "openingVisualIntent": "Pair the contrarian statement with a clear presenter or text-led opening.",
+      "recommendedVisualModes": [
+        "GREEN_SCREEN_PRESENTER",
+        "TEXT_LED",
+        "PRODUCT_SCREEN"
+      ],
+      "proofMoment": "An example that makes the counter-position credible.",
+      "recommendedRevealWindow": {
+        "minMs": 2500,
+        "maxMs": 7000
+      },
+      "visualFailureModes": [
+        "Rage-bait opening.",
+        "No qualification.",
+        "Claim stronger than evidence."
+      ]
+    },
+    "cta": {
+      "preferredTypes": [
+        "COMMENT",
+        "FOLLOW",
+        "SOFT_DISCOVERY"
+      ],
+      "tone": "Confident but measured.",
+      "placementGuidance": "CONTEXT_DEPENDENT",
+      "avoid": [
+        "Manufactured controversy",
+        "Insults",
+        "False certainty"
+      ]
+    }
+  },
+  "adaptation": {
+    "suitableVisionUseCases": [
+      "Prospecting strategy",
+      "Lead quality",
+      "AI workflow opinions"
+    ],
+    "suitableAudiences": [
+      "Founders",
+      "Freelancers",
+      "Sales professionals"
+    ],
+    "compatiblePrimaryFormats": [
+      "GREEN_SCREEN_EXPLAINER",
+      "FOUNDER_STORY"
+    ],
+    "compatibleEditingProfileKeys": [
+      "HIGH_ENERGY_SHORT",
+      "CALM_EXPERT_SHORT"
+    ]
+  },
+  "constraints": {
+    "forbiddenMoves": [
+      "Making controversial factual claims without evidence."
+    ],
+    "commonFailureModes": [
+      "Hook is clickbait.",
+      "Explanation is weaker than claim."
+    ],
+    "requiresProductProof": false,
+    "requiresHumanPresence": true,
+    "requiresExternalClaimEvidence": false
+  },
+  "provenance": {
+    "sourceType": "INTERNAL_SYNTHESIS",
+    "sourceReferenceIds": [],
+    "createdBy": "HUMAN",
+    "abstractionNotes": "Initial Vision V1 seed defined during product specification."
+  }
+}
