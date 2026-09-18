@@ -1,0 +1,25 @@
+{
+  "adapterKey": "YOUTUBE_SHORTS_V1",
+  "platform": "YOUTUBE",
+  "deliveryMode": "API_AUTOMATED",
+  "authStrategy": "OAUTH2",
+  "uploadMethod": "videos.insert",
+  "uploadProtocol": "RESUMABLE",
+  "canonicalMediaIdentity": "Publication.mediaAssetId",
+  "publicCapabilityGate": "YOUTUBE_PUBLIC_UPLOAD_READY",
+  "nativeScheduling": {
+    "supported": true,
+    "canonicalSchedule": "Publication.scheduledAt",
+    "remoteFields": [
+      "status.privacyStatus=private",
+      "status.publishAt"
+    ]
+  },
+  "metadataSchema": "youtube-short-v1",
+  "processingStates": [
+    "uploaded",
+    "processed",
+    "failed",
+    "rejected"
+  ]
+}

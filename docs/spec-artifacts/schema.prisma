@@ -209,14 +209,24 @@ enum PlatformAccountStatus {
   ERROR
 }
 
+enum PublicationDeliveryMode {
+  API_AUTOMATED
+  MANUAL_HANDOFF
+}
+
 enum PublicationStatus {
   DRAFT
   SCHEDULED
+  READY_FOR_MANUAL_PUBLISH
   PUBLISHING
   PUBLISHING_UNKNOWN
   PUBLISHED
   FAILED
   CANCELLED
+}
+
+enum AssetDerivationType {
+  PLATFORM_DERIVATIVE
 }
 
 enum PublicationResponseClass {
@@ -653,9 +663,30 @@ model Asset {
   renderDiagnostics     RenderAttempt[]        @relation("RenderDiagnosticAsset")
   approvedForRenders    Render[]               @relation("ApprovedRenderAsset")
   publicationMedia      Publication[]          @relation("PublicationMediaAsset")
+  derivedChildren        AssetDerivation[]       @relation("AssetDerivationSource")
+  derivedFrom            AssetDerivation?        @relation("AssetDerivationDerived")
 
   @@index([sourceEntityType, sourceEntityId])
   @@index([status, createdAt])
+}
+
+
+model AssetDerivation {
+  id                           String              @id @default(uuid(7)) @db.Uuid
+  sourceAssetId                String              @db.Uuid
+  derivedAssetId               String              @unique @db.Uuid
+  type                         AssetDerivationType
+  platform                     Platform?
+  transformationProfileKey     String
+  transformationProfileVersion String
+  metadataJson                 Json?
+  createdAt                    DateTime            @default(now())
+
+  sourceAsset                  Asset               @relation("AssetDerivationSource", fields: [sourceAssetId], references: [id], onDelete: Restrict)
+  derivedAsset                 Asset               @relation("AssetDerivationDerived", fields: [derivedAssetId], references: [id], onDelete: Restrict)
+
+  @@index([sourceAssetId, createdAt])
+  @@index([platform, type, createdAt])
 }
 
 model CaptureScenario {
@@ -942,8 +973,9 @@ model Publication {
   id                String            @id @default(uuid(7)) @db.Uuid
   renderId          String            @db.Uuid
   platformAccountId String            @db.Uuid
-  operationId       String            @default(uuid(7)) @unique @db.Uuid
-  status            PublicationStatus @default(DRAFT)
+  operationId       String                    @default(uuid(7)) @unique @db.Uuid
+  deliveryMode      PublicationDeliveryMode     @default(API_AUTOMATED)
+  status            PublicationStatus           @default(DRAFT)
   scheduledAt       DateTime?
   publishedAt       DateTime?
   remotePostId      String?
@@ -965,6 +997,7 @@ model Publication {
 
   @@unique([platformAccountId, remotePostId])
   @@index([status, scheduledAt])
+  @@index([deliveryMode, status, scheduledAt])
   @@index([platformAccountId, publishedAt])
   @@index([renderId])
 }

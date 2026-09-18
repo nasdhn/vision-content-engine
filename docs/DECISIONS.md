@@ -338,3 +338,39 @@ Toute modification significative doit ajouter une entrée datée.
 
 ## D-112 — UX async persistante
 **Décision :** quitter/recharger une vue n'annule pas les workflows longs; les états sont canoniques côté backend.
+
+## D-113 — Distribution mixte par plateforme
+**Décision :** Instagram/YouTube utilisent API_AUTOMATED; TikTok utilise MANUAL_HANDOFF en V1 interne.
+
+## D-114 — TikTok Direct Post exclu de la V1 interne
+**Décision :** ne pas contourner les règles TikTok par browser automation ni présenter l'API comme conforme à un outil privé interne.
+
+## D-115 — PublicationDeliveryMode explicite
+**Décision :** chaque Publication stocke API_AUTOMATED ou MANUAL_HANDOFF.
+
+## D-116 — READY_FOR_MANUAL_PUBLISH
+**Décision :** état explicite pour handoff TikTok prêt à publier.
+
+## D-117 — AssetDerivation relationnelle
+**Décision :** dérivés plateforme conservent source, Asset dérivé, profil/version et plateforme.
+
+## D-118 — Instagram Login V1
+**Décision :** compte professionnel + permissions instagram_business_basic / instagram_business_content_publish.
+
+## D-119 — Instagram remote-fetch sécurisé
+**Décision :** URL temporaire read-only vers l'exact mediaAssetId; bucket non public.
+
+## D-120 — YouTube resumable upload
+**Décision :** videos.insert avec protocole resumable et reconciliation par remote video/session.
+
+## D-121 — YouTube public capability gate
+**Décision :** l'auto-publication publique n'est déclarée prête qu'après satisfaction des exigences d'audit/capability de l'API project.
+
+## D-122 — Scheduler local canonique
+**Décision :** Publication.scheduledAt est canonique; native scheduling peut être utilisé sans devenir source de vérité.
+
+## D-123 — PUBLISHING_UNKNOWN interdit le retry naïf
+**Décision :** reconcile avant toute nouvelle création distante lorsque le side effect est ambigu.
+
+## D-124 — Manual publication honest
+**Décision :** TikTok peut être PUBLISHED sur confirmation humaine avec remotePostId null; aucune confirmation plateforme n'est inventée.

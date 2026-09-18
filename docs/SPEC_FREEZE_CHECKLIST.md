@@ -76,12 +76,12 @@ Mark an item `[x]` only after explicit validation.
 - [x] analytics
 
 ## Distribution
-- [ ] TikTok adapter contract
-- [ ] Instagram adapter contract
-- [ ] YouTube adapter contract
-- [ ] scheduling contract
-- [ ] idempotence/reconciliation
-- [ ] token lifecycle
+- [x] TikTok adapter contract
+- [x] Instagram adapter contract
+- [x] YouTube adapter contract
+- [x] scheduling contract
+- [x] idempotence/reconciliation
+- [x] token lifecycle
 
 ## Analytics & learning
 - [ ] raw metric model

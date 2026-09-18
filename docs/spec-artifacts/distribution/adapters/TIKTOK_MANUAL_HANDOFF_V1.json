@@ -1,0 +1,18 @@
+{
+  "adapterKey": "TIKTOK_MANUAL_HANDOFF_V1",
+  "platform": "TIKTOK",
+  "deliveryMode": "MANUAL_HANDOFF",
+  "apiPublishing": false,
+  "reason": "Internal/private-use Direct Post is not accepted under current TikTok Content Sharing Guidelines.",
+  "package": [
+    "EXACT_MEDIA_ASSET",
+    "CAPTION",
+    "HASHTAGS",
+    "CTA_NOTES",
+    "COVER_RECOMMENDATION",
+    "SCHEDULED_TIME",
+    "COMMERCIAL_DISCLOSURE_REMINDER"
+  ],
+  "completion": "USER_CONFIRMED",
+  "metadataSchema": "tiktok-manual-handoff-v1"
+}

@@ -1,0 +1,25 @@
+{
+  "adapterKey": "INSTAGRAM_REELS_V1",
+  "platform": "INSTAGRAM",
+  "deliveryMode": "API_AUTOMATED",
+  "authStrategy": "INSTAGRAM_LOGIN",
+  "accountRequirement": "PROFESSIONAL",
+  "requiredPermissions": [
+    "instagram_business_basic",
+    "instagram_business_content_publish"
+  ],
+  "mediaTransfer": {
+    "mode": "REMOTE_FETCH",
+    "requiresTemporaryDeliveryUrl": true,
+    "canonicalMediaIdentity": "Publication.mediaAssetId"
+  },
+  "flow": [
+    "PREPARE_SIGNED_DELIVERY_URL",
+    "CREATE_REELS_CONTAINER",
+    "POLL_CONTAINER_FINISHED",
+    "MEDIA_PUBLISH",
+    "STORE_REMOTE_MEDIA_ID"
+  ],
+  "ambiguityBoundary": "After media_publish may have reached Meta",
+  "metadataSchema": "instagram-reel-v1"
+}

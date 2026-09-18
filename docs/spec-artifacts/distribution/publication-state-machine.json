@@ -1,0 +1,43 @@
+{
+  "version": "v1",
+  "automated": {
+    "DRAFT": [
+      "SCHEDULED",
+      "CANCELLED"
+    ],
+    "SCHEDULED": [
+      "PUBLISHING",
+      "CANCELLED"
+    ],
+    "PUBLISHING": [
+      "PUBLISHED",
+      "FAILED",
+      "PUBLISHING_UNKNOWN"
+    ],
+    "PUBLISHING_UNKNOWN": [
+      "PUBLISHED",
+      "FAILED",
+      "PUBLISHING"
+    ],
+    "PUBLISHED": [],
+    "FAILED": [],
+    "CANCELLED": []
+  },
+  "manualHandoff": {
+    "DRAFT": [
+      "SCHEDULED",
+      "CANCELLED"
+    ],
+    "SCHEDULED": [
+      "READY_FOR_MANUAL_PUBLISH",
+      "CANCELLED"
+    ],
+    "READY_FOR_MANUAL_PUBLISH": [
+      "PUBLISHED",
+      "CANCELLED"
+    ],
+    "PUBLISHED": [],
+    "FAILED": [],
+    "CANCELLED": []
+  }
+}

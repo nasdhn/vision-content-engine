@@ -12,10 +12,11 @@ Editing Intelligence accepted.
 Video Engine accepted.  
 Product Capture / Playwright accepted.  
 Dashboard UX accepted.  
-Distribution is now the active design task.
+Distribution accepted.  
+Analytics & Learning is now the active design task.
 
 ## Version
-Draft: `spec-v0.11`
+Draft: `spec-v0.12`
 
 ## Foundation status
 - Product: ACCEPTED
@@ -29,26 +30,39 @@ Draft: `spec-v0.11`
 - Video Engine: ACCEPTED
 - Product Capture / Playwright: ACCEPTED
 - Dashboard UX: ACCEPTED
+- Distribution: ACCEPTED
 
-## Accepted Dashboard UX principles
-- two human decision gates remain central
-- Needs Attention is a derived operator surface
-- no mandatory script/creative-plan approval
-- Production shows business stages, not raw queue internals
-- Recording Pack is optimized for raw takes
-- final Review is video-first
-- publication uncertainty requires reconciliation
-- analytics displays uncertainty/null/comparability honestly
-- desktop-first, with review/upload/attention supported on mobile
-- async workflow state survives navigation/reload
+## Accepted Distribution principles
+- Instagram Reels: API_AUTOMATED
+- YouTube Shorts: API_AUTOMATED when public-upload capability is ready
+- TikTok: MANUAL_HANDOFF for internal V1
+- explicit PublicationDeliveryMode
+- READY_FOR_MANUAL_PUBLISH status
+- exact Publication.mediaAssetId
+- explicit AssetDerivation provenance
+- local scheduler canonical
+- Instagram Login + temporary signed delivery URL
+- YouTube resumable upload and capability/audit gate
+- bounded retry and strict PUBLISHING_UNKNOWN reconciliation
+- secret-reference token lifecycle
+- manual TikTok confirmation does not fabricate remote proof
 
-## Canonical Dashboard UX artifacts
-- `docs/spec-artifacts/dashboard-ux/screen-contracts.json`
-- `docs/spec-artifacts/dashboard-ux/review-actions.json`
-- `docs/spec-artifacts/dashboard-ux/needs-attention.json`
+## Prisma amendments
+Canonical spec schema now includes:
+- PublicationDeliveryMode
+- Publication.deliveryMode
+- PublicationStatus.READY_FOR_MANUAL_PUBLISH
+- AssetDerivation
+- AssetDerivationType
+
+## Canonical Distribution spec artifacts
+- `docs/spec-artifacts/distribution/schema.ts`
+- `docs/spec-artifacts/distribution/publication-state-machine.json`
+- `docs/spec-artifacts/distribution/adapters/*.json`
+- amended `docs/spec-artifacts/schema.prisma`
 
 ## Gate
 Codex implementation is **NOT authorized** until all required items are validated and this document reaches `spec-v1.0`.
 
 ## Next specification
-Distribution / publisher adapters.
+Analytics & Learning.
