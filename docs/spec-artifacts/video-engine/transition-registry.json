@@ -1,0 +1,21 @@
+{
+  "version": "v1",
+  "presets": {
+    "CUT": {
+      "durationMs": 0
+    },
+    "MATCH_CUT": {
+      "durationMs": 0,
+      "requiresSemanticMatch": true
+    },
+    "SHORT_FADE": {
+      "durationMs": 180
+    },
+    "SLIDE": {
+      "durationMs": 220
+    },
+    "MASK_REVEAL": {
+      "durationMs": 260
+    }
+  }
+}

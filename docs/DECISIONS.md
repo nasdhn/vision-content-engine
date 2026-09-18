@@ -236,3 +236,42 @@ Toute modification significative doit ajouter une entrée datée.
 
 ## D-078 — 7 EditingProfiles V1
 **Décision :** FAST_PRODUCT_DEMO, FOUNDER_STORY, GREEN_SCREEN_EXPLAINER, PROBLEM_SOLUTION, MANUAL_VS_VISION, HIGH_ENERGY_SHORT, CALM_EXPERT_SHORT.
+
+## D-079 — VideoRenderer abstraction
+**Décision :** Remotion est derrière une interface `VideoRenderer`; le domaine ne dépend pas directement de son API.
+
+## D-080 — Render déterministe sans IA mid-frame
+**Décision :** aucun appel LLM pendant le rendu. Le worker consomme un EditingPlanVersion validé.
+
+## D-081 — Preflight/probe obligatoire
+**Décision :** inputs et output sont probés; un exit code de renderer ne suffit pas comme validation.
+
+## D-082 — SDR BT.709 master V1
+**Décision :** le master social V1 est SDR BT.709; HDR/HLG/Dolby Vision sont tone-mappés ou rejetés explicitement.
+
+## D-083 — Renderer sans fetch internet arbitraire
+**Décision :** les dépendances média de rendu doivent être des Assets connus/versionnés, pas des URLs libres.
+
+## D-084 — Profils média versionnés
+**Décision :** ColorProfile, AudioProfile et CodecProfile sont des configurations déterministes versionnées.
+
+## D-085 — Fonts/brand assets pinés
+**Décision :** aucune dépendance critique à des fonts/assets mutablement installés sur l'host.
+
+## D-086 — Exact Publication media asset
+**Décision :** `Publication.mediaAssetId` référence l'Asset exact envoyé à la plateforme.
+
+## D-087 — Dérivé plateforme avec provenance
+**Décision :** tout dérivé futur conserve une provenance explicite depuis le master; le shape final sera fermé avec Distribution.
+
+## D-088 — Rendu isolé par attempt
+**Décision :** workspace temporaire unique par RenderAttempt, jamais canonique.
+
+## D-089 — ms→frame conversion centralisée
+**Décision :** utilitaire unique, start=floor/end=ceil sous contraintes de durée.
+
+## D-090 — Technical QA déterministe
+**Décision :** codec, dimensions, durée, color metadata, audio, black/silence catastrophiques sont contrôlés par code.
+
+## D-091 — Remotion licensing gate
+**Décision :** licence Remotion re-vérifiée avant production; l'abstraction doit permettre remplacement.

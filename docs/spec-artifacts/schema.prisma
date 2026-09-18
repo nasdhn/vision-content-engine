@@ -652,6 +652,7 @@ model Asset {
   renderOutputs         RenderAttempt[]        @relation("RenderOutputAsset")
   renderDiagnostics     RenderAttempt[]        @relation("RenderDiagnosticAsset")
   approvedForRenders    Render[]               @relation("ApprovedRenderAsset")
+  publicationMedia      Publication[]          @relation("PublicationMediaAsset")
 
   @@index([sourceEntityType, sourceEntityId])
   @@index([status, createdAt])
@@ -947,12 +948,14 @@ model Publication {
   publishedAt       DateTime?
   remotePostId      String?
   remoteUrl         String?
+  mediaAssetId      String?            @db.Uuid
   metadataJson      Json
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 
   render            Render                     @relation(fields: [renderId], references: [id], onDelete: Restrict)
   platformAccount   PlatformAccount            @relation(fields: [platformAccountId], references: [id], onDelete: Restrict)
+  mediaAsset        Asset?                     @relation("PublicationMediaAsset", fields: [mediaAssetId], references: [id], onDelete: Restrict)
   attempts          PublicationAttempt[]
   rawMetrics        MetricSnapshotRaw[]
   normalizedMetrics MetricSnapshotNormalized[]

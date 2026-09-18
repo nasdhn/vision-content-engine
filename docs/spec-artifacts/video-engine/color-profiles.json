@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "profiles": {
+    "SDR_BT709_SOCIAL_V1": {
+      "version": "1",
+      "outputDynamicRange": "SDR",
+      "primaries": "bt709",
+      "transfer": "bt709",
+      "matrix": "bt709",
+      "range": "tv",
+      "pixelFormat": "yuv420p",
+      "hdrInputPolicy": "TONE_MAP_TO_SDR"
+    }
+  }
+}

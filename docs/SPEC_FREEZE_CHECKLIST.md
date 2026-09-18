@@ -49,13 +49,13 @@ Mark an item `[x]` only after explicit validation.
 
 ## Media
 - [x] Pattern schema
-- [ ] Template schema
+- [x] Template schema
 - [x] EditingProfile schema
 - [x] EditingPlan schema
 - [x] captions model
 - [x] audio model
-- [ ] asset model
-- [ ] render validation rules
+- [x] asset model
+- [x] render validation rules
 
 ## Product capture
 - [ ] Playwright scenario schema

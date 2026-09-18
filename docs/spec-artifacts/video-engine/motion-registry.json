@@ -1,0 +1,59 @@
+{
+  "version": "v1",
+  "presets": {
+    "CUT": {
+      "kind": "none"
+    },
+    "SUBTLE_SCALE_IN": {
+      "kind": "scale",
+      "from": 1.0,
+      "to": 1.04,
+      "durationMs": 700,
+      "easing": "easeOut"
+    },
+    "FOCUS_ZOOM": {
+      "kind": "focusZoom",
+      "maxScale": 1.25,
+      "durationMs": 450,
+      "easing": "easeInOut"
+    },
+    "SHORT_SLIDE_UP": {
+      "kind": "translateY",
+      "fromPercent": 8,
+      "toPercent": 0,
+      "durationMs": 220
+    },
+    "SHORT_SLIDE_LEFT": {
+      "kind": "translateX",
+      "fromPercent": 8,
+      "toPercent": 0,
+      "durationMs": 220
+    },
+    "MASK_REVEAL": {
+      "kind": "maskReveal",
+      "durationMs": 260
+    },
+    "RESULT_POP": {
+      "kind": "scale",
+      "from": 0.96,
+      "to": 1.0,
+      "durationMs": 180
+    },
+    "SUBTLE_FADE": {
+      "kind": "opacity",
+      "from": 0,
+      "to": 1,
+      "durationMs": 220
+    },
+    "SHORT_SLIDE": {
+      "kind": "translate",
+      "durationMs": 220
+    },
+    "SUBTLE_SCALE": {
+      "kind": "scale",
+      "from": 1.0,
+      "to": 1.025,
+      "durationMs": 900
+    }
+  }
+}

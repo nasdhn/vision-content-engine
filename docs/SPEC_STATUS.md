@@ -9,10 +9,11 @@ Workflows accepted.
 AI contracts accepted.  
 Pattern Library accepted.  
 Editing Intelligence accepted.  
-Video Engine is now the active design task.
+Video Engine accepted.  
+Product Capture / Playwright is now the active design task.
 
 ## Version
-Draft: `spec-v0.8`
+Draft: `spec-v0.9`
 
 ## Foundation status
 - Product: ACCEPTED
@@ -23,47 +24,42 @@ Draft: `spec-v0.8`
 - AI Contracts: ACCEPTED
 - Pattern Library: ACCEPTED
 - Editing Intelligence: ACCEPTED
+- Video Engine: ACCEPTED
 
-## Accepted Editing Intelligence principles
-- AI plans editing; renderer executes deterministically
-- Creative Director and Editing Intelligence have distinct responsibilities
-- two-pass editorial selection then timing/composition
-- real natural voice remains the narrative backbone by default
-- natural pauses are preserved; dead air is trimmed
-- semantic cut grammar, not timer-based cutting
-- proof-first product visibility
-- normalized 0..1 visual coordinate system
-- presenter placement is gesture/product/caption aware
-- semantic captions with sparse emphasis
-- music and SFX are optional
-- motion uses whitelisted purposeful presets
-- layered timeline model
-- deterministic collision/hard validation
-- minimal-scope repair
-- descriptive editing diagnostics
-- seven V1 EditingProfile seeds
+## Accepted Video Engine principles
+- replaceable `VideoRenderer` boundary
+- deterministic render from immutable inputs
+- FFmpeg/ffprobe preflight and output inspection
+- isolated RenderAttempt workspace
+- no arbitrary remote media fetch
+- orientation normalization
+- HDR/HLG/Dolby Vision → SDR BT.709 policy
+- versioned Color/Audio/Codec profiles
+- versioned motion/transition/chroma registries
+- pinned font/template dependencies
+- centralized ms→frame conversion
+- deterministic Technical QA
+- exact `Publication.mediaAssetId`
+- platform-derivative provenance required
+- Remotion licensing gate before production
 
-## Canonical Editing Intelligence spec artifacts
-- `docs/spec-artifacts/editing-intelligence/schema.ts`
-- `docs/spec-artifacts/editing-intelligence/profiles/*.json`
+## Prisma amendment
+Canonical spec schema now contains:
 
-These remain specification artifacts until implementation authorization.
+`Publication.mediaAssetId -> Asset`
 
-## Still to freeze before Codex implementation
-- Template contract
-- Video Engine / renderer contract
-- exact media Asset ingest/normalization contract
-- render validation rules
-- Playwright capture contract
-- dashboard UX
-- platform publisher adapters
-- analytics normalization and learning
-- security/observability/deployment
-- tests/acceptance criteria
-- Codex Master Prompt
+for exact uploaded-media lineage.
+
+## Canonical Video Engine spec artifacts
+- `docs/spec-artifacts/video-engine/schema.ts`
+- `docs/spec-artifacts/video-engine/asset-media-contract.ts`
+- `docs/spec-artifacts/video-engine/*-profiles.json`
+- `docs/spec-artifacts/video-engine/*-registry.json`
+- `docs/spec-artifacts/templates/*.json`
+- amended `docs/spec-artifacts/schema.prisma`
 
 ## Gate
 Codex implementation is **NOT authorized** until all required items are validated and this document reaches `spec-v1.0`.
 
 ## Next specification
-`docs/08_VIDEO_ENGINE.md`
+`docs/09_PRODUCT_CAPTURE_PLAYWRIGHT.md`
