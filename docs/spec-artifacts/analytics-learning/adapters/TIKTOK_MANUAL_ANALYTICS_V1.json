@@ -1,0 +1,24 @@
+{
+  "adapterKey": "TIKTOK_MANUAL_ANALYTICS_V1",
+  "platform": "TIKTOK",
+  "collectionMethod": "MANUAL_ENTRY",
+  "noScraping": true,
+  "fields": [
+    "views",
+    "likes",
+    "comments",
+    "shares",
+    "saves",
+    "avgWatchDurationMs",
+    "completionRate",
+    "profileVisits",
+    "websiteClicks"
+  ],
+  "requiredFields": [],
+  "defaultWindows": [
+    "T_PLUS_24H",
+    "T_PLUS_72H",
+    "T_PLUS_7D"
+  ],
+  "optionalFutureAdapter": "TIKTOK_DISPLAY_API_V1_IF_APPROVED"
+}

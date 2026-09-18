@@ -1,0 +1,25 @@
+{
+  "adapterKey": "UMAMI_V1",
+  "sourceSystem": "UMAMI",
+  "access": "SUPPORTED_API",
+  "inputs": [
+    "pageviews",
+    "visits",
+    "visitors",
+    "referrer",
+    "query",
+    "events",
+    "event-data"
+  ],
+  "attributionUse": [
+    "website visits",
+    "tracked UTM/publication code",
+    "marketing events"
+  ],
+  "notAuthoritativeFor": [
+    "activation",
+    "customer",
+    "revenue"
+  ],
+  "directDatabaseAccess": false
+}

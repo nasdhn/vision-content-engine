@@ -1,0 +1,31 @@
+{
+  "adapterKey": "YOUTUBE_ANALYTICS_V1",
+  "platform": "YOUTUBE",
+  "collectionMethod": "PLATFORM_API",
+  "api": "YouTube Analytics reports.query",
+  "scoping": [
+    "channel==MINE",
+    "filter by video where appropriate"
+  ],
+  "candidateMetrics": [
+    "views",
+    "engagedViews",
+    "likes",
+    "comments",
+    "shares",
+    "estimatedMinutesWatched",
+    "averageViewDuration",
+    "averageViewPercentage"
+  ],
+  "rawFirst": true,
+  "defaultWindows": [
+    "T_PLUS_1H",
+    "T_PLUS_6H",
+    "T_PLUS_24H",
+    "T_PLUS_72H",
+    "T_PLUS_7D",
+    "T_PLUS_30D"
+  ],
+  "metricDelayAware": true,
+  "retentionPolicyKey": "VERIFY_CURRENT_PROVIDER_TERMS_BEFORE_IMPLEMENTATION"
+}

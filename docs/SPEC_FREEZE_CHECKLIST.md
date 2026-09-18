@@ -84,10 +84,10 @@ Mark an item `[x]` only after explicit validation.
 - [x] token lifecycle
 
 ## Analytics & learning
-- [ ] raw metric model
-- [ ] normalized metric model
+- [x] raw metric model
+- [x] normalized metric model
 - [ ] attribution scope
-- [ ] experiment model
+- [x] experiment model
 - [ ] confidence language
 - [ ] weekly report contract
 

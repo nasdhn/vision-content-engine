@@ -1,0 +1,50 @@
+{
+  "version": "v1",
+  "automatedPlatformWindows": [
+    {
+      "key": "T_PLUS_1H",
+      "offsetSeconds": 3600
+    },
+    {
+      "key": "T_PLUS_6H",
+      "offsetSeconds": 21600
+    },
+    {
+      "key": "T_PLUS_24H",
+      "offsetSeconds": 86400
+    },
+    {
+      "key": "T_PLUS_72H",
+      "offsetSeconds": 259200
+    },
+    {
+      "key": "T_PLUS_7D",
+      "offsetSeconds": 604800
+    },
+    {
+      "key": "T_PLUS_30D",
+      "offsetSeconds": 2592000
+    }
+  ],
+  "manualTikTokWindows": [
+    {
+      "key": "T_PLUS_24H",
+      "offsetSeconds": 86400
+    },
+    {
+      "key": "T_PLUS_72H",
+      "offsetSeconds": 259200
+    },
+    {
+      "key": "T_PLUS_7D",
+      "offsetSeconds": 604800
+    }
+  ],
+  "optionalManualTikTokWindows": [
+    {
+      "key": "T_PLUS_30D",
+      "offsetSeconds": 2592000
+    }
+  ],
+  "comparisonRule": "Compare metrics at same/sufficiently close content age under a versioned tolerance policy."
+}

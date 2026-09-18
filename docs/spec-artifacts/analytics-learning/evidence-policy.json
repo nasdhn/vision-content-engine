@@ -1,0 +1,23 @@
+{
+  "version": "v1",
+  "confidenceLevels": [
+    "INSUFFICIENT_DATA",
+    "WEAK_SIGNAL",
+    "INTERESTING_SIGNAL",
+    "FAIRLY_SOLID"
+  ],
+  "guardrails": {
+    "singlePublicationMaxConfidence": "WEAK_SIGNAL",
+    "requiresSameMeasurementWindowForDirectComparison": true,
+    "requiresCompatibleMetricSemantics": true,
+    "fairlySolidRequires": [
+      "meaningful configured sample",
+      "multiple observations/dates",
+      "consistent direction",
+      "confounders documented",
+      "no single viral outlier dominating",
+      "compatible metric semantics"
+    ]
+  },
+  "note": "Sample-size thresholds are analysis-policy configuration, not universal truths."
+}

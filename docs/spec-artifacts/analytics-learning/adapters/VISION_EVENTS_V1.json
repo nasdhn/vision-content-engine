@@ -1,0 +1,15 @@
+{
+  "adapterKey": "VISION_EVENTS_V1",
+  "sourceSystem": "VISION_APP",
+  "transport": "SIGNED_INTERNAL_HTTP_EVENT_INGEST",
+  "events": [
+    "SIGNUP",
+    "ACTIVATION",
+    "CUSTOMER",
+    "REVENUE"
+  ],
+  "idempotence": "externalEventId",
+  "identity": "opaque IDs only where possible",
+  "directDatabaseAccess": false,
+  "replayProtection": true
+}

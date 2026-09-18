@@ -1,0 +1,27 @@
+{
+  "version": "v1",
+  "utm": {
+    "utm_medium": "organic_social",
+    "utm_content": "Publication.trackingCode"
+  },
+  "confidence": {
+    "DIRECT": [
+      "publication trackingCode in first-party event",
+      "unique tracked click token",
+      "explicit referral code"
+    ],
+    "INFERRED": [
+      "platform/referrer plus temporal association without publication-specific identifier"
+    ],
+    "UNKNOWN": [
+      "no defensible content-level link"
+    ]
+  },
+  "sourcePriority": [
+    "VISION_APP",
+    "UMAMI_DIRECT_TRACKED",
+    "UMAMI_INFERRED",
+    "MANUAL"
+  ],
+  "piiPolicy": "Prefer opaque user/session IDs; do not require email/name."
+}

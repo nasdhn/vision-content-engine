@@ -374,3 +374,42 @@ Toute modification significative doit ajouter une entrée datée.
 
 ## D-124 — Manual publication honest
 **Décision :** TikTok peut être PUBLISHED sur confirmation humaine avec remotePostId null; aucune confirmation plateforme n'est inventée.
+
+## D-125 — Raw / normalized / attribution séparés
+**Décision :** les données provider brutes, les métriques normalisées et les événements business restent des couches distinctes.
+
+## D-126 — NULL ≠ 0
+**Décision :** métrique indisponible/non observée = NULL; zéro uniquement si zéro est réellement observé.
+
+## D-127 — Measurement age canonique
+**Décision :** comparer des contenus à âge/fenêtre comparable, jamais des cumuls 6h vs 30j sans avertissement.
+
+## D-128 — TikTok analytics manuel V1
+**Décision :** pas de scraping; saisie légère T+24h/T+72h/T+7d tant que Display API n'est pas approuvé.
+
+## D-129 — Umami adapter, pas DB direct
+**Décision :** pageviews/referrers/events via API Umami supportée.
+
+## D-130 — Publication.trackingCode
+**Décision :** identifiant opaque stable pour UTM/attribution quand un lien spécifique est utilisable.
+
+## D-131 — Vision attribution ingest
+**Décision :** signup/activation/customer/revenue arrivent par événements HTTP signés, sans couplage DB Vision.
+
+## D-132 — Attribution business typée
+**Décision :** sourceSystem/externalEventId dédupliquent; revenue utilise amount minor + currency.
+
+## D-133 — Identité minimisée
+**Décision :** utiliser IDs opaques/session IDs; éviter email/nom dans Content Engine.
+
+## D-134 — Métriques plateforme non universelles
+**Décision :** metricSemanticsVersion + comparability; aucun score global d'engagement.
+
+## D-135 — EvidencePolicy versionnée
+**Décision :** confidence guardrails explicites; seuils configurables, pas vérité universelle.
+
+## D-136 — Analyst non causal/autonome
+**Décision :** Insights/Recommendations n'impliquent ni causalité automatique ni mutation de stratégie.
+
+## D-137 — Weekly learning report
+**Décision :** rapport hebdo business-first avec funnel, plateformes, patterns, editing, expériences, limites et next tests.

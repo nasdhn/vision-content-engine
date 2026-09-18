@@ -1,0 +1,17 @@
+{
+  "adapterKey": "INSTAGRAM_ANALYTICS_V1",
+  "platform": "INSTAGRAM",
+  "collectionMethod": "PLATFORM_API",
+  "accountRequirement": "PROFESSIONAL_ACCOUNT",
+  "rawFirst": true,
+  "mappingPolicy": "Versioned provider-field mapping to canonical metrics; unsupported metrics remain null.",
+  "defaultWindows": [
+    "T_PLUS_1H",
+    "T_PLUS_6H",
+    "T_PLUS_24H",
+    "T_PLUS_72H",
+    "T_PLUS_7D",
+    "T_PLUS_30D"
+  ],
+  "retentionPolicyKey": "VERIFY_CURRENT_PROVIDER_TERMS_BEFORE_IMPLEMENTATION"
+}

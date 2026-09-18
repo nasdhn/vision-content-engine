@@ -13,10 +13,11 @@ Video Engine accepted.
 Product Capture / Playwright accepted.  
 Dashboard UX accepted.  
 Distribution accepted.  
-Analytics & Learning is now the active design task.
+Analytics & Learning accepted.  
+Security / Observability / Operations is now the active design task.
 
 ## Version
-Draft: `spec-v0.12`
+Draft: `spec-v0.13`
 
 ## Foundation status
 - Product: ACCEPTED
@@ -31,38 +32,45 @@ Draft: `spec-v0.12`
 - Product Capture / Playwright: ACCEPTED
 - Dashboard UX: ACCEPTED
 - Distribution: ACCEPTED
+- Analytics & Learning: ACCEPTED
 
-## Accepted Distribution principles
-- Instagram Reels: API_AUTOMATED
-- YouTube Shorts: API_AUTOMATED when public-upload capability is ready
-- TikTok: MANUAL_HANDOFF for internal V1
-- explicit PublicationDeliveryMode
-- READY_FOR_MANUAL_PUBLISH status
-- exact Publication.mediaAssetId
-- explicit AssetDerivation provenance
-- local scheduler canonical
-- Instagram Login + temporary signed delivery URL
-- YouTube resumable upload and capability/audit gate
-- bounded retry and strict PUBLISHING_UNKNOWN reconciliation
-- secret-reference token lifecycle
-- manual TikTok confirmation does not fabricate remote proof
+## Accepted Analytics principles
+- business outcomes outrank vanity metrics
+- raw / normalized / attribution remain separate
+- NULL is never silently treated as zero
+- platform metrics retain semantic/comparability metadata
+- collection uses content-age windows
+- Instagram/YouTube automated analytics
+- TikTok manual analytics until approved API access exists
+- Umami via supported API
+- stable Publication trackingCode
+- DIRECT / INFERRED / UNKNOWN attribution
+- signed Vision product-event ingest
+- source event idempotence and typed revenue
+- privacy-minimized identity
+- deterministic feature extraction
+- versioned evidence policy
+- experiments preferred over uncontrolled causal claims
+- Analyst recommends but does not autonomously change strategy
 
 ## Prisma amendments
 Canonical spec schema now includes:
-- PublicationDeliveryMode
-- Publication.deliveryMode
-- PublicationStatus.READY_FOR_MANUAL_PUBLISH
-- AssetDerivation
-- AssetDerivationType
+- MetricCollectionMethod
+- Publication.trackingCode
+- MetricSnapshotRaw collection method/operation identity
+- additional normalized metric/comparability fields
+- AttributionEvent source-system idempotence and typed revenue
 
-## Canonical Distribution spec artifacts
-- `docs/spec-artifacts/distribution/schema.ts`
-- `docs/spec-artifacts/distribution/publication-state-machine.json`
-- `docs/spec-artifacts/distribution/adapters/*.json`
-- amended `docs/spec-artifacts/schema.prisma`
+## Canonical Analytics artifacts
+- `docs/spec-artifacts/analytics-learning/schema.ts`
+- `docs/spec-artifacts/analytics-learning/metric-definitions.json`
+- `docs/spec-artifacts/analytics-learning/collection-windows.json`
+- `docs/spec-artifacts/analytics-learning/evidence-policy.json`
+- `docs/spec-artifacts/analytics-learning/attribution-contract.json`
+- `docs/spec-artifacts/analytics-learning/adapters/*.json`
 
 ## Gate
 Codex implementation is **NOT authorized** until all required items are validated and this document reaches `spec-v1.0`.
 
 ## Next specification
-Analytics & Learning.
+Security / Observability / Operations.

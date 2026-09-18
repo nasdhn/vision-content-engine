@@ -251,6 +251,11 @@ enum AttributionConfidenceType {
   UNKNOWN
 }
 
+enum MetricCollectionMethod {
+  PLATFORM_API
+  MANUAL_ENTRY
+}
+
 enum ExperimentStatus {
   DRAFT
   RUNNING
@@ -974,6 +979,7 @@ model Publication {
   renderId          String            @db.Uuid
   platformAccountId String            @db.Uuid
   operationId       String                    @default(uuid(7)) @unique @db.Uuid
+  trackingCode      String                    @unique
   deliveryMode      PublicationDeliveryMode     @default(API_AUTOMATED)
   status            PublicationStatus           @default(DRAFT)
   scheduledAt       DateTime?
@@ -1029,6 +1035,8 @@ model MetricSnapshotRaw {
   platform              Platform
   collectedAt           DateTime
   providerSchemaVersion String?
+  collectionMethod      MetricCollectionMethod
+  collectionOperationId String                 @unique @db.Uuid
   payloadJson           Json
   payloadHash           String?
   createdAt             DateTime @default(now())
@@ -1037,6 +1045,7 @@ model MetricSnapshotRaw {
   normalizedSnapshots   MetricSnapshotNormalized[]
 
   @@index([publicationId, collectedAt])
+  @@index([platform, collectionMethod, collectedAt])
 }
 
 model MetricSnapshotNormalized {
@@ -1045,6 +1054,9 @@ model MetricSnapshotNormalized {
   rawSnapshotId        String?            @db.Uuid
   collectedAt          DateTime
   views                BigInt?
+  engagedViews         BigInt?
+  reach                BigInt?
+  impressions          BigInt?
   likes                BigInt?
   comments             BigInt?
   shares               BigInt?
@@ -1055,8 +1067,12 @@ model MetricSnapshotNormalized {
   completionRate       Float?
   profileVisits        BigInt?
   websiteClicks        BigInt?
+  follows              BigInt?
   otherMetricsJson     Json?
+  availabilityJson     Json?
+  comparabilityJson    Json?
   normalizerVersion    String
+  metricSemanticsVersion String
   createdAt            DateTime           @default(now())
 
   publication          Publication        @relation(fields: [publicationId], references: [id], onDelete: Restrict)
@@ -1073,15 +1089,20 @@ model AttributionEvent {
   eventType         AttributionEventType
   occurredAt        DateTime
   source            String?
+  sourceSystem      String
+  externalEventId   String?
   confidenceType    AttributionConfidenceType
   externalVisitorId String?
   userId            String?
+  valueAmountMinor  BigInt?
+  valueCurrency     String?
   metadataJson      Json?
   createdAt         DateTime                  @default(now())
 
   publication       Publication?              @relation(fields: [publicationId], references: [id], onDelete: SetNull)
   campaign          Campaign?                 @relation(fields: [campaignId], references: [id], onDelete: SetNull)
 
+  @@unique([sourceSystem, externalEventId])
   @@index([eventType, occurredAt])
   @@index([publicationId, occurredAt])
   @@index([campaignId, occurredAt])

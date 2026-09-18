@@ -1,0 +1,70 @@
+{
+  "version": "v1",
+  "principles": {
+    "nullMeans": "UNAVAILABLE_OR_UNOBSERVED",
+    "zeroMeans": "OBSERVED_ZERO",
+    "crossPlatformViewsDirectlyComparable": false
+  },
+  "canonicalMetrics": {
+    "views": {
+      "kind": "COUNT",
+      "crossPlatformComparability": "LIMITED"
+    },
+    "engagedViews": {
+      "kind": "COUNT",
+      "crossPlatformComparability": "NO"
+    },
+    "reach": {
+      "kind": "COUNT",
+      "crossPlatformComparability": "LIMITED"
+    },
+    "impressions": {
+      "kind": "COUNT",
+      "crossPlatformComparability": "LIMITED"
+    },
+    "likes": {
+      "kind": "COUNT",
+      "crossPlatformComparability": "LIMITED"
+    },
+    "comments": {
+      "kind": "COUNT",
+      "crossPlatformComparability": "LIMITED"
+    },
+    "shares": {
+      "kind": "COUNT",
+      "crossPlatformComparability": "LIMITED"
+    },
+    "saves": {
+      "kind": "COUNT",
+      "crossPlatformComparability": "LIMITED"
+    },
+    "watchTimeMs": {
+      "kind": "DURATION",
+      "crossPlatformComparability": "LIMITED"
+    },
+    "avgWatchDurationMs": {
+      "kind": "DURATION",
+      "crossPlatformComparability": "LIMITED"
+    },
+    "avgWatchPercentage": {
+      "kind": "PERCENTAGE",
+      "crossPlatformComparability": "LIMITED"
+    },
+    "completionRate": {
+      "kind": "RATE",
+      "crossPlatformComparability": "LIMITED"
+    },
+    "profileVisits": {
+      "kind": "COUNT",
+      "crossPlatformComparability": "NO"
+    },
+    "websiteClicks": {
+      "kind": "COUNT",
+      "crossPlatformComparability": "LIMITED"
+    },
+    "follows": {
+      "kind": "COUNT",
+      "crossPlatformComparability": "LIMITED"
+    }
+  }
+}
