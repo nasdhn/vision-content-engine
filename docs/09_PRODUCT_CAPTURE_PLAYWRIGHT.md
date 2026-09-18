@@ -1,36 +1,828 @@
 # 09 — Product Capture with Playwright
 
-## But
-Créer automatiquement de vraies démos Vision reproductibles.
+**Status:** ACCEPTED  
+**Specification version:** spec-v0.10  
+**Scope:** Vision Content Engine V1  
+**Depends on:** Video Engine ACCEPTED
+**Accepted:** 2026-09-18
 
-## Principe
-Le LLM peut proposer un scénario.
-L'exécution est déterministe.
+---
 
-## Exemple
-Scenario: restaurants sans site à Lyon
+# 1. Purpose
 
-1. ouvrir environnement contrôlé Vision ;
-2. naviguer vers Agent ;
-3. saisir une requête définie ;
-4. lancer ;
-5. attendre un état attendu ;
-6. capturer étapes / écrans ;
-7. produire assets vidéo/screenshot ;
-8. transmettre au montage.
+Product Capture creates deterministic, safe, repeatable source media from a controlled Vision environment.
 
-## Sécurité
-- préférer environnement de démo / staging ;
-- éviter navigation libre en production ;
-- scénarios whitelistés ;
-- comptes dédiés ;
-- timeouts et assertions ;
-- logs et screenshots d'échec ;
-- aucune action destructive.
+It produces screenshots, screen recordings, proof moments and diagnostics.
 
-## À définir avant code
-- environnement cible ;
-- données reproductibles ;
-- auth dédiée ;
-- stratégies de capture ;
-- nettoyage des runs.
+It does **not** allow an LLM to freely browse Vision.
+
+Core rule:
+
+```text
+AI chooses WHAT proof is useful
+→ known CaptureScenarioVersion
+→ deterministic Playwright steps decide HOW to capture it
+```
+
+Never:
+
+```text
+"AI, click around Vision until you find something interesting."
+```
+
+---
+
+# 2. Controlled environment
+
+V1 captures only against a dedicated controlled Vision environment/account.
+
+Preferred order:
+
+```text
+dedicated demo/staging environment
+> dedicated deterministic demo tenant/account
+> isolated production-like fixture environment
+```
+
+Do not use normal customer data or mutate real customer missions.
+
+---
+
+# 3. Dedicated capture identity
+
+Use a dedicated Vision capture account with:
+
+- predictable entitlements/credits;
+- predictable feature flags;
+- resettable demo data;
+- no personal/customer secrets.
+
+Authentication secrets never appear inside CaptureScenario JSON.
+
+---
+
+# 4. Browser isolation
+
+Each CaptureRun receives a fresh Playwright `BrowserContext`.
+
+No page/session state is shared across independent CaptureRuns.
+
+This is a reproducibility and security boundary.
+
+---
+
+# 5. Authentication
+
+Preferred V1 strategy:
+
+```text
+secret-backed Playwright storage state
+```
+
+The auth state is a credential.
+
+Rules:
+
+- never commit to Git;
+- never expose as ordinary Asset;
+- protect/encrypt at rest;
+- recreate when expired;
+- scope to the controlled Vision environment.
+
+---
+
+# 6. CaptureScenario root/version
+
+Existing domain:
+
+```text
+CaptureScenario
+└── CaptureScenarioVersion
+```
+
+New immutable version when steps/selectors/assertions/fixtures/outputs materially change.
+
+---
+
+# 7. CaptureScenarioVersion contract
+
+```ts
+type CaptureScenarioVersionSpec = {
+  identity: {
+    captureScenarioVersionId: string;
+    scenarioKey: string;
+    version: number;
+    name: string;
+  };
+
+  environment: {
+    environmentKey: string;
+    allowedOrigins: string[];
+    baseUrl: string;
+  };
+
+  auth: {
+    authProfileKey: string;
+  };
+
+  browser: BrowserProfile;
+
+  inputSchema: unknown;
+
+  fixturePolicy: CaptureFixturePolicy;
+
+  steps: CaptureStep[];
+
+  outputs: CaptureOutputSpec[];
+
+  assertions: CaptureAssertion[];
+
+  safety: CaptureSafetyPolicy;
+
+  timeouts: CaptureTimeoutPolicy;
+};
+```
+
+---
+
+# 8. BrowserProfile
+
+```ts
+type BrowserProfile = {
+  browser: "CHROMIUM";
+
+  viewport: {
+    width: number;
+    height: number;
+  };
+
+  deviceScaleFactor: number;
+
+  locale: "fr-FR";
+  timezoneId: "Europe/Paris";
+
+  reducedMotion:
+    | "NO_PREFERENCE"
+    | "REDUCE";
+
+  colorScheme:
+    | "LIGHT"
+    | "DARK";
+
+  recordVideo: boolean;
+
+  recordVideoSize?: {
+    width: number;
+    height: number;
+  };
+};
+```
+
+V1 uses controlled Chromium only.
+
+---
+
+# 9. Locator strategy
+
+Preferred order:
+
+```text
+1. role / accessible name
+2. label
+3. stable data-testid
+4. exact stable text
+5. reviewed CSS escape hatch only
+```
+
+Avoid brittle DOM-path selectors.
+
+Critical Vision controls used by capture should expose stable accessibility or test-id contracts.
+
+---
+
+# 10. Locator contract
+
+```ts
+type CaptureLocator =
+  | {
+      strategy: "ROLE";
+      role: string;
+      name?: string;
+      exact?: boolean;
+    }
+  | {
+      strategy: "LABEL";
+      text: string;
+      exact?: boolean;
+    }
+  | {
+      strategy: "TEST_ID";
+      value: string;
+    }
+  | {
+      strategy: "TEXT";
+      text: string;
+      exact: boolean;
+    };
+```
+
+Raw arbitrary CSS is not part of the normal AI-facing DSL.
+
+---
+
+# 11. Readiness rule
+
+Do not use long fixed sleeps as readiness.
+
+Do not use `networkidle` as the default proof that Vision is ready.
+
+Use semantic state:
+
+```text
+expected element visible
+button enabled
+known URL reached
+mission state visible
+results rendered
+spinner absent
+```
+
+Small bounded pauses are allowed only for visual settling **after** readiness is proven.
+
+---
+
+# 12. Step DSL
+
+V1 bounded step language:
+
+```ts
+type CaptureStep =
+  | NavigateStep
+  | ClickStep
+  | FillStep
+  | PressStep
+  | WaitForStep
+  | AssertStep
+  | ScreenshotStep
+  | MarkMomentStep
+  | VisualSettleStep;
+```
+
+No arbitrary JavaScript generated by AI.
+
+---
+
+# 13. NavigateStep
+
+```ts
+type NavigateStep = {
+  type: "NAVIGATE";
+
+  path: string;
+
+  waitUntil:
+    | "COMMIT"
+    | "DOM_CONTENT_LOADED"
+    | "LOAD";
+};
+```
+
+Resolved URL must remain within allowed Vision origins.
+
+---
+
+# 14. ClickStep
+
+```ts
+type ClickStep = {
+  type: "CLICK";
+  locator: CaptureLocator;
+
+  expectedAfter?: {
+    locatorVisible?: CaptureLocator;
+    urlPattern?: string;
+  };
+};
+```
+
+Important transitions should include a post-condition.
+
+---
+
+# 15. FillStep
+
+```ts
+type FillStep = {
+  type: "FILL";
+  locator: CaptureLocator;
+
+  valueFromInput: string;
+
+  clearFirst: boolean;
+};
+```
+
+Scenario definitions never embed secrets as input values.
+
+---
+
+# 16. PressStep
+
+```ts
+type PressStep = {
+  type: "PRESS";
+  locator?: CaptureLocator;
+
+  key:
+    | "ENTER"
+    | "ESCAPE"
+    | "TAB";
+};
+```
+
+---
+
+# 17. WaitForStep
+
+```ts
+type WaitForStep = {
+  type: "WAIT_FOR";
+
+  condition:
+    | {
+        kind: "VISIBLE";
+        locator: CaptureLocator;
+      }
+    | {
+        kind: "HIDDEN";
+        locator: CaptureLocator;
+      }
+    | {
+        kind: "ENABLED";
+        locator: CaptureLocator;
+      }
+    | {
+        kind: "URL";
+        pattern: string;
+      }
+    | {
+        kind: "TEXT";
+        locator: CaptureLocator;
+        contains: string;
+      };
+
+  timeoutMs?: number;
+};
+```
+
+---
+
+# 18. AssertStep
+
+```ts
+type AssertStep = {
+  type: "ASSERT";
+
+  assertion:
+    | {
+        kind: "VISIBLE";
+        locator: CaptureLocator;
+      }
+    | {
+        kind: "TEXT_CONTAINS";
+        locator: CaptureLocator;
+        valueFromInput?: string;
+        literal?: string;
+      }
+    | {
+        kind: "URL_MATCHES";
+        pattern: string;
+      };
+};
+```
+
+Assertions determine whether product proof is valid.
+
+---
+
+# 19. ScreenshotStep
+
+```ts
+type ScreenshotStep = {
+  type: "SCREENSHOT";
+
+  outputKey: string;
+
+  mode:
+    | "VIEWPORT"
+    | "LOCATOR";
+
+  locator?: CaptureLocator;
+
+  maskLocatorKeys?: string[];
+
+  omitBackground?: boolean;
+};
+```
+
+---
+
+# 20. MarkMomentStep
+
+For editorial selection inside recorded screen video:
+
+```ts
+type MarkMomentStep = {
+  type: "MARK_MOMENT";
+
+  key: string;
+
+  editorialMeaning: string;
+};
+```
+
+Worker records capture-relative timestamp.
+
+Example:
+
+```text
+RESULT_VISIBLE @ 8230ms
+```
+
+---
+
+# 21. VisualSettleStep
+
+```ts
+type VisualSettleStep = {
+  type: "VISUAL_SETTLE";
+  durationMs: number;
+  reason: string;
+};
+```
+
+Bounded and only after semantic readiness.
+
+---
+
+# 22. CaptureOutputSpec
+
+```ts
+type CaptureOutputSpec = {
+  key: string;
+
+  role:
+    | "SCREENSHOT"
+    | "VIDEO"
+    | "FRAME"
+    | "TRACE";
+
+  required: boolean;
+
+  editorialDescription: string;
+};
+```
+
+Produced binary outputs become Assets linked via `CaptureRunAsset`.
+
+---
+
+# 23. Video capture
+
+Playwright video recording may be used as deterministic product-screen source media.
+
+Requirements:
+
+- explicit viewport/video size;
+- no debug/action annotations in editorial source;
+- close context before video is considered complete;
+- probe the resulting video through normal media pipeline.
+
+---
+
+# 24. Trace policy
+
+Trace is diagnostic, not editorial media.
+
+Recommended:
+
+```text
+success:
+  short/optional retention
+
+failure:
+  retain under diagnostic policy
+```
+
+Trace may contain sensitive state and must not be public.
+
+---
+
+# 25. Failure diagnostics
+
+On failure, where safe capture:
+
+```text
+viewport screenshot
+trace
+failed step index
+current URL
+locator/assertion context
+console/page errors
+request failures
+```
+
+Do not log auth state.
+
+---
+
+# 26. Fixture policy
+
+```ts
+type CaptureFixturePolicy = {
+  mode:
+    | "SEEDED_DEMO_DATA"
+    | "CONTROLLED_QUERY_LIVE_PROVIDER"
+    | "PREPARED_STATE";
+
+  resetBeforeRun: boolean;
+
+  fixtureVersion?: string;
+
+  variabilityNotes: string[];
+};
+```
+
+Prefer controlled/seeded state for product demos.
+
+---
+
+# 27. Live-provider scenarios
+
+When a Vision demo intentionally relies on live provider output:
+
+- mark scenario variable;
+- assert structural behavior, not exact company names;
+- content copy must not assume an exact result before capture;
+- provider usage/cost is observable;
+- retry is bounded.
+
+Do not spend real provider calls when a deterministic fixture tells the same story.
+
+---
+
+# 28. Fixture reset boundary
+
+Use a controlled fixture service/interface.
+
+Do not put SQL/database mutation in CaptureScenario JSON.
+
+```ts
+interface CaptureFixtureManager {
+  prepare(
+    fixturePolicy: CaptureFixturePolicy,
+    input: unknown
+  ): Promise<PreparedFixture>;
+}
+```
+
+---
+
+# 29. Safety policy
+
+```ts
+type CaptureSafetyPolicy = {
+  allowedOrigins: string[];
+
+  blockDownloads: boolean;
+  blockPopupsByDefault: boolean;
+
+  allowClipboardWrite: boolean;
+  allowFileUpload: boolean;
+
+  maximumPages: number;
+
+  prohibitedPathPatterns: string[];
+};
+```
+
+V1 is restrictive.
+
+---
+
+# 30. Destructive actions
+
+Default prohibited:
+
+```text
+account deletion
+billing actions
+password/security changes
+real customer mutations
+production bulk operations
+external messages/emails
+irreversible actions
+```
+
+---
+
+# 31. Timeout policy
+
+```ts
+type CaptureTimeoutPolicy = {
+  scenarioMs: number;
+  navigationMs: number;
+  actionMs: number;
+  assertionMs: number;
+  visualSettleMaxMs: number;
+};
+```
+
+No infinite waits.
+
+---
+
+# 32. Retry and reconciliation
+
+Transient browser crash/network failure may retry the same immutable CaptureRun when safe.
+
+Scenario/input change creates a new CaptureRun.
+
+If a scenario launches a real Vision mission, retries must reconcile existing mission/application state first.
+
+Do not blindly create duplicate missions after timeout.
+
+---
+
+# 33. CaptureRun report
+
+```ts
+type CaptureRunReport = {
+  result:
+    | "SUCCEEDED"
+    | "FAILED";
+
+  executedStepCount: number;
+
+  assertions: {
+    key: string;
+    result:
+      | "PASS"
+      | "FAIL";
+    message?: string;
+  }[];
+
+  markedMoments: {
+    key: string;
+    atMs: number;
+    editorialMeaning: string;
+  }[];
+
+  outputs: {
+    key: string;
+    assetId: string;
+    role:
+      | "SCREENSHOT"
+      | "VIDEO"
+      | "FRAME"
+      | "TRACE";
+  }[];
+
+  warnings: string[];
+
+  runtime: {
+    playwrightVersion: string;
+    browserVersion: string;
+    workerVersion: string;
+  };
+};
+```
+
+---
+
+# 34. Capture output QA
+
+Screenshot:
+
+```text
+decodable
+expected geometry
+not blank
+```
+
+Video:
+
+```text
+ffprobe succeeds
+duration sane
+geometry expected
+no catastrophic black capture
+```
+
+Editorial suitability is separate.
+
+---
+
+# 35. Browser/build pinning
+
+Capture worker image pins:
+
+```text
+Playwright version
+compatible Chromium build
+worker revision
+```
+
+No unattended browser drift.
+
+---
+
+# 36. Initial V1 scenarios
+
+Start with:
+
+```text
+1. AGENT_QUERY_TO_RESULTS
+2. AGENT_RESULT_DETAIL
+3. MISSION_RUNNING_TO_DONE
+4. PRICING_PAGE
+5. LANDING_PRODUCT_PROOF
+```
+
+Do not create a scenario for every screen.
+
+---
+
+# 37. V1 anti-patterns
+
+Avoid:
+
+```text
+LLM free-roaming browser
+fragile nth-child selectors
+networkidle as product readiness
+long fixed sleeps
+customer data
+normal personal account
+auth state in Git
+shared stateful BrowserContext across runs
+arbitrary third-party navigation
+arbitrary JS from scenario JSON
+blind retry after mission-launch timeout
+browser auto-update drift
+trace as public media
+```
+
+---
+
+# 38. Spec artifacts after acceptance
+
+Create:
+
+```text
+docs/spec-artifacts/product-capture/
+├── schema.ts
+├── README.md
+├── browser-profiles.json
+├── safety-policies.json
+└── scenarios/
+    ├── AGENT_QUERY_TO_RESULTS.json
+    ├── AGENT_RESULT_DETAIL.json
+    ├── MISSION_RUNNING_TO_DONE.json
+    ├── PRICING_PAGE.json
+    └── LANDING_PRODUCT_PROOF.json
+```
+
+Auth state/secrets are never spec artifacts.
+
+---
+
+# 39. Acceptance checklist
+
+- [x] deterministic scenario principle accepted.
+- [x] controlled environment/account boundary accepted.
+- [x] fresh BrowserContext per run accepted.
+- [x] secret-backed storage-state strategy accepted.
+- [x] CaptureScenarioVersion contract accepted.
+- [x] browser profile accepted.
+- [x] locator strategy accepted.
+- [x] semantic readiness/no-networkidle policy accepted.
+- [x] bounded step DSL accepted.
+- [x] screenshot/mark-moment outputs accepted.
+- [x] Playwright video policy accepted.
+- [x] trace diagnostic policy accepted.
+- [x] fixture/reset model accepted.
+- [x] live-provider variability/cost policy accepted.
+- [x] safety/destructive-action policy accepted.
+- [x] timeout/retry/reconciliation accepted.
+- [x] CaptureRun report accepted.
+- [x] stable Vision UI automation contracts accepted.
+- [x] browser/build pinning accepted.
+- [x] five initial scenario seeds accepted.
+
+After acceptance:
+
+1. freeze `09_PRODUCT_CAPTURE_PLAYWRIGHT.md`;
+2. generate scenario/Zod spec artifacts;
+3. update Decisions/Status/Checklist;
+4. proceed to Dashboard UX specification.

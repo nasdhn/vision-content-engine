@@ -275,3 +275,36 @@ Toute modification significative doit ajouter une entrée datée.
 
 ## D-091 — Remotion licensing gate
 **Décision :** licence Remotion re-vérifiée avant production; l'abstraction doit permettre remplacement.
+
+## D-092 — Playwright scenarios déterministes
+**Décision :** l'IA choisit un CaptureScenarioVersion connu; elle ne pilote pas librement le navigateur.
+
+## D-093 — Environnement de capture contrôlé
+**Décision :** captures sur environnement/compte Vision dédié, sans données clients normales.
+
+## D-094 — BrowserContext neuf par CaptureRun
+**Décision :** cookies/local state ne fuient pas entre runs.
+
+## D-095 — Auth storageState secret-backed
+**Décision :** état d'auth traité comme credential, hors Git et hors Assets publics.
+
+## D-096 — Locator contract stable
+**Décision :** role/label/test-id/text stable avant CSS fragile.
+
+## D-097 — Readiness sémantique
+**Décision :** pas de long sleeps/networkidle comme preuve métier; attente sur état UI connu.
+
+## D-098 — Step DSL borné
+**Décision :** Navigate/Click/Fill/Press/Wait/Assert/Screenshot/MarkMoment/VisualSettle seulement en V1.
+
+## D-099 — Fixture-first
+**Décision :** démos produit privilégient seeded/prepared state; live providers seulement si nécessaire à la preuve.
+
+## D-100 — Capture diagnostics protégés
+**Décision :** traces/screens de panne sont diagnostics sensibles, pas médias éditoriaux publics.
+
+## D-101 — Browser/build pinning
+**Décision :** Playwright/Chromium/worker versions sont pinés et enregistrés.
+
+## D-102 — Cinq scénarios initiaux
+**Décision :** AGENT_QUERY_TO_RESULTS, AGENT_RESULT_DETAIL, MISSION_RUNNING_TO_DONE, PRICING_PAGE, LANDING_PRODUCT_PROOF.

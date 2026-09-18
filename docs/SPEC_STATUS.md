@@ -10,10 +10,11 @@ AI contracts accepted.
 Pattern Library accepted.  
 Editing Intelligence accepted.  
 Video Engine accepted.  
-Product Capture / Playwright is now the active design task.
+Product Capture / Playwright accepted.  
+Dashboard UX is now the active design task.
 
 ## Version
-Draft: `spec-v0.9`
+Draft: `spec-v0.10`
 
 ## Foundation status
 - Product: ACCEPTED
@@ -25,41 +26,34 @@ Draft: `spec-v0.9`
 - Pattern Library: ACCEPTED
 - Editing Intelligence: ACCEPTED
 - Video Engine: ACCEPTED
+- Product Capture / Playwright: ACCEPTED
 
-## Accepted Video Engine principles
-- replaceable `VideoRenderer` boundary
-- deterministic render from immutable inputs
-- FFmpeg/ffprobe preflight and output inspection
-- isolated RenderAttempt workspace
-- no arbitrary remote media fetch
-- orientation normalization
-- HDR/HLG/Dolby Vision → SDR BT.709 policy
-- versioned Color/Audio/Codec profiles
-- versioned motion/transition/chroma registries
-- pinned font/template dependencies
-- centralized ms→frame conversion
-- deterministic Technical QA
-- exact `Publication.mediaAssetId`
-- platform-derivative provenance required
-- Remotion licensing gate before production
+## Accepted Product Capture principles
+- deterministic CaptureScenarioVersion execution
+- controlled Vision capture environment/account
+- fresh BrowserContext per CaptureRun
+- secret-backed auth state
+- stable locator contract
+- semantic readiness rather than networkidle/fixed sleeps
+- bounded capture DSL
+- screenshot/video/mark-moment outputs
+- fixture-first product proof
+- bounded live-provider variability/cost
+- protected traces and failure diagnostics
+- restricted origins/destructive actions
+- browser/build version pinning
+- five initial V1 capture scenarios
 
-## Prisma amendment
-Canonical spec schema now contains:
+## Canonical Product Capture spec artifacts
+- `docs/spec-artifacts/product-capture/schema.ts`
+- `docs/spec-artifacts/product-capture/browser-profiles.json`
+- `docs/spec-artifacts/product-capture/safety-policies.json`
+- `docs/spec-artifacts/product-capture/scenarios/*.json`
 
-`Publication.mediaAssetId -> Asset`
-
-for exact uploaded-media lineage.
-
-## Canonical Video Engine spec artifacts
-- `docs/spec-artifacts/video-engine/schema.ts`
-- `docs/spec-artifacts/video-engine/asset-media-contract.ts`
-- `docs/spec-artifacts/video-engine/*-profiles.json`
-- `docs/spec-artifacts/video-engine/*-registry.json`
-- `docs/spec-artifacts/templates/*.json`
-- amended `docs/spec-artifacts/schema.prisma`
+These remain specification artifacts until implementation authorization.
 
 ## Gate
 Codex implementation is **NOT authorized** until all required items are validated and this document reaches `spec-v1.0`.
 
 ## Next specification
-`docs/09_PRODUCT_CAPTURE_PLAYWRIGHT.md`
+Dashboard UX specification.

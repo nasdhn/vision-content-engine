@@ -1,0 +1,90 @@
+{
+  "identity": {
+    "captureScenarioVersionId": "018f3000-0000-7000-8000-000000000003",
+    "scenarioKey": "MISSION_RUNNING_TO_DONE",
+    "version": 1,
+    "name": "Mission running to done"
+  },
+  "environment": {
+    "environmentKey": "VISION_CAPTURE_DEMO",
+    "allowedOrigins": [
+      "https://capture-demo.urvision.fr"
+    ],
+    "baseUrl": "https://capture-demo.urvision.fr"
+  },
+  "auth": {
+    "authProfileKey": "VISION_CAPTURE_ACCOUNT_V1"
+  },
+  "browserProfileKey": "VISION_DESKTOP_CAPTURE_V1",
+  "inputSchema": {
+    "type": "object",
+    "properties": {}
+  },
+  "fixturePolicy": {
+    "mode": "PREPARED_STATE",
+    "resetBeforeRun": true,
+    "fixtureVersion": "mission-running-v1",
+    "variabilityNotes": []
+  },
+  "steps": [
+    {
+      "type": "NAVIGATE",
+      "path": "/missions/demo-running",
+      "waitUntil": "DOM_CONTENT_LOADED"
+    },
+    {
+      "type": "ASSERT",
+      "assertion": {
+        "kind": "VISIBLE",
+        "locator": {
+          "strategy": "TEST_ID",
+          "value": "mission-running"
+        }
+      }
+    },
+    {
+      "type": "WAIT_FOR",
+      "condition": {
+        "kind": "VISIBLE",
+        "locator": {
+          "strategy": "TEST_ID",
+          "value": "mission-done"
+        }
+      },
+      "timeoutMs": 60000
+    },
+    {
+      "type": "MARK_MOMENT",
+      "key": "MISSION_DONE",
+      "editorialMeaning": "Mission visibly transitions to completed."
+    },
+    {
+      "type": "SCREENSHOT",
+      "outputKey": "done",
+      "mode": "VIEWPORT"
+    }
+  ],
+  "outputs": [
+    {
+      "key": "video",
+      "role": "VIDEO",
+      "required": true,
+      "editorialDescription": "Mission transitions from running to completed."
+    },
+    {
+      "key": "done",
+      "role": "SCREENSHOT",
+      "required": true,
+      "editorialDescription": "Completed mission state."
+    }
+  ],
+  "assertions": [],
+  "safetyPolicyKey": "VISION_CAPTURE_RESTRICTED_V1",
+  "timeouts": {
+    "scenarioMs": 120000,
+    "navigationMs": 20000,
+    "actionMs": 10000,
+    "assertionMs": 60000,
+    "visualSettleMaxMs": 1500
+  }
+}

@@ -1,0 +1,101 @@
+{
+  "identity": {
+    "captureScenarioVersionId": "018f3000-0000-7000-8000-000000000002",
+    "scenarioKey": "AGENT_RESULT_DETAIL",
+    "version": 1,
+    "name": "Agent result detail"
+  },
+  "environment": {
+    "environmentKey": "VISION_CAPTURE_DEMO",
+    "allowedOrigins": [
+      "https://capture-demo.urvision.fr"
+    ],
+    "baseUrl": "https://capture-demo.urvision.fr"
+  },
+  "auth": {
+    "authProfileKey": "VISION_CAPTURE_ACCOUNT_V1"
+  },
+  "browserProfileKey": "VISION_DESKTOP_CAPTURE_V1",
+  "inputSchema": {
+    "type": "object",
+    "properties": {}
+  },
+  "fixturePolicy": {
+    "mode": "SEEDED_DEMO_DATA",
+    "resetBeforeRun": true,
+    "fixtureVersion": "agent-result-detail-v1",
+    "variabilityNotes": []
+  },
+  "steps": [
+    {
+      "type": "NAVIGATE",
+      "path": "/agent/demo-result",
+      "waitUntil": "DOM_CONTENT_LOADED"
+    },
+    {
+      "type": "ASSERT",
+      "assertion": {
+        "kind": "VISIBLE",
+        "locator": {
+          "strategy": "TEST_ID",
+          "value": "prospect-card-0"
+        }
+      }
+    },
+    {
+      "type": "CLICK",
+      "locator": {
+        "strategy": "TEST_ID",
+        "value": "prospect-card-0"
+      },
+      "expectedAfter": {
+        "locatorVisible": {
+          "strategy": "TEST_ID",
+          "value": "prospect-detail"
+        }
+      }
+    },
+    {
+      "type": "MARK_MOMENT",
+      "key": "DETAIL_VISIBLE",
+      "editorialMeaning": "Prospect detail panel fully visible."
+    },
+    {
+      "type": "VISUAL_SETTLE",
+      "durationMs": 300,
+      "reason": "Settle detail panel animation."
+    },
+    {
+      "type": "SCREENSHOT",
+      "outputKey": "detail",
+      "mode": "LOCATOR",
+      "locator": {
+        "strategy": "TEST_ID",
+        "value": "prospect-detail"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "key": "video",
+      "role": "VIDEO",
+      "required": true,
+      "editorialDescription": "Open a result and show the qualification detail."
+    },
+    {
+      "key": "detail",
+      "role": "SCREENSHOT",
+      "required": true,
+      "editorialDescription": "Prospect detail proof."
+    }
+  ],
+  "assertions": [],
+  "safetyPolicyKey": "VISION_CAPTURE_RESTRICTED_V1",
+  "timeouts": {
+    "scenarioMs": 120000,
+    "navigationMs": 20000,
+    "actionMs": 10000,
+    "assertionMs": 60000,
+    "visualSettleMaxMs": 1500
+  }
+}

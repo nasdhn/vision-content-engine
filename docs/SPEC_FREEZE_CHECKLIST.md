@@ -58,12 +58,12 @@ Mark an item `[x]` only after explicit validation.
 - [x] render validation rules
 
 ## Product capture
-- [ ] Playwright scenario schema
-- [ ] safe environment
-- [ ] auth
-- [ ] deterministic fixtures
-- [ ] capture outputs
-- [ ] failure handling
+- [x] Playwright scenario schema
+- [x] safe environment
+- [x] auth
+- [x] deterministic fixtures
+- [x] capture outputs
+- [x] failure handling
 
 ## UX
 - [ ] navigation

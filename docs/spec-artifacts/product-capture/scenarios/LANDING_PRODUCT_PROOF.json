@@ -1,0 +1,77 @@
+{
+  "identity": {
+    "captureScenarioVersionId": "018f3000-0000-7000-8000-000000000005",
+    "scenarioKey": "LANDING_PRODUCT_PROOF",
+    "version": 1,
+    "name": "Landing product proof"
+  },
+  "environment": {
+    "environmentKey": "VISION_CAPTURE_DEMO",
+    "allowedOrigins": [
+      "https://capture-demo.urvision.fr"
+    ],
+    "baseUrl": "https://capture-demo.urvision.fr"
+  },
+  "auth": {
+    "authProfileKey": "VISION_CAPTURE_ACCOUNT_V1"
+  },
+  "browserProfileKey": "VISION_DESKTOP_CAPTURE_V1",
+  "inputSchema": {
+    "type": "object",
+    "properties": {}
+  },
+  "fixturePolicy": {
+    "mode": "PREPARED_STATE",
+    "resetBeforeRun": false,
+    "fixtureVersion": "marketing-v1",
+    "variabilityNotes": []
+  },
+  "steps": [
+    {
+      "type": "NAVIGATE",
+      "path": "/",
+      "waitUntil": "LOAD"
+    },
+    {
+      "type": "ASSERT",
+      "assertion": {
+        "kind": "VISIBLE",
+        "locator": {
+          "strategy": "TEST_ID",
+          "value": "product-proof-section"
+        }
+      }
+    },
+    {
+      "type": "VISUAL_SETTLE",
+      "durationMs": 350,
+      "reason": "Allow landing motion to settle."
+    },
+    {
+      "type": "SCREENSHOT",
+      "outputKey": "product-proof",
+      "mode": "LOCATOR",
+      "locator": {
+        "strategy": "TEST_ID",
+        "value": "product-proof-section"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "key": "product-proof",
+      "role": "SCREENSHOT",
+      "required": true,
+      "editorialDescription": "Controlled landing product-proof visual."
+    }
+  ],
+  "assertions": [],
+  "safetyPolicyKey": "VISION_CAPTURE_RESTRICTED_V1",
+  "timeouts": {
+    "scenarioMs": 120000,
+    "navigationMs": 20000,
+    "actionMs": 10000,
+    "assertionMs": 60000,
+    "visualSettleMaxMs": 1500
+  }
+}

@@ -1,0 +1,125 @@
+{
+  "identity": {
+    "captureScenarioVersionId": "018f3000-0000-7000-8000-000000000001",
+    "scenarioKey": "AGENT_QUERY_TO_RESULTS",
+    "version": 1,
+    "name": "Agent query to results"
+  },
+  "environment": {
+    "environmentKey": "VISION_CAPTURE_DEMO",
+    "allowedOrigins": [
+      "https://capture-demo.urvision.fr"
+    ],
+    "baseUrl": "https://capture-demo.urvision.fr"
+  },
+  "auth": {
+    "authProfileKey": "VISION_CAPTURE_ACCOUNT_V1"
+  },
+  "browserProfileKey": "VISION_DESKTOP_CAPTURE_V1",
+  "inputSchema": {
+    "type": "object",
+    "required": [
+      "query"
+    ],
+    "properties": {
+      "query": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "fixturePolicy": {
+    "mode": "SEEDED_DEMO_DATA",
+    "resetBeforeRun": true,
+    "fixtureVersion": "agent-results-v1",
+    "variabilityNotes": []
+  },
+  "steps": [
+    {
+      "type": "NAVIGATE",
+      "path": "/agent",
+      "waitUntil": "DOM_CONTENT_LOADED"
+    },
+    {
+      "type": "ASSERT",
+      "assertion": {
+        "kind": "VISIBLE",
+        "locator": {
+          "strategy": "TEST_ID",
+          "value": "agent-composer"
+        }
+      }
+    },
+    {
+      "type": "FILL",
+      "locator": {
+        "strategy": "TEST_ID",
+        "value": "agent-composer"
+      },
+      "valueFromInput": "query",
+      "clearFirst": true
+    },
+    {
+      "type": "CLICK",
+      "locator": {
+        "strategy": "TEST_ID",
+        "value": "agent-submit"
+      },
+      "expectedAfter": {
+        "locatorVisible": {
+          "strategy": "TEST_ID",
+          "value": "mission-running"
+        }
+      }
+    },
+    {
+      "type": "WAIT_FOR",
+      "condition": {
+        "kind": "VISIBLE",
+        "locator": {
+          "strategy": "TEST_ID",
+          "value": "mission-results"
+        }
+      },
+      "timeoutMs": 60000
+    },
+    {
+      "type": "MARK_MOMENT",
+      "key": "RESULT_VISIBLE",
+      "editorialMeaning": "First stable moment where the result list is visible."
+    },
+    {
+      "type": "VISUAL_SETTLE",
+      "durationMs": 350,
+      "reason": "Allow final row/layout animation to settle."
+    },
+    {
+      "type": "SCREENSHOT",
+      "outputKey": "results",
+      "mode": "VIEWPORT"
+    }
+  ],
+  "outputs": [
+    {
+      "key": "video",
+      "role": "VIDEO",
+      "required": true,
+      "editorialDescription": "Full deterministic product journey from query to results."
+    },
+    {
+      "key": "results",
+      "role": "SCREENSHOT",
+      "required": true,
+      "editorialDescription": "Stable results state."
+    }
+  ],
+  "assertions": [],
+  "safetyPolicyKey": "VISION_CAPTURE_RESTRICTED_V1",
+  "timeouts": {
+    "scenarioMs": 120000,
+    "navigationMs": 20000,
+    "actionMs": 10000,
+    "assertionMs": 60000,
+    "visualSettleMaxMs": 1500
+  }
+}

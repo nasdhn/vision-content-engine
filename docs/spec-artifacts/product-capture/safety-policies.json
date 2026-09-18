@@ -1,0 +1,18 @@
+{
+  "version": "v1",
+  "policies": {
+    "VISION_CAPTURE_RESTRICTED_V1": {
+      "blockDownloads": true,
+      "blockPopupsByDefault": true,
+      "allowClipboardWrite": false,
+      "allowFileUpload": false,
+      "maximumPages": 1,
+      "prohibitedPathPatterns": [
+        "/billing",
+        "/settings/security",
+        "/account/delete",
+        "/admin"
+      ]
+    }
+  }
+}

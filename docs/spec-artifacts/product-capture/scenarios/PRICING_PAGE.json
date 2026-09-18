@@ -1,0 +1,73 @@
+{
+  "identity": {
+    "captureScenarioVersionId": "018f3000-0000-7000-8000-000000000004",
+    "scenarioKey": "PRICING_PAGE",
+    "version": 1,
+    "name": "Pricing page"
+  },
+  "environment": {
+    "environmentKey": "VISION_CAPTURE_DEMO",
+    "allowedOrigins": [
+      "https://capture-demo.urvision.fr"
+    ],
+    "baseUrl": "https://capture-demo.urvision.fr"
+  },
+  "auth": {
+    "authProfileKey": "VISION_CAPTURE_ACCOUNT_V1"
+  },
+  "browserProfileKey": "VISION_DESKTOP_CAPTURE_V1",
+  "inputSchema": {
+    "type": "object",
+    "properties": {}
+  },
+  "fixturePolicy": {
+    "mode": "PREPARED_STATE",
+    "resetBeforeRun": false,
+    "fixtureVersion": "marketing-v1",
+    "variabilityNotes": []
+  },
+  "steps": [
+    {
+      "type": "NAVIGATE",
+      "path": "/tarifs",
+      "waitUntil": "LOAD"
+    },
+    {
+      "type": "ASSERT",
+      "assertion": {
+        "kind": "VISIBLE",
+        "locator": {
+          "strategy": "TEST_ID",
+          "value": "pricing-primary-card"
+        }
+      }
+    },
+    {
+      "type": "VISUAL_SETTLE",
+      "durationMs": 350,
+      "reason": "Allow marketing motion to settle."
+    },
+    {
+      "type": "SCREENSHOT",
+      "outputKey": "pricing",
+      "mode": "VIEWPORT"
+    }
+  ],
+  "outputs": [
+    {
+      "key": "pricing",
+      "role": "SCREENSHOT",
+      "required": true,
+      "editorialDescription": "Stable pricing-page visual for content."
+    }
+  ],
+  "assertions": [],
+  "safetyPolicyKey": "VISION_CAPTURE_RESTRICTED_V1",
+  "timeouts": {
+    "scenarioMs": 120000,
+    "navigationMs": 20000,
+    "actionMs": 10000,
+    "assertionMs": 60000,
+    "visualSettleMaxMs": 1500
+  }
+}
