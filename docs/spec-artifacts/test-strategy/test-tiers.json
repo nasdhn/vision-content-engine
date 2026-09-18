@@ -1,0 +1,45 @@
+{
+  "version": "v1",
+  "tiers": {
+    "TIER_0_STATIC": [
+      "format_lint",
+      "typescript",
+      "spec_artifact_validation",
+      "prisma_validation",
+      "secret_scan"
+    ],
+    "TIER_1_FAST": [
+      "unit",
+      "domain",
+      "state_machine",
+      "contract_validation",
+      "normalizers",
+      "mappers"
+    ],
+    "TIER_2_INTEGRATION": [
+      "postgres",
+      "redis_bullmq",
+      "s3_compatible",
+      "fake_ai",
+      "fake_publishers",
+      "fake_analytics",
+      "remotion_fixture",
+      "playwright_fixture"
+    ],
+    "TIER_3_WORKFLOW": [
+      "full_content_workflow",
+      "recording_path",
+      "failure_recovery"
+    ],
+    "TIER_4_PROVIDER_SMOKE": [
+      "explicit_real_provider_checks"
+    ],
+    "TIER_5_OPS_DRILL": [
+      "restore",
+      "queue_recovery",
+      "publication_reconciliation",
+      "kill_switch",
+      "secret_rotation"
+    ]
+  }
+}

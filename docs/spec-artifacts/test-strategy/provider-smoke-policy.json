@@ -1,0 +1,19 @@
+{
+  "version": "v1",
+  "defaultEnabled": false,
+  "rules": [
+    "explicit credentials required",
+    "explicit environment flag required",
+    "prefer non-destructive capability/auth checks",
+    "prefer test/private accounts",
+    "paid tests budgeted and tagged",
+    "never run real social publishing in normal CI"
+  ],
+  "platforms": {
+    "TIKTOK": "MANUAL_V1_NO_AUTOMATED_PUBLISH_SMOKE",
+    "INSTAGRAM": "AUTH_CAPABILITY_AND_CONTROLLED_TEST_WHERE_AVAILABLE",
+    "YOUTUBE": "PRIVATE_UPLOAD_OR_AUTH_CAPABILITY_TEST",
+    "UMAMI": "READ_ONLY_API_TEST",
+    "AI": "LOW_COST_EXPLICIT_CANARY"
+  }
+}

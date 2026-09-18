@@ -1,0 +1,17 @@
+{
+  "version": "v1",
+  "releaseBlocking": [
+    "prisma_schema_and_migrations_valid",
+    "workflow_state_machine_invariants",
+    "human_approval_gates_enforced",
+    "publication_exact_media_lineage",
+    "publishing_unknown_duplicate_prevention",
+    "transactional_outbox_atomicity",
+    "render_technical_qa",
+    "capture_origin_safety",
+    "auth_and_secret_redaction",
+    "kill_switches",
+    "analytics_null_semantics",
+    "attribution_idempotence"
+  ]
+}

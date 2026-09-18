@@ -102,7 +102,7 @@ Mark an item `[x]` only after explicit validation.
 
 ## Codex handoff
 - [ ] implementation phases
-- [ ] acceptance criteria for every phase
+- [x] acceptance criteria for every phase
 - [ ] stop conditions
 - [ ] inspection-first rules
 - [ ] Master Prompt

@@ -1,0 +1,109 @@
+{
+  "version": "v1",
+  "subsystems": {
+    "DOMAIN": {
+      "required": [
+        "TIER_0_STATIC",
+        "TIER_1_FAST",
+        "TIER_2_INTEGRATION"
+      ],
+      "critical": [
+        "state_machine",
+        "db_constraints",
+        "version_lineage"
+      ]
+    },
+    "AI": {
+      "required": [
+        "TIER_0_STATIC",
+        "TIER_1_FAST",
+        "TIER_2_INTEGRATION"
+      ],
+      "critical": [
+        "schema_validation",
+        "reference_validation",
+        "budget_guard"
+      ]
+    },
+    "MEDIA": {
+      "required": [
+        "TIER_0_STATIC",
+        "TIER_1_FAST",
+        "TIER_2_INTEGRATION",
+        "TIER_3_WORKFLOW"
+      ],
+      "critical": [
+        "probe",
+        "normalization",
+        "render_qa",
+        "media_lineage"
+      ]
+    },
+    "CAPTURE": {
+      "required": [
+        "TIER_0_STATIC",
+        "TIER_1_FAST",
+        "TIER_2_INTEGRATION",
+        "TIER_3_WORKFLOW"
+      ],
+      "critical": [
+        "allowed_origin",
+        "fresh_context",
+        "semantic_readiness",
+        "fixture_e2e"
+      ]
+    },
+    "DASHBOARD": {
+      "required": [
+        "TIER_0_STATIC",
+        "TIER_1_FAST",
+        "TIER_2_INTEGRATION"
+      ],
+      "critical": [
+        "concept_review",
+        "render_review",
+        "needs_attention",
+        "null_display"
+      ]
+    },
+    "DISTRIBUTION": {
+      "required": [
+        "TIER_0_STATIC",
+        "TIER_1_FAST",
+        "TIER_2_INTEGRATION",
+        "TIER_3_WORKFLOW"
+      ],
+      "critical": [
+        "ambiguity_reconciliation",
+        "no_duplicate_publish",
+        "auth_capability"
+      ]
+    },
+    "ANALYTICS": {
+      "required": [
+        "TIER_0_STATIC",
+        "TIER_1_FAST",
+        "TIER_2_INTEGRATION"
+      ],
+      "critical": [
+        "raw_preserved",
+        "null_semantics",
+        "attribution_dedup",
+        "evidence_policy"
+      ]
+    },
+    "OPERATIONS": {
+      "required": [
+        "TIER_0_STATIC",
+        "TIER_2_INTEGRATION",
+        "TIER_5_OPS_DRILL"
+      ],
+      "critical": [
+        "backup_restore",
+        "kill_switch",
+        "redis_recovery",
+        "redaction"
+      ]
+    }
+  }
+}

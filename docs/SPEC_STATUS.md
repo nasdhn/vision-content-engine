@@ -15,10 +15,11 @@ Dashboard UX accepted.
 Distribution accepted.  
 Analytics & Learning accepted.  
 Security / Observability / Operations accepted.  
-Test Strategy & Acceptance is now the active design task.
+Test Strategy & Acceptance accepted.  
+Final specification reconciliation is now the active task.
 
 ## Version
-Draft: `spec-v0.14`
+Draft: `spec-v0.15`
 
 ## Foundation status
 - Product: ACCEPTED
@@ -35,39 +36,42 @@ Draft: `spec-v0.14`
 - Distribution: ACCEPTED
 - Analytics & Learning: ACCEPTED
 - Security / Observability / Operations: ACCEPTED
+- Test Strategy & Acceptance: ACCEPTED
 
-## Accepted operational principles
-- dedicated Docker Compose production host
-- strict trust boundaries and typed validation
-- secret-reference model
-- private object storage
-- Postgres authoritative / Redis recoverable
-- transactional outbox + lease recovery
-- structured correlated logs + central redaction
-- worker heartbeats / queue-age / operational alerts
-- cost/disk/concurrency bounds
-- automated off-host DB backup + restore drills
-- initial RPO <=24h / RTO <=4h targets
-- pinned deployment/build/runtime versions
-- controlled migrations and rollback strategy
-- global kill switches
-- incident runbooks
-- category-specific retention
-- graceful external-provider degradation
-- safe local development defaults
-- explicit third-party terms/licensing rechecks
+## Accepted test principles
+- deterministic CI by default
+- controllable clock/IDs/randomness
+- real PostgreSQL for persistence/migration tests
+- exhaustive state-machine invariants
+- fake deterministic AI/provider adapters in normal CI
+- media functional/perceptual regression rather than byte-identical encoding
+- controlled Playwright fixture E2E
+- publication ambiguity/duplicate prevention as release blocker
+- Redis loss recoverable from canonical state
+- analytics NULL/idempotence/evidence tests
+- security/redaction/cost/kill-switch tests
+- backup restore drills
+- real-provider smoke tests explicit/off by default
+- progressive production enablement
+- documented first-production acceptance report
 
-## Canonical Operations artifacts
-- `docs/spec-artifacts/security-operations/deployment-topology.json`
-- `docs/spec-artifacts/security-operations/environment-contract.json`
-- `docs/spec-artifacts/security-operations/backup-policy.json`
-- `docs/spec-artifacts/security-operations/retention-policy.json`
-- `docs/spec-artifacts/security-operations/observability-contract.json`
-- `docs/spec-artifacts/security-operations/kill-switches.json`
-- `docs/spec-artifacts/security-operations/runbooks/*.md`
+## Canonical Test Strategy artifacts
+- `docs/spec-artifacts/test-strategy/test-tiers.json`
+- `docs/spec-artifacts/test-strategy/release-blocking-invariants.json`
+- `docs/spec-artifacts/test-strategy/acceptance-matrix.json`
+- `docs/spec-artifacts/test-strategy/fixture-policy.json`
+- `docs/spec-artifacts/test-strategy/provider-smoke-policy.json`
+- `docs/spec-artifacts/test-strategy/fixtures/FIXTURE_CATALOG.md`
 
 ## Gate
-Codex implementation is **NOT authorized** until all required items are validated and this document reaches `spec-v1.0`.
+Codex implementation is **NOT authorized yet**.
 
-## Next specification
-Test Strategy & Acceptance.
+Before `spec-v1.0`, perform:
+1. full final reconciliation;
+2. resolve remaining known schema/contract debt;
+3. verify cross-document terminology and lineage;
+4. freeze corrected canonical schema/contracts;
+5. then produce Codex Master Handoff.
+
+## Next specification task
+Final Specification Reconciliation.

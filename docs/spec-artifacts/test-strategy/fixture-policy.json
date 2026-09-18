@@ -1,0 +1,29 @@
+{
+  "version": "v1",
+  "principles": [
+    "synthetic data only",
+    "small deterministic media",
+    "fixed valid UUID fixture IDs",
+    "controllable clock",
+    "seeded randomness",
+    "no real credentials",
+    "no real customer data",
+    "no provider cost by default"
+  ],
+  "goldenChanges": {
+    "automaticAcceptance": false,
+    "requiresReview": true
+  },
+  "mediaFixtureTypes": [
+    "SDR_PORTRAIT_VIDEO",
+    "HDR_OR_HLG_VIDEO_WHERE_PRACTICAL",
+    "GREENSCREEN_PRESENTER",
+    "VOICE_AUDIO",
+    "MUSIC_AUDIO",
+    "SILENT_AUDIO",
+    "BLACK_VIDEO",
+    "ROTATED_PHONE_VIDEO",
+    "CORRUPT_FILE",
+    "PRODUCT_CAPTURE"
+  ]
+}

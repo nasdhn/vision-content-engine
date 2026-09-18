@@ -452,3 +452,39 @@ Toute modification significative doit ajouter une entrée datée.
 
 ## D-150 — Terms/licensing recheck discipline
 **Décision :** contraintes TikTok/YouTube/Instagram/AI/Remotion re-vérifiées avant activation après longue pause.
+
+## D-151 — Layered deterministic test strategy
+**Décision :** tests statiques/unit/domain/contract/DB/integration/workflow/provider/ops, avec vrais providers hors CI normal.
+
+## D-152 — Injectable Clock / seeded randomness
+**Décision :** scheduling/windows/exploration testables sans horloge/randomness réelle.
+
+## D-153 — Real PostgreSQL persistence tests
+**Décision :** contraintes/migrations/outbox testés sur Postgres réel, pas SQLite substitut.
+
+## D-154 — Media functional reproducibility
+**Décision :** validation par métadonnées/scènes/layout/perceptual frames/audio, pas bytes vidéo identiques.
+
+## D-155 — Publishing ambiguity is release-blocking
+**Décision :** lost-response after remote accept doit produire PUBLISHING_UNKNOWN sans duplicate publish.
+
+## D-156 — Redis loss must be recoverable
+**Décision :** workflow canonical récupérable depuis Postgres/control après perte Redis.
+
+## D-157 — Backup restore is an acceptance test
+**Décision :** backup non restauré en drill n'est pas considéré comme récupération prouvée.
+
+## D-158 — Real-provider smoke tests explicit
+**Décision :** credentials/flag/budget dédiés; jamais de publication réelle dans CI standard.
+
+## D-159 — Progressive production enablement
+**Décision :** shadow mode puis TikTok manuel, uploads privés/test, Instagram auto, YouTube public gated, analytics ensuite.
+
+## D-160 — Release-blocking invariant matrix
+**Décision :** gates universels sécurité/lineage/idempotence non contournables par simple green build partiel.
+
+## D-161 — Flaky tests are defects
+**Décision :** quarantaine temporaire uniquement avec owner/raison/expiration; pas de rerun-until-green comme norme.
+
+## D-162 — V1 acceptance report
+**Décision :** premier go-live conserve commit/build, migrations, test matrix, provider capabilities, backup/restore, flags et limitations connues.
