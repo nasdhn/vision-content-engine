@@ -97,7 +97,7 @@ Mark an item `[x]` only after explicit validation.
 - [ ] cost tracking
 - [ ] backups
 - [ ] tests
-- [ ] deployment
+- [x] deployment
 - [ ] rollback
 
 ## Codex handoff

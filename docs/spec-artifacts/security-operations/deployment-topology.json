@@ -1,0 +1,33 @@
+{
+  "version": "v1",
+  "production": {
+    "mode": "DOCKER_COMPOSE_DEDICATED_HOST",
+    "services": [
+      "web",
+      "api",
+      "control",
+      "worker-ai",
+      "worker-capture",
+      "worker-render",
+      "worker-publish",
+      "worker-analytics",
+      "postgres",
+      "redis"
+    ],
+    "external": [
+      "S3_COMPATIBLE_OBJECT_STORAGE",
+      "AI_PROVIDERS",
+      "INSTAGRAM",
+      "YOUTUBE",
+      "UMAMI",
+      "VISION_ATTRIBUTION_INGEST_SOURCE"
+    ]
+  },
+  "principles": [
+    "Postgres authoritative",
+    "Redis non-authoritative",
+    "object storage canonical for binary media",
+    "workers independently pausable",
+    "pinned build/image versions"
+  ]
+}

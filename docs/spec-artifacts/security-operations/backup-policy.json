@@ -1,0 +1,20 @@
+{
+  "version": "v1",
+  "postgres": {
+    "automated": true,
+    "minimumFrequency": "DAILY",
+    "offHost": true,
+    "monitorSuccess": true,
+    "periodicRestoreDrill": true
+  },
+  "objectStorage": {
+    "mustSurviveApplicationHostLoss": true,
+    "canonicalAssetsNeverOnlyLocal": true
+  },
+  "targets": {
+    "initialRpoHours": 24,
+    "initialRtoHours": 4,
+    "note": "Targets are not considered achieved until verified by restore drills."
+  },
+  "redisCanonicalBackupRequired": false
+}

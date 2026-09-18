@@ -1,0 +1,17 @@
+{
+  "version": "v1",
+  "environments": [
+    "LOCAL",
+    "STAGING_CAPTURE",
+    "PRODUCTION"
+  ],
+  "rules": {
+    "separateDatabase": true,
+    "separateRedis": true,
+    "separateObjectStorageNamespace": true,
+    "separateCredentials": true,
+    "productionPublishingDisabledInLocalByDefault": true
+  },
+  "configPrinciple": "All non-secret config is parsed through one typed startup schema.",
+  "secretPrinciple": "Secrets are referenced/resolved at execution time and are not stored in jobs/logs/docs."
+}

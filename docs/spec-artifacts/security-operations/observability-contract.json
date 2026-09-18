@@ -1,0 +1,54 @@
+{
+  "version": "v1",
+  "commonLogFields": [
+    "timestamp",
+    "level",
+    "service",
+    "environment",
+    "version",
+    "requestId",
+    "workflowRunId",
+    "jobAttemptId",
+    "entityType",
+    "entityId",
+    "operationId",
+    "message",
+    "errorCode"
+  ],
+  "redact": [
+    "oauth_token",
+    "api_key",
+    "cookie",
+    "storage_state",
+    "signed_url_secret",
+    "database_password",
+    "authorization_header"
+  ],
+  "metrics": [
+    "api_latency",
+    "api_error_rate",
+    "queue_depth",
+    "oldest_job_age",
+    "job_success_failure",
+    "worker_capacity",
+    "outbox_pending_failed",
+    "render_duration",
+    "capture_duration",
+    "ai_latency_cost",
+    "publish_success_failure_unknown",
+    "analytics_freshness",
+    "storage_failures",
+    "db_redis_connectivity"
+  ],
+  "alertOn": [
+    "persistent_failure",
+    "data_loss_risk",
+    "publication_ambiguity",
+    "auth_broken",
+    "backup_failure",
+    "storage_capacity_risk",
+    "database_unavailable",
+    "queue_stalled",
+    "cost_budget_breach"
+  ]
+}

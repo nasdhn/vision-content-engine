@@ -1,0 +1,18 @@
+{
+  "version": "v1",
+  "categories": {
+    "businessDomainLineage": "LONG_TERM",
+    "approvedFinalMedia": "LONG_TERM",
+    "sourceRecordingsAndCapturesDays": 180,
+    "rawProviderAnalytics": "PROVIDER_POLICY_BOUNDED",
+    "normalizedAnalytics": "LONG_TERM_IF_PERMITTED",
+    "applicationLogsDays": 30,
+    "errorDiagnosticsDays": 60,
+    "playwrightFailureTracesDays": 14,
+    "playwrightSuccessTraces": "OFF_OR_SHORT",
+    "renderCaptureTempHours": 24,
+    "aiRawProviderResponses": "BOUNDED_CONFIGURED",
+    "auditEvents": "LONG_TERM"
+  },
+  "principle": "Retention must respect provider terms and storage budget."
+}

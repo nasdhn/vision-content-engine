@@ -413,3 +413,42 @@ Toute modification significative doit ajouter une entrée datée.
 
 ## D-137 — Weekly learning report
 **Décision :** rapport hebdo business-first avec funnel, plateformes, patterns, editing, expériences, limites et next tests.
+
+## D-138 — Dedicated Docker Compose production host
+**Décision :** V1 déployé sur host dédié avec containers séparés par runtime; pas de Kubernetes.
+
+## D-139 — Secret-reference architecture
+**Décision :** secrets résolus à l'exécution; jamais dans Git, DB JSON métier, jobs, logs ou prompts.
+
+## D-140 — Postgres authoritative / Redis recoverable
+**Décision :** Redis/BullMQ ne contient jamais l'unique vérité business/schedule/workflow.
+
+## D-141 — Structured logs + redaction
+**Décision :** logs JSON corrélés; tokens/cookies/signed URLs/auth headers redacted centralement.
+
+## D-142 — Worker heartbeats et queue-age
+**Décision :** santé workers/queues observée indépendamment des états métier.
+
+## D-143 — Resource-bounded heavy workers
+**Décision :** render/capture ont limites CPU/mémoire/disk/concurrency/timeouts.
+
+## D-144 — Automated backups + restore drills
+**Décision :** backups Postgres off-host surveillés et périodiquement restaurés en environnement isolé.
+
+## D-145 — Initial RPO/RTO targets
+**Décision :** cible initiale RPO <=24h et RTO <=4h, considérée atteinte seulement après drill.
+
+## D-146 — Pinned deployment
+**Décision :** images/builds/runtime versions pinés; pas de production `git pull && latest install`.
+
+## D-147 — Global kill switches
+**Décision :** publication/AI/capture/render/analytics peuvent être pausés sans réécrire l'historique.
+
+## D-148 — Retention by data category
+**Décision :** lineage/audit/final media long-terme; diagnostics/temp/trace limités; raw provider policy-bounded.
+
+## D-149 — Local safety default
+**Décision :** dev local n'a pas de vrais credentials de publication actifs par défaut.
+
+## D-150 — Terms/licensing recheck discipline
+**Décision :** contraintes TikTok/YouTube/Instagram/AI/Remotion re-vérifiées avant activation après longue pause.

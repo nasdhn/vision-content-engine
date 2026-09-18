@@ -1,0 +1,11 @@
+{
+  "version": "v1",
+  "switches": [
+    "PAUSE_ALL_PUBLISHING",
+    "PAUSE_AI_GENERATION",
+    "PAUSE_CAPTURE",
+    "PAUSE_RENDERING",
+    "PAUSE_ANALYTICS_COLLECTION"
+  ],
+  "rule": "Kill switches prevent new work of the affected class without rewriting canonical workflow state."
+}
