@@ -29,13 +29,13 @@ Mark an item `[x]` only after explicit validation.
 - [x] cost model
 
 ## Workflows
-- [ ] Content workflow
-- [ ] Recording workflow
-- [ ] Render workflow
-- [ ] Review workflow
-- [ ] Publication workflow
-- [ ] Analytics workflow
-- [ ] failure/recovery paths
+- [x] Content workflow
+- [x] Recording workflow
+- [x] Render workflow
+- [x] Review workflow
+- [x] Publication workflow
+- [x] Analytics workflow
+- [x] failure/recovery paths
 
 ## AI
 - [ ] Brand/Product Knowledge contract

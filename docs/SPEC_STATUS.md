@@ -5,35 +5,47 @@ Product direction validated.
 System architecture accepted.  
 Domain model accepted.  
 Prisma structural review accepted.  
-Workflow specification is now the active design task.
+Workflow specification accepted.  
+Final Prisma schema draft is now the active validation task.
 
 ## Version
-Draft: `spec-v0.3`
+Draft: `spec-v0.4`
 
-## Accepted Prisma structural decisions
-- Prisma ORM 7 for V1
-- UUID v7 canonical IDs
-- explicit CaptureRunAsset relation
-- explicit RenderInputAsset relation
-- explicit TemplateVersionAsset relation
-- single Approval table with explicit supported-subject FKs
-- database CHECK constraint for Approval integrity
-- Brief + BriefVersion snapshot strategy
-- protected historical lineage via Restrict/archive
-- Prisma Migrate as authoritative workflow
-- remaining lifecycle enums owned by workflow specification
+## Accepted workflow decisions
+- Brief / Idea / Concept lifecycles
+- Script / CreativePlan / EditingPlan lifecycles
+- human RecordingRequest lifecycle
+- CaptureRun lifecycle
+- Render / RenderAttempt semantics
+- Creative QA behavior
+- two mandatory human review gates
+- Publication lifecycle including `PUBLISHING_UNKNOWN`
+- analytics append-only measurement
+- weekly analysis workflow
+- `WorkflowRun.WAITING` semantics
+- retry vs regeneration distinction
+- recovery behavior after worker/control crashes
+- stable failure taxonomy
+- workflow-owned lifecycle enums
 
-## Why Prisma draft is not yet checked as frozen
-The relational structure is accepted, but the final `schema.prisma` still depends on lifecycle enums defined by `04_WORKFLOWS.md`.
+## Why Prisma schema draft is still not checked
+The workflow enums are now known, but the draft must be revised to include:
+- UUID v7
+- Prisma 7 generator/config shape
+- lifecycle enums
+- CaptureRunAsset
+- RenderInputAsset
+- TemplateVersionAsset
+- corrected Approval relation/integrity
+- final delete/index directions
 
 ## Still to freeze before Codex implementation
-- exact workflow state transitions
-- final Prisma schema draft after workflow enums
+- final Prisma schema draft
 - exact AI JSON contracts
-- exact Pattern schema details
-- exact EditingPlan schema
-- exact template/render contracts
-- exact Playwright capture contract
+- Pattern schema details
+- EditingPlan contract
+- template/render contracts
+- Playwright capture contract
 - dashboard screen contracts
 - platform publisher interfaces
 - analytics normalization model
@@ -44,4 +56,4 @@ The relational structure is accepted, but the final `schema.prisma` still depend
 Codex implementation is **NOT authorized** until all required items are validated and this document reaches `spec-v1.0`.
 
 ## Next specification
-`docs/04_WORKFLOWS.md`
+`docs/03B_PRISMA_SCHEMA_FINAL_DRAFT.md`
