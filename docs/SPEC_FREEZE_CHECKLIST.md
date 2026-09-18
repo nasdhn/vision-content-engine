@@ -13,12 +13,12 @@ Mark an item `[x]` only after explicit validation.
 - [x] Editing quality requirement
 
 ## Architecture
-- [ ] System boundaries
-- [ ] Deployment topology
-- [ ] Repository structure
-- [ ] Queue strategy
-- [ ] Object storage strategy
-- [ ] Failure/retry strategy
+- [x] System boundaries
+- [x] Deployment topology
+- [x] Repository structure
+- [x] Queue strategy
+- [x] Object storage strategy
+- [x] Failure/retry strategy
 
 ## Domain
 - [ ] Entity list
