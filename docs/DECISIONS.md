@@ -191,3 +191,48 @@ Toute modification significative doit ajouter une entrée datée.
 
 ## D-063 — Seed V1 limité à 8 Patterns
 **Décision :** démarrage avec huit mécanismes distincts ; variantes proches restent des angles jusqu'à preuve d'un mécanisme réellement différent.
+
+## D-064 — Editing Intelligence est un planificateur éditorial
+**Décision :** Editing Intelligence décide le montage ; le renderer exécute sans décision créative.
+
+## D-065 — Montage en deux passes conceptuelles
+**Décision :** sélection éditoriale des assets avant construction du timing/composition.
+
+## D-066 — Voix naturelle comme colonne vertébrale
+**Décision :** sur contenu narré, les visuels s'adaptent normalement à la vraie voix, pas l'inverse.
+
+## D-067 — Silences classifiés
+**Décision :** DEAD_AIR est coupé ; respirations/pauses intentionnelles sont préservées selon profil.
+
+## D-068 — Cut grammar sémantique
+**Décision :** cuts guidés par changement d'idée/preuve/état visuel, pas par timer arbitraire.
+
+## D-069 — Proof first
+**Décision :** preuve produit prioritaire sur décoration, présentateur ou motion.
+
+## D-070 — Coordonnées visuelles normalisées
+**Décision :** x/y/width/height utilisent 0..1 comme convention canonique.
+
+## D-071 — Captions sémantiques
+**Décision :** sous-titres en chunks/phrases, emphase rare, timing aligné à la vraie parole quand possible.
+
+## D-072 — Motion intentionnelle
+**Décision :** motion uniquement via presets whitelistés et avec but éditorial explicite.
+
+## D-073 — Musique/SFX optionnels
+**Décision :** priorité audio à la voix ; musique/SFX ne sont jamais obligatoires.
+
+## D-074 — Timeline multi-layer explicite
+**Décision :** EditingPlan encode layers/zIndex/composition et non une simple liste plate de plans.
+
+## D-075 — Hard validation déterministe
+**Décision :** timing, références, collisions, presets, slots template et contraintes techniques sont validés par code.
+
+## D-076 — Réparation minimale
+**Décision :** un problème local de montage crée une nouvelle EditingPlanVersion/Render sans régénérer inutilement tout le pipeline.
+
+## D-077 — Diagnostics descriptifs, pas score qualité
+**Décision :** stocker densité/cuts/presenter/product time/etc. comme signaux descriptifs, sans note universelle.
+
+## D-078 — 7 EditingProfiles V1
+**Décision :** FAST_PRODUCT_DEMO, FOUNDER_STORY, GREEN_SCREEN_EXPLAINER, PROBLEM_SOLUTION, MANUAL_VS_VISION, HIGH_ENERGY_SHORT, CALM_EXPERT_SHORT.

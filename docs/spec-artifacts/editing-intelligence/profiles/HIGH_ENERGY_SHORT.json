@@ -1,0 +1,122 @@
+{
+  "identity": {
+    "editingProfileVersionId": "018f1000-0000-7000-8000-000000000006",
+    "key": "HIGH_ENERGY_SHORT",
+    "version": 1,
+    "name": "High-Energy Short"
+  },
+  "pacing": {
+    "targetEnergy": "HIGH",
+    "preferredAverageShotMs": {
+      "min": 700,
+      "max": 1500
+    },
+    "maxDeadAirMs": 300,
+    "preserveNaturalPauseUpToMs": 450,
+    "maxUnchangedVisualMs": 2200,
+    "patternInterruptGuidance": {
+      "enabled": true,
+      "minimumSpacingMs": 1800,
+      "preferredTypes": [
+        "FOCUS_ZOOM",
+        "TEXT_CARD",
+        "COMPARISON_SWITCH",
+        "RESULT_REVEAL"
+      ]
+    }
+  },
+  "cuts": {
+    "preferSemanticBoundaries": true,
+    "minimumOrdinaryShotMs": 650,
+    "allowFlashCuts": true,
+    "avoidWordInternalCuts": true
+  },
+  "captions": {
+    "mode": "SHORT_PHRASES",
+    "maxLines": 2,
+    "maxCharactersPerLine": 28,
+    "minimumCueMs": 550,
+    "maximumCueMs": 1900,
+    "emphasis": {
+      "enabled": true,
+      "maxHighlightedWordsPerCue": 2
+    }
+  },
+  "focus": {
+    "preferProductProofOverDecoration": true,
+    "maxSimultaneousDominantElements": 2,
+    "allowFollowTarget": false
+  },
+  "motion": {
+    "allowedPresetKeys": [
+      "CUT",
+      "SHORT_SLIDE",
+      "FOCUS_ZOOM",
+      "MASK_REVEAL"
+    ],
+    "maximumConcurrentMotions": 2,
+    "preferSubtleMotion": false,
+    "requirePurposeForMotion": true,
+    "defaultTransitionDurationMs": {
+      "min": 80,
+      "max": 240
+    }
+  },
+  "presenter": {
+    "allowedSides": [
+      "LEFT",
+      "RIGHT"
+    ],
+    "preferredWidthPercent": {
+      "min": 22,
+      "max": 34
+    },
+    "avoidCoveringProductRegion": true,
+    "avoidCoveringCaptionRegion": true,
+    "gestureAwarePlacement": true,
+    "maximumContinuousPresenterMs": 4000
+  },
+  "audio": {
+    "voiceTargetLoudness": {
+      "targetLufs": -16,
+      "tolerance": 2
+    },
+    "music": {
+      "enabled": true,
+      "defaultUnderVoiceDb": -17,
+      "allowNoMusic": true
+    },
+    "sfx": {
+      "enabled": true,
+      "maxEventsPer10Sec": 3
+    },
+    "avoidContinuousAttentionSfx": true
+  },
+  "hook": {
+    "maxSetupMs": 700,
+    "requireMeaningfulFirstFrame": true,
+    "allowLogoIntro": false,
+    "preferredOpeningModes": [
+      "PRODUCT_RESULT",
+      "TEXT_STATEMENT",
+      "PRESENTER"
+    ],
+    "maximumSimultaneousFocalElements": 2
+  },
+  "ending": {
+    "avoidDeadEnding": true,
+    "preferredCtaLeadInMs": 900,
+    "allowAbruptCutIfIntentional": true
+  },
+  "constraints": {
+    "suitablePrimaryFormats": [
+      "PRODUCT_DEMO",
+      "MANUAL_TO_VISION",
+      "PROBLEM_SOLUTION",
+      "GREEN_SCREEN_EXPLAINER"
+    ],
+    "minDurationMs": 7000,
+    "maxDurationMs": 35000,
+    "requiresHumanPresenter": false
+  }
+}

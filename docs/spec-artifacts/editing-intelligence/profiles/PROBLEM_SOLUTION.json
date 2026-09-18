@@ -1,0 +1,119 @@
+{
+  "identity": {
+    "editingProfileVersionId": "018f1000-0000-7000-8000-000000000004",
+    "key": "PROBLEM_SOLUTION",
+    "version": 1,
+    "name": "Problem → Solution"
+  },
+  "pacing": {
+    "targetEnergy": "MODERATE",
+    "preferredAverageShotMs": {
+      "min": 1200,
+      "max": 2600
+    },
+    "maxDeadAirMs": 500,
+    "preserveNaturalPauseUpToMs": 650,
+    "maxUnchangedVisualMs": 3400,
+    "patternInterruptGuidance": {
+      "enabled": true,
+      "minimumSpacingMs": 3000,
+      "preferredTypes": [
+        "PROBLEM_TO_PRODUCT",
+        "RESULT_REVEAL",
+        "TEXT_EMPHASIS"
+      ]
+    }
+  },
+  "cuts": {
+    "preferSemanticBoundaries": true,
+    "minimumOrdinaryShotMs": 750,
+    "allowFlashCuts": false,
+    "avoidWordInternalCuts": true
+  },
+  "captions": {
+    "mode": "SEMANTIC_CHUNKS",
+    "maxLines": 2,
+    "maxCharactersPerLine": 34,
+    "minimumCueMs": 750,
+    "maximumCueMs": 2700,
+    "emphasis": {
+      "enabled": true,
+      "maxHighlightedWordsPerCue": 2
+    }
+  },
+  "focus": {
+    "preferProductProofOverDecoration": true,
+    "maxSimultaneousDominantElements": 2,
+    "allowFollowTarget": false
+  },
+  "motion": {
+    "allowedPresetKeys": [
+      "CUT",
+      "SHORT_SLIDE",
+      "FOCUS_ZOOM",
+      "MASK_REVEAL"
+    ],
+    "maximumConcurrentMotions": 2,
+    "preferSubtleMotion": true,
+    "requirePurposeForMotion": true,
+    "defaultTransitionDurationMs": {
+      "min": 100,
+      "max": 300
+    }
+  },
+  "presenter": {
+    "allowedSides": [
+      "LEFT",
+      "RIGHT"
+    ],
+    "preferredWidthPercent": {
+      "min": 24,
+      "max": 36
+    },
+    "avoidCoveringProductRegion": true,
+    "avoidCoveringCaptionRegion": true,
+    "gestureAwarePlacement": true,
+    "maximumContinuousPresenterMs": 7000
+  },
+  "audio": {
+    "voiceTargetLoudness": {
+      "targetLufs": -16,
+      "tolerance": 2
+    },
+    "music": {
+      "enabled": true,
+      "defaultUnderVoiceDb": -19,
+      "allowNoMusic": true
+    },
+    "sfx": {
+      "enabled": true,
+      "maxEventsPer10Sec": 2
+    },
+    "avoidContinuousAttentionSfx": true
+  },
+  "hook": {
+    "maxSetupMs": 1000,
+    "requireMeaningfulFirstFrame": true,
+    "allowLogoIntro": false,
+    "preferredOpeningModes": [
+      "PROBLEM_VISUAL",
+      "PRESENTER",
+      "TEXT_STATEMENT"
+    ],
+    "maximumSimultaneousFocalElements": 2
+  },
+  "ending": {
+    "avoidDeadEnding": true,
+    "preferredCtaLeadInMs": 1400,
+    "allowAbruptCutIfIntentional": true
+  },
+  "constraints": {
+    "suitablePrimaryFormats": [
+      "PROBLEM_SOLUTION",
+      "GREEN_SCREEN_EXPLAINER"
+    ],
+    "minDurationMs": 9000,
+    "maxDurationMs": 50000,
+    "requiresHumanPresenter": false
+  }
+}

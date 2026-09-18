@@ -50,10 +50,10 @@ Mark an item `[x]` only after explicit validation.
 ## Media
 - [x] Pattern schema
 - [ ] Template schema
-- [ ] EditingProfile schema
-- [ ] EditingPlan schema
-- [ ] captions model
-- [ ] audio model
+- [x] EditingProfile schema
+- [x] EditingPlan schema
+- [x] captions model
+- [x] audio model
 - [ ] asset model
 - [ ] render validation rules
 

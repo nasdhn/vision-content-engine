@@ -8,10 +8,11 @@ Prisma specification accepted.
 Workflows accepted.  
 AI contracts accepted.  
 Pattern Library accepted.  
-Editing Intelligence is now the active design task.
+Editing Intelligence accepted.  
+Video Engine is now the active design task.
 
 ## Version
-Draft: `spec-v0.7`
+Draft: `spec-v0.8`
 
 ## Foundation status
 - Product: ACCEPTED
@@ -21,33 +22,38 @@ Draft: `spec-v0.7`
 - Workflows: ACCEPTED
 - AI Contracts: ACCEPTED
 - Pattern Library: ACCEPTED
+- Editing Intelligence: ACCEPTED
 
-## Accepted Pattern Library principles
-- Pattern distinct from Angle / Template / EditingProfile
-- stable Pattern root + immutable PatternVersion
-- stable primary category
-- performance evidence separated from PatternVersion
-- no universal pattern score
-- deterministic bounded candidate selection before Creator
-- explicit eligibility rules
-- configurable exploration/exploitation
-- fatigue evaluated from content combinations
-- deliberate variants tracked explicitly
-- initial seed limited to 8 distinct mechanisms
-- semantic-overlap gate before activating new patterns
-- Researcher remains deferred
+## Accepted Editing Intelligence principles
+- AI plans editing; renderer executes deterministically
+- Creative Director and Editing Intelligence have distinct responsibilities
+- two-pass editorial selection then timing/composition
+- real natural voice remains the narrative backbone by default
+- natural pauses are preserved; dead air is trimmed
+- semantic cut grammar, not timer-based cutting
+- proof-first product visibility
+- normalized 0..1 visual coordinate system
+- presenter placement is gesture/product/caption aware
+- semantic captions with sparse emphasis
+- music and SFX are optional
+- motion uses whitelisted purposeful presets
+- layered timeline model
+- deterministic collision/hard validation
+- minimal-scope repair
+- descriptive editing diagnostics
+- seven V1 EditingProfile seeds
 
-## Canonical Pattern spec artifacts
-- `docs/spec-artifacts/pattern-library/schema.ts`
-- `docs/spec-artifacts/pattern-library/seeds/*.json`
+## Canonical Editing Intelligence spec artifacts
+- `docs/spec-artifacts/editing-intelligence/schema.ts`
+- `docs/spec-artifacts/editing-intelligence/profiles/*.json`
 
-These are specification artifacts only until implementation authorization.
+These remain specification artifacts until implementation authorization.
 
 ## Still to freeze before Codex implementation
 - Template contract
-- EditingProfile contract
-- EditingPlan/media details
-- captions/audio/render validation
+- Video Engine / renderer contract
+- exact media Asset ingest/normalization contract
+- render validation rules
 - Playwright capture contract
 - dashboard UX
 - platform publisher adapters
@@ -60,4 +66,4 @@ These are specification artifacts only until implementation authorization.
 Codex implementation is **NOT authorized** until all required items are validated and this document reaches `spec-v1.0`.
 
 ## Next specification
-`docs/07_EDITING_INTELLIGENCE.md`
+`docs/08_VIDEO_ENGINE.md`
