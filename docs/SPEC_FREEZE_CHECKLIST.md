@@ -38,14 +38,14 @@ Mark an item `[x]` only after explicit validation.
 - [x] failure/recovery paths
 
 ## AI
-- [ ] Brand/Product Knowledge contract
-- [ ] Creator contract
-- [ ] Creative Director contract
-- [ ] Editing Intelligence contract
-- [ ] Creative QA contract
-- [ ] Analyst contract
-- [ ] model/provider gateway rules
-- [ ] prompt/version registry
+- [x] Brand/Product Knowledge contract
+- [x] Creator contract
+- [x] Creative Director contract
+- [x] Editing Intelligence contract
+- [x] Creative QA contract
+- [x] Analyst contract
+- [x] model/provider gateway rules
+- [x] prompt/version registry
 
 ## Media
 - [ ] Pattern schema

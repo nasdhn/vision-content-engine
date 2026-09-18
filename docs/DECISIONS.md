@@ -7,13 +7,13 @@ Toute modification significative doit ajouter une entrée datée.
 **Décision :** la V1 sert Vision uniquement.
 
 ## D-002 — Qualité > volume
-**Décision :** le système vise un rendu de niveau monteur short-form compétent, pas un simple assemblage automatisé.
+**Décision :** le système vise un rendu de niveau monteur short-form compétent.
 
 ## D-003 — Vraie voix
 **Décision :** vraie voix naturelle par défaut.
 
 ## D-004 — Présence humaine
-**Décision :** format principal = incrustation fond vert avec moitié du visage et geste de pointage ; pas de facecam classique exigée.
+**Décision :** format principal = incrustation fond vert avec moitié du visage et geste de pointage.
 
 ## D-005 — Deux validations humaines
 **Décision :** validation des concepts + validation de la vidéo finale.
@@ -22,118 +22,148 @@ Toute modification significative doit ajouter une entrée datée.
 **Décision :** publication automatique après review au départ ; autonomie complète possible plus tard par règles.
 
 ## D-007 — Pattern Library dès V1
-**Décision :** les concepts doivent dériver de patterns connus/analysés, pas de génération arbitraire.
+**Décision :** les concepts doivent dériver de patterns connus/analysés.
 
 ## D-008 — Researcher externe plus tard
-**Décision :** recherche automatique de références / tendances = phase ultérieure ; architecture compatible dès V1.
+**Décision :** recherche automatique de références/tendances = phase ultérieure.
 
 ## D-009 — Editing Intelligence
 **Décision :** le montage est un domaine produit central.
 
 ## D-010 — Playwright capture
-**Décision :** prévoir l'automatisation de démos Vision via scénarios de navigateur contrôlés et reproductibles.
+**Décision :** démos Vision via scénarios navigateur contrôlés et reproductibles.
 
 ## D-011 — IA vs déterminisme
-**Décision :** IA pour ambiguïté, créativité et analyse ; code déterministe pour exécution, état, rendering, scheduling, publication, retries, sécurité.
+**Décision :** IA pour ambiguïté/créativité/analyse ; code déterministe pour exécution.
 
 ## D-012 — Architecture initiale
-**Décision :** modular monolith + workers ; pas de microservices prématurés.
+**Décision :** modular monolith + workers.
 
 ## D-013 — PostgreSQL comme source de vérité
-**Décision :** PostgreSQL porte l'état métier canonique. Redis/BullMQ sert uniquement à l'exécution asynchrone.
+**Décision :** PostgreSQL porte l'état métier canonique.
 
 ## D-014 — Transactional Outbox en V1
-**Décision :** les demandes de jobs asynchrones importantes passent par un outbox transactionnel.
+**Décision :** outbox transactionnel entre état métier et exécution async.
 
 ## D-015 — Processus control séparé
-**Décision :** scheduler, outbox dispatcher, reconciliation et tâches périodiques vivent dans un processus `control` séparé de l'API.
+**Décision :** scheduler/outbox/reconciliation/périodique vivent hors API.
 
-## D-016 — Stockage objet pour les médias
-**Décision :** les fichiers audio/vidéo/images utilisent une abstraction S3-compatible.
+## D-016 — Stockage objet
+**Décision :** médias en stockage S3-compatible.
 
-## D-017 — Idempotence et reconciliation
-**Décision :** rendering, capture, analytics et publication doivent tolérer retries et résultats distants ambigus sans créer de doublons.
+## D-017 — Idempotence/reconciliation
+**Décision :** retries et side effects ambigus sont explicitement gérés.
 
-## D-018 — Déploiement V1 simple mais séparé
-**Décision :** le Content Engine peut démarrer sur un seul host dédié distinct de Vision.
+## D-018 — Déploiement V1 séparé
+**Décision :** host Content Engine dédié, distinct de Vision.
 
 ## D-019 — Baseline runtime
-**Décision :** Node.js 24 LTS, TypeScript strict, React/Vite, NestJS, Prisma/PostgreSQL, Redis/BullMQ, Zod, Playwright, Remotion, FFmpeg/ffprobe, stockage S3-compatible, pnpm workspaces, Docker Compose.
+**Décision :** Node 24 LTS, TS strict, React/Vite, NestJS, Prisma/Postgres, BullMQ/Redis, Zod, Playwright, Remotion, FFmpeg, S3-compatible, pnpm, Docker Compose.
 
-## D-020 — Entités racines + versions immuables
-**Décision :** les objets métier évolutifs utilisent une identité stable et des versions immuables.
+## D-020 — Versions immuables
+**Décision :** identité stable + versions immuables.
 
-## D-021 — Idea est une entité de première classe
-**Décision :** `Idea` reste distinct de `Brief` et `Concept`.
+## D-021 — Idea first-class
+**Décision :** `Idea` distinct de Brief/Concept.
 
-## D-022 — Plusieurs prises par RecordingRequest
-**Décision :** un `RecordingRequest` peut recevoir plusieurs `Recording`/takes.
+## D-022 — Multiple takes
+**Décision :** RecordingRequest accepte plusieurs takes.
 
-## D-023 — Scheduling porté par Publication
-**Décision :** pas d'agrégat `Schedule` séparé en V1 ; `Publication.scheduledAt` est canonique.
+## D-023 — Scheduling sur Publication
+**Décision :** pas d'agrégat Schedule en V1.
 
-## D-024 — Insights et Recommendations persistants
-**Décision :** `Insight` et `Recommendation` sont des entités persistantes.
+## D-024 — Insights/Recommendations persistants
+**Décision :** mémoire d'apprentissage durable.
 
-## D-025 — Attribution prudente en V1
-**Décision :** `AttributionEvent` existe dès la V1 avec une confiance explicite `DIRECT / INFERRED / UNKNOWN`.
+## D-025 — Attribution prudente
+**Décision :** DIRECT / INFERRED / UNKNOWN.
 
-## D-026 — Raw metrics séparées des normalized metrics
-**Décision :** les snapshots bruts des plateformes sont immuables et séparés des métriques normalisées.
+## D-026 — Raw vs normalized metrics
+**Décision :** séparation stricte.
 
-## D-027 — Coûts et audit comme données métier
-**Décision :** `CostEntry`, `ModelInvocation` et `AuditEvent` sont persistés.
+## D-027 — Coûts/audit persistants
+**Décision :** CostEntry/ModelInvocation/AuditEvent sont métier.
 
-## D-028 — Prisma 7 pour la V1
-**Décision :** Prisma ORM 7 est explicitement retenu pour la V1.
+## D-028 — Prisma 7
+**Décision :** Prisma ORM 7 pour V1.
 
-## D-029 — UUID v7 comme ID canonique
-**Décision :** les entités canoniques utilisent des UUID v7 cohérents.
+## D-029 — UUID v7
+**Décision :** UUID v7 canoniques.
 
 ## D-030 — Lineage média explicite
-**Décision :** `CaptureRunAsset`, `RenderInputAsset` et `TemplateVersionAsset` sont explicites.
+**Décision :** CaptureRunAsset / RenderInputAsset / TemplateVersionAsset.
 
-## D-031 — Approval relationnel explicite
-**Décision :** une table `Approval` unique avec FKs explicites vers les sujets V1 et contrainte DB.
+## D-031 — Approval explicite
+**Décision :** table Approval unique + FKs + CHECK DB.
 
-## D-032 — Snapshot Brief conservé
-**Décision :** conserver `Brief` éditable + `BriefVersion` immuable.
+## D-032 — Brief snapshot
+**Décision :** Brief éditable + BriefVersion immuable.
 
-## D-033 — Prisma Migrate autoritaire
-**Décision :** Prisma Migrate est le workflow de schéma ; `db push` n'est pas la source de vérité de production.
+## D-033 — Prisma Migrate
+**Décision :** Prisma Migrate autoritaire.
 
-## D-034 — Enums de workflow propriétaires du workflow
-**Décision :** les lifecycle enums sont définis par `04_WORKFLOWS.md`.
+## D-034 — Workflow owns lifecycle enums
+**Décision :** lifecycle enums définis par Workflow spec.
 
-## D-035 — Deux gates humaines par défaut
-**Décision :** validation obligatoire du ConceptVersion puis du Render final. Pas de validation obligatoire indépendante du script.
+## D-035 — Deux gates humaines
+**Décision :** ConceptVersion + Render final.
 
-## D-036 — Recording humain conditionnel
-**Décision :** l'intervention humaine d'enregistrement n'existe que lorsque le CreativePlan l'exige.
+## D-036 — Recording conditionnel
+**Décision :** intervention humaine uniquement quand CreativePlan l'exige.
 
-## D-037 — Retry technique vs regeneration créative
-**Décision :** un retry technique conserve les mêmes inputs et crée un nouvel Attempt ; une modification d'inputs/creative plan crée une nouvelle version ou un nouveau Render.
+## D-037 — Retry vs regeneration
+**Décision :** retry = mêmes inputs + nouvel Attempt ; changement créatif = nouvelle version/nouveau Render.
 
 ## D-038 — PUBLISHING_UNKNOWN
-**Décision :** tout effet distant ambigu passe par `PUBLISHING_UNKNOWN` et reconciliation avant nouveau publish.
+**Décision :** reconciliation avant retry ambigu.
 
-## D-039 — WAITING ne consomme pas de worker
-**Décision :** un WorkflowRun peut rester `WAITING` pour validation, recording, scheduled time ou measurement window sans job actif.
+## D-039 — WAITING sans worker
+**Décision :** workflow en attente ne consomme pas de worker.
 
-## D-040 — QA créative non autonome en V1
-**Décision :** la QA créative peut bloquer ou émettre des warnings, mais l'approbation finale humaine reste obligatoire.
+## D-040 — Creative QA non-autonome
+**Décision :** QA peut bloquer/warn mais ne remplace pas la review finale V1.
 
 ## D-041 — Analytics append-only
-**Décision :** les snapshots analytics sont ajoutés dans le temps, jamais écrasés.
+**Décision :** snapshots non écrasés.
 
 ## D-042 — Needs Attention dérivé
-**Décision :** pas d'enum universel `NEEDS_ATTENTION`; la vue opérationnelle est dérivée.
+**Décision :** pas d'état universel dédié.
 
-## D-043 — CreativePlan WAITING_FOR_INPUTS
-**Décision :** `WAITING_FOR_INPUTS` remplace les blockers séparés recording/capture. Les dépendances manquantes sont dérivées des relations réelles.
+## D-043 — WAITING_FOR_INPUTS
+**Décision :** blocker générique, dépendances dérivées.
 
-## D-044 — Schéma Prisma concret figé comme artefact de spec
-**Décision :** le schéma Prisma complet est stocké sous `docs/spec-artifacts/schema.prisma` tant que l'implémentation n'est pas autorisée.
+## D-044 — Prisma concret comme spec artifact
+**Décision :** schéma canonique sous docs/spec-artifacts avant implémentation.
 
-## D-045 — Config Prisma documentée mais non exécutée
-**Décision :** `docs/spec-artifacts/prisma.config.ts` documente la future config Prisma 7 ; elle n'est pas encore une config d'application active.
+## D-045 — Config Prisma documentée
+**Décision :** config future stockée comme artefact, non active.
+
+## D-046 — Capacités IA comme contrats, pas agents autonomes
+**Décision :** Creator, CreativeDirector, EditingIntelligence, CreativeQA et Analyst sont des capacités structurées derrière un gateway.
+
+## D-047 — Knowledge Snapshot versionné
+**Décision :** chaque appel IA reçoit un snapshot de connaissance Vision versionné/hashé et récupérable historiquement.
+
+## D-048 — Validation multi-étapes des sorties IA
+**Décision :** schema → references → business rules → claims → checks déterministes avant acceptation.
+
+## D-049 — Références IA whitelistées
+**Décision :** tout ID généré doit appartenir aux candidats/ressources fournis à l'appel.
+
+## D-050 — Creative QA evidence-bound
+**Décision :** la QA ne peut évaluer que les dimensions pour lesquelles elle a reçu une preuve exploitable.
+
+## D-051 — Prompt Registry immuable/versionné
+**Décision :** prompt key/version/hash sont figés dans chaque ModelInvocation.
+
+## D-052 — Déduplication déterministe
+**Décision :** l'IA reçoit la mémoire, mais le moteur effectue les contrôles exacts/semantiques.
+
+## D-053 — Claims contrôlés
+**Décision :** faits produit/prix/stats externes exigent une preuve/version connue ; opinion et expérience sont distinguées.
+
+## D-054 — Analyst prudent
+**Décision :** fenêtres de mesure, comparabilité, NULL et niveau de confiance sont obligatoires.
+
+## D-055 — Coûts IA bornés
+**Décision :** chaque capability a timeout, retries, token/cost ceilings et fallback sous même contrat.
