@@ -66,14 +66,14 @@ Mark an item `[x]` only after explicit validation.
 - [x] failure handling
 
 ## UX
-- [ ] navigation
-- [ ] campaign/brief screen
-- [ ] concepts screen
-- [ ] recording pack screen
-- [ ] production screen
-- [ ] review screen
-- [ ] calendar
-- [ ] analytics
+- [x] navigation
+- [x] campaign/brief screen
+- [x] concepts screen
+- [x] recording pack screen
+- [x] production screen
+- [x] review screen
+- [x] calendar
+- [x] analytics
 
 ## Distribution
 - [ ] TikTok adapter contract

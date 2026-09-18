@@ -11,10 +11,11 @@ Pattern Library accepted.
 Editing Intelligence accepted.  
 Video Engine accepted.  
 Product Capture / Playwright accepted.  
-Dashboard UX is now the active design task.
+Dashboard UX accepted.  
+Distribution is now the active design task.
 
 ## Version
-Draft: `spec-v0.10`
+Draft: `spec-v0.11`
 
 ## Foundation status
 - Product: ACCEPTED
@@ -27,33 +28,27 @@ Draft: `spec-v0.10`
 - Editing Intelligence: ACCEPTED
 - Video Engine: ACCEPTED
 - Product Capture / Playwright: ACCEPTED
+- Dashboard UX: ACCEPTED
 
-## Accepted Product Capture principles
-- deterministic CaptureScenarioVersion execution
-- controlled Vision capture environment/account
-- fresh BrowserContext per CaptureRun
-- secret-backed auth state
-- stable locator contract
-- semantic readiness rather than networkidle/fixed sleeps
-- bounded capture DSL
-- screenshot/video/mark-moment outputs
-- fixture-first product proof
-- bounded live-provider variability/cost
-- protected traces and failure diagnostics
-- restricted origins/destructive actions
-- browser/build version pinning
-- five initial V1 capture scenarios
+## Accepted Dashboard UX principles
+- two human decision gates remain central
+- Needs Attention is a derived operator surface
+- no mandatory script/creative-plan approval
+- Production shows business stages, not raw queue internals
+- Recording Pack is optimized for raw takes
+- final Review is video-first
+- publication uncertainty requires reconciliation
+- analytics displays uncertainty/null/comparability honestly
+- desktop-first, with review/upload/attention supported on mobile
+- async workflow state survives navigation/reload
 
-## Canonical Product Capture spec artifacts
-- `docs/spec-artifacts/product-capture/schema.ts`
-- `docs/spec-artifacts/product-capture/browser-profiles.json`
-- `docs/spec-artifacts/product-capture/safety-policies.json`
-- `docs/spec-artifacts/product-capture/scenarios/*.json`
-
-These remain specification artifacts until implementation authorization.
+## Canonical Dashboard UX artifacts
+- `docs/spec-artifacts/dashboard-ux/screen-contracts.json`
+- `docs/spec-artifacts/dashboard-ux/review-actions.json`
+- `docs/spec-artifacts/dashboard-ux/needs-attention.json`
 
 ## Gate
 Codex implementation is **NOT authorized** until all required items are validated and this document reaches `spec-v1.0`.
 
 ## Next specification
-Dashboard UX specification.
+Distribution / publisher adapters.

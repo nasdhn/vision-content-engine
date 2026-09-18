@@ -1,0 +1,54 @@
+{
+  "version": "v1",
+  "primaryRoutes": [
+    "/",
+    "/campaigns",
+    "/campaigns/:id",
+    "/concepts",
+    "/concepts/:id",
+    "/production",
+    "/production/:id",
+    "/review",
+    "/review/:renderId",
+    "/calendar",
+    "/published",
+    "/publications/:id",
+    "/analytics",
+    "/assets",
+    "/assets/:id",
+    "/patterns",
+    "/templates",
+    "/settings",
+    "/attention"
+  ],
+  "navigation": [
+    "Dashboard",
+    "Ideas & Campaigns",
+    "Concepts",
+    "Production",
+    "Review",
+    "Calendar",
+    "Published",
+    "Analytics",
+    "Assets",
+    "Templates",
+    "Settings"
+  ],
+  "prioritySurfaces": [
+    "Needs Attention",
+    "Concept Review",
+    "Final Review"
+  ],
+  "humanGates": [
+    "CONCEPT_VERSION",
+    "RENDER"
+  ],
+  "desktopFirst": true,
+  "mobileRequired": [
+    "Review video",
+    "Approve/reject render",
+    "Recording instructions",
+    "Recording upload",
+    "Needs Attention"
+  ]
+}

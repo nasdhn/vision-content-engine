@@ -1,0 +1,21 @@
+{
+  "version": "v1",
+  "sources": [
+    "PUBLICATION_PUBLISHING_UNKNOWN",
+    "PLATFORM_ACCOUNT_REAUTH_REQUIRED",
+    "OUTBOX_FAILED",
+    "RENDER_FAILED",
+    "CAPTURE_FAILED",
+    "WORKFLOW_BLOCKED",
+    "RECORDING_REQUIRED",
+    "AI_SCHEMA_RETRY_EXHAUSTED",
+    "PLATFORM_PERMANENT_REJECTION"
+  ],
+  "requiredFields": [
+    "title",
+    "reason",
+    "affectedContent",
+    "recommendedAction",
+    "safeAction"
+  ]
+}

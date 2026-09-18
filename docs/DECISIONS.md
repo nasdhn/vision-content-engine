@@ -308,3 +308,33 @@ Toute modification significative doit ajouter une entrée datée.
 
 ## D-102 — Cinq scénarios initiaux
 **Décision :** AGENT_QUERY_TO_RESULTS, AGENT_RESULT_DETAIL, MISSION_RUNNING_TO_DONE, PRICING_PAGE, LANDING_PRODUCT_PROOF.
+
+## D-103 — Dashboard centré sur décisions humaines
+**Décision :** UX optimisée autour des deux gates Concept/Render et des exceptions, pas autour des entités/queues internes.
+
+## D-104 — Needs Attention dérivé comme surface principale
+**Décision :** incidents/re-auth/unknown/blockers sont agrégés dans une vue opérateur dédiée.
+
+## D-105 — Review vidéo prioritaire
+**Décision :** la vidéo finale est dominante visuellement; QA/script/CTA restent contextuels.
+
+## D-106 — Pas de gate script
+**Décision :** script éditable mais pas de validation obligatoire séparée.
+
+## D-107 — Production simplifiée
+**Décision :** l'UI montre étapes métier et prochaine action; les jobs/queues détaillés restent diagnostics.
+
+## D-108 — Recording Pack orienté raw material
+**Décision :** l'utilisateur fournit prises/voix, jamais un TikTok fini.
+
+## D-109 — Analytics prudentes
+**Décision :** NULL ≠ 0, attribution inferred distincte, confiance visible, pas de faux leaderboard.
+
+## D-110 — Dashboard desktop-first avec review/upload mobile
+**Décision :** opérations complexes desktop; approbation/upload/attention accessibles sur mobile.
+
+## D-111 — Publication unknown sans retry naïf
+**Décision :** `PUBLISHING_UNKNOWN` propose reconciliation, jamais retry direct.
+
+## D-112 — UX async persistante
+**Décision :** quitter/recharger une vue n'annule pas les workflows longs; les états sont canoniques côté backend.
