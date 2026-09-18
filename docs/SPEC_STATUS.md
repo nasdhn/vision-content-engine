@@ -6,54 +6,61 @@ System architecture accepted.
 Domain model accepted.  
 Prisma structural review accepted.  
 Workflow specification accepted.  
-Final Prisma schema draft is now the active validation task.
+Concrete Prisma schema specification accepted.  
+AI contract specification is now the active design task.
 
 ## Version
-Draft: `spec-v0.4`
+Draft: `spec-v0.5`
 
-## Accepted workflow decisions
-- Brief / Idea / Concept lifecycles
-- Script / CreativePlan / EditingPlan lifecycles
-- human RecordingRequest lifecycle
-- CaptureRun lifecycle
-- Render / RenderAttempt semantics
-- Creative QA behavior
-- two mandatory human review gates
-- Publication lifecycle including `PUBLISHING_UNKNOWN`
-- analytics append-only measurement
-- weekly analysis workflow
-- `WorkflowRun.WAITING` semantics
-- retry vs regeneration distinction
-- recovery behavior after worker/control crashes
-- stable failure taxonomy
-- workflow-owned lifecycle enums
+## Foundation status
+- Product: ACCEPTED
+- Architecture: ACCEPTED
+- Domain Model: ACCEPTED
+- Prisma structural decisions: ACCEPTED
+- Workflows: ACCEPTED
+- Concrete Prisma schema specification: ACCEPTED
 
-## Why Prisma schema draft is still not checked
-The workflow enums are now known, but the draft must be revised to include:
-- UUID v7
-- Prisma 7 generator/config shape
-- lifecycle enums
-- CaptureRunAsset
-- RenderInputAsset
-- TemplateVersionAsset
-- corrected Approval relation/integrity
-- final delete/index directions
+## Important
+The Prisma schema is still a **spec artifact**, not active application code.
+
+Canonical design artifacts:
+- `docs/spec-artifacts/schema.prisma`
+- `docs/spec-artifacts/prisma.config.ts`
+
+During implementation bootstrap these must be mechanically verified with the pinned Prisma 7 toolchain before any migration is applied.
+
+## Accepted correction
+`CreativePlanStatus` uses:
+
+- DRAFT
+- READY
+- WAITING_FOR_INPUTS
+- READY_FOR_EDITING
+- SUPERSEDED
+- ARCHIVED
+
+Missing recording/capture/asset dependencies are derived from relational state rather than encoded as mutually exclusive blocker statuses.
 
 ## Still to freeze before Codex implementation
-- final Prisma schema draft
-- exact AI JSON contracts
+- Brand/Product Knowledge contract
+- Creator contract
+- Creative Director contract
+- Editing Intelligence contract
+- Creative QA contract
+- Analyst contract
+- AI provider gateway + prompt registry
 - Pattern schema details
-- EditingPlan contract
+- EditingPlan media contracts
 - template/render contracts
 - Playwright capture contract
 - dashboard screen contracts
 - platform publisher interfaces
-- analytics normalization model
+- analytics normalization/learning rules
 - deployment/security details
-- acceptance criteria per implementation phase
+- tests and acceptance criteria per implementation phase
 
 ## Gate
 Codex implementation is **NOT authorized** until all required items are validated and this document reaches `spec-v1.0`.
 
 ## Next specification
-`docs/03B_PRISMA_SCHEMA_FINAL_DRAFT.md`
+`docs/05_AI_CONTRACTS.md`

@@ -24,7 +24,7 @@ Mark an item `[x]` only after explicit validation.
 - [x] Entity list
 - [x] Relationships
 - [x] Versioning rules
-- [ ] Prisma schema draft
+- [x] Prisma schema draft
 - [x] audit model
 - [x] cost model
 

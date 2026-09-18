@@ -1,7 +1,7 @@
 # 04 — Workflows
 
 **Status:** ACCEPTED  
-**Specification version:** spec-v0.4  
+**Specification version:** spec-v0.5  
 **Scope:** Vision Content Engine V1  
 **Depends on:** Architecture ACCEPTED, Domain Model ACCEPTED, Prisma structural review ACCEPTED
 **Accepted:** 2026-09-18
@@ -197,8 +197,7 @@ Version history, not status mutation, expresses most revisions.
 ```text
 DRAFT
 READY
-BLOCKED_ON_RECORDING
-BLOCKED_ON_CAPTURE
+WAITING_FOR_INPUTS
 READY_FOR_EDITING
 SUPERSEDED
 ARCHIVED
@@ -212,16 +211,24 @@ After CreativePlanVersion is created:
 DRAFT
  ↓ validate
 READY
- ├─ needs human recordings → BLOCKED_ON_RECORDING
- ├─ needs product capture  → BLOCKED_ON_CAPTURE
- ├─ needs both             → blocked until both satisfied
- └─ needs neither          → READY_FOR_EDITING
+ ├─ missing required human recording(s) ┐
+ ├─ missing required product capture(s) ├→ WAITING_FOR_INPUTS
+ ├─ missing required asset(s)           ┘
+ └─ all required inputs satisfied        → READY_FOR_EDITING
 ```
 
-When both required recordings and capture outputs become accepted/ready:
+`WAITING_FOR_INPUTS` is deliberately generic because a content item may be missing several input types at once.
+
+The exact blockers are derived from relational state:
+
+- `RecordingRequest`
+- `CaptureRun`
+- required `Asset` relations
+
+When all required inputs are satisfied:
 
 ```text
-BLOCKED_* → READY_FOR_EDITING
+WAITING_FOR_INPUTS → READY_FOR_EDITING
 ```
 
 If a new CreativePlanVersion materially changes requirements:

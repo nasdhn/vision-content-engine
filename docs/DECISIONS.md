@@ -102,7 +102,7 @@ Toute modification significative doit ajouter une entrée datée.
 ## D-033 — Prisma Migrate autoritaire
 **Décision :** Prisma Migrate est le workflow de schéma ; `db push` n'est pas la source de vérité de production.
 
-## D-034 — Enums de workflow différés
+## D-034 — Enums de workflow propriétaires du workflow
 **Décision :** les lifecycle enums sont définis par `04_WORKFLOWS.md`.
 
 ## D-035 — Deux gates humaines par défaut
@@ -127,4 +127,13 @@ Toute modification significative doit ajouter une entrée datée.
 **Décision :** les snapshots analytics sont ajoutés dans le temps, jamais écrasés.
 
 ## D-042 — Needs Attention dérivé
-**Décision :** pas d'enum universel `NEEDS_ATTENTION`; la vue opérationnelle est dérivée de failures, unknown states, reauth, blocked dependencies, etc.
+**Décision :** pas d'enum universel `NEEDS_ATTENTION`; la vue opérationnelle est dérivée.
+
+## D-043 — CreativePlan WAITING_FOR_INPUTS
+**Décision :** `WAITING_FOR_INPUTS` remplace les blockers séparés recording/capture. Les dépendances manquantes sont dérivées des relations réelles.
+
+## D-044 — Schéma Prisma concret figé comme artefact de spec
+**Décision :** le schéma Prisma complet est stocké sous `docs/spec-artifacts/schema.prisma` tant que l'implémentation n'est pas autorisée.
+
+## D-045 — Config Prisma documentée mais non exécutée
+**Décision :** `docs/spec-artifacts/prisma.config.ts` documente la future config Prisma 7 ; elle n'est pas encore une config d'application active.
