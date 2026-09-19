@@ -5,7 +5,13 @@
   "type": "module",
   "license": "UNLICENSED",
   "dependencies": {
-    "@prisma/client": "7.10.0"
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0",
+    "@vision/domain": "workspace:*",
+    "pg": "8.23.0"
   },
-  "exports": "./src/index.ts"
+  "exports": "./src/index.ts",
+  "devDependencies": {
+    "@types/pg": "8.23.1"
+  }
 }

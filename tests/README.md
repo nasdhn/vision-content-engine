@@ -1,12 +1,24 @@
-# Phase 0 test harness
+# Deterministic tests
 
-`pnpm test` uses synthetic, in-process fixtures only. The scripted provider and manual clock
-are test utilities for future fake AI, publisher and analytics adapters. They implement no
-business workflow or provider contract yet. Real-provider tests are absent and disabled.
+`pnpm test` runs unit, frozen-spec, migration-contract and in-process API tests without a database
+or external provider. The scripted provider and manual clock remain test utilities only.
 
-`pnpm test:infra` is an explicit local integration canary: PostgreSQL query, Redis PING,
-signed S3 write/read/delete and anonymous-access denial. It requires `pnpm infra:up`,
-refuses remote endpoints and never applies business migrations.
+`pnpm test:postgres` runs real PostgreSQL persistence tests in a uniquely named disposable local
+database. It loads the ignored local environment, refuses remote hosts, creates its own database,
+applies the reviewed migration and cleans up only that database. Requires local CREATEDB privileges.
+No application data is truncated. No social, AI, capture, rendering or analytics provider is called.
 
-Domain, outbox, human gates, publication reconciliation, media and attribution tests belong
-to their separately authorized implementation phases. Passing this harness does not certify V1.
+The PostgreSQL suite checks migration replay/checksum/catalog, all manual constraints, atomic
+rollback, immutable version allocation, human gates, exact lineage, typed cost/audit, NULL versus
+zero, durable lease concurrency and fencing. Concurrent tests use separate connections. Expiry is
+set explicitly in fixture rows and lock waits use barriers/catalog observations, without sleeps
+or retries. Outbox redelivery is tested with an in-memory deduplicating transport stand-in.
+
+`pnpm check:phase1` runs `check`, `test:postgres` and `build:web`. CI starts the pinned PostgreSQL
+Compose service and runs both deterministic suites. Tests never silently skip when PostgreSQL is
+required and unavailable.
+
+`pnpm test:infra` remains the explicit local PostgreSQL/Redis/private-S3 canary. It requires
+`pnpm infra:up`, refuses remote endpoints and never applies business migrations.
+
+Phase 2 and provider integration remain unauthorized in this tranche.

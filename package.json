@@ -28,7 +28,10 @@
     "infra:up": "docker compose --env-file .env -f infra/compose.yaml up -d --wait --wait-timeout 120",
     "infra:down": "docker compose --env-file .env -f infra/compose.yaml down",
     "infra:status": "docker compose --env-file .env -f infra/compose.yaml ps",
-    "test:infra": "tsx scripts/check-local-infra.ts"
+    "test:infra": "tsx scripts/check-local-infra.ts",
+    "test:postgres": "vitest run --config vitest.postgres.config.ts",
+    "db:migrate:local": "tsx scripts/migrate-local.ts",
+    "check:phase1": "pnpm check && pnpm test:postgres && pnpm build:web"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

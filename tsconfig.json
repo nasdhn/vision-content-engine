@@ -1,6 +1,8 @@
 {
   "extends": "./tsconfig.base.json",
-  "compilerOptions": { "types": ["node"] },
+  "compilerOptions": {
+    "types": ["node"]
+  },
   "include": [
     "apps/**/*.ts",
     "apps/**/*.tsx",
@@ -8,7 +10,8 @@
     "tests/**/*.ts",
     "scripts/**/*.ts",
     "prisma.config.ts",
-    "vitest.config.ts"
+    "vitest.config.ts",
+    "vitest.postgres.config.ts"
   ],
   "exclude": ["node_modules", "**/dist", "packages/database/src/generated"]
 }
