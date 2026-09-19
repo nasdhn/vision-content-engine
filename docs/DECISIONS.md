@@ -536,3 +536,18 @@ Toute modification significative doit ajouter une entrée datée.
 
 ## D-178 — Legacy security spec removed
 **Décision :** `13_SECURITY_OBSERVABILITY.md` supprimé au profit de `13_SECURITY_OBSERVABILITY_OPERATIONS.md`.
+
+## D-179 — spec-v1.0 is the implementation baseline
+**Décision :** le tag `spec-v1.0` sur le commit final de spécification devient la baseline normative du V1.
+
+## D-180 — Codex Master Prompt authorizes Phase 0 only
+**Décision :** le handoff final n'autorise que Bootstrap & repository; chaque phase suivante exige une autorisation explicite.
+
+## D-181 — Final validation is structural, Prisma CLI validation happens in Phase 0
+**Décision :** JSON/TS/static Prisma/cross-artifact sanity checks sont verts; `prisma format/validate/generate` avec dépendance pinée reste un gate Phase 0.
+
+## D-182 — Historical sequencing text is non-operative
+**Décision :** les anciens paragraphes After acceptance / Next des specs acceptées décrivent le processus de freeze historique et ne rouvrent aucune décision.
+
+## D-183 — External policy/licence gates remain activation-time checks
+**Décision :** TikTok/Instagram/YouTube/provider terms et licence Remotion sont re-vérifiés avant activation réelle sans changer silencieusement la spec.

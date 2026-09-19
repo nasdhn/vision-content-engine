@@ -1262,7 +1262,7 @@ docs/spec-artifacts/distribution/
 - [x] manual completion honesty accepted.
 - [x] security/observability accepted.
 
-Next:
+Historical spec-sequencing note — completed:
 
 1. freeze Distribution;
 2. proceed to Analytics & Learning.

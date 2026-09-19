@@ -1300,7 +1300,7 @@ This prioritizes the human gates before secondary administration.
 - [x] accessibility baseline accepted.
 - [x] implementation ordering accepted.
 
-Next:
+Historical spec-sequencing note — completed:
 
 1. freeze this specification;
 2. generate screen/action spec artifacts;

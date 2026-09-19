@@ -1739,7 +1739,7 @@ docs/spec-artifacts/security-operations/
 - [x] local developer safety accepted.
 - [x] dependency/licensing/terms discipline accepted.
 
-Next:
+Historical spec-sequencing note — completed:
 
 1. freeze Security / Observability / Operations;
 2. proceed to Test Strategy & Acceptance.

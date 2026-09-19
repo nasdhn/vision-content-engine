@@ -1556,7 +1556,7 @@ docs/spec-artifacts/test-strategy/
 - [x] Definitions of Done accepted.
 - [x] acceptance report accepted.
 
-Next:
+Historical spec-sequencing note — completed:
 
 1. freeze Test Strategy & Acceptance;
 2. perform final specification reconciliation;

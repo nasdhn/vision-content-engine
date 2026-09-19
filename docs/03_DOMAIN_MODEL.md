@@ -2089,7 +2089,7 @@ The domain model can move from `PROPOSED` to `ACCEPTED` when:
 - [x] Required unique/index directions are accepted.
 - [x] Deferred multi-tenant/billing entities are confirmed out of scope.
 
-After acceptance:
+Historical freeze actions — completed:
 
 1. mark this document `ACCEPTED`;
 2. update `DECISIONS.md`;
@@ -2100,9 +2100,9 @@ After acceptance:
 
 ---
 
-# 37. Questions intentionally left for review
+# 37. Historical review questions — resolved below
 
-The model deliberately leaves a few choices for explicit validation before acceptance:
+These questions were deliberately left open during the original review and are now resolved in section 38:
 
 1. Should `Idea` remain a first-class entity, or should concepts derive directly from Briefs?
 2. Should `RecordingRequest` support multiple takes? Proposed answer: yes.

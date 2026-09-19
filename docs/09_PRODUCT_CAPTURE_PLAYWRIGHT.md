@@ -820,7 +820,7 @@ Auth state/secrets are never spec artifacts.
 - [x] browser/build pinning accepted.
 - [x] five initial scenario seeds accepted.
 
-After acceptance:
+Historical freeze actions — completed:
 
 1. freeze `09_PRODUCT_CAPTURE_PLAYWRIGHT.md`;
 2. generate scenario/Zod spec artifacts;

@@ -116,5 +116,5 @@ Mark an item `[x]` only after explicit validation.
 - [x] acceptance criteria for every phase
 - [x] stop conditions
 - [x] inspection-first rules
-- [ ] Master Prompt
-- [ ] final spec tag `spec-v1.0`
+- [x] Master Prompt
+- [x] final spec tag `spec-v1.0`

@@ -442,19 +442,18 @@ Kubernetes / Temporal / Kafka
 
 ---
 
-# 21. Gate after this reconciliation
+# 21. Final freeze completion
 
-After this corrective commit:
+The spec-v0.16 reconciliation was followed by the final `spec-v1.0` freeze.
 
-```text
-spec-v0.16
-```
+Completed:
 
-The final freeze step must:
+1. reconciled artifact sanity pass;
+2. final checklist closure;
+3. final Codex Master Prompt;
+4. `SPEC_STATUS.md` → `spec-v1.0`;
+5. final validation report;
+6. final spec tag command defined;
+7. Phase 0 authorization made explicit in the Master Prompt.
 
-1. validate the reconciled schema/artifacts;
-2. close the checklist;
-3. generate the final Codex Master Prompt;
-4. mark `SPEC_STATUS.md` as `spec-v1.0`;
-5. create/tag the final spec commit;
-6. only then authorize implementation Phase 0.
+No application implementation is performed by the specification freeze itself.

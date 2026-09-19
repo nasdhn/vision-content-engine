@@ -1597,7 +1597,7 @@ These remain spec artifacts until implementation is authorized.
 
 # 52. Acceptance checklist
 
-The AI contract specification can move to ACCEPTED when:
+Final AI-contract acceptance criteria — all satisfied:
 
 - [x] AI processing boundary accepted.
 - [x] shared request/response envelope accepted.
@@ -1631,7 +1631,7 @@ The AI contract specification can move to ACCEPTED when:
 - [x] bounded raw request/response retention accepted.
 - [x] Creative QA ModelInvocation linkage accepted.
 
-After acceptance:
+Historical freeze actions — completed:
 
 1. freeze `05_AI_CONTRACTS.md`;
 2. update Decisions/Status/Checklist;

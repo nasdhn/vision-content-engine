@@ -1482,7 +1482,7 @@ This is not scope creep: it closes a lineage hole revealed by allowing platform-
 - [x] renderer abstraction accepted.
 - [x] Remotion licensing gate accepted.
 
-After acceptance:
+Historical freeze actions — completed:
 
 1. freeze `08_VIDEO_ENGINE.md`;
 2. generate renderer/template spec artifacts;

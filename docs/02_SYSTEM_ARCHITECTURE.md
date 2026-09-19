@@ -1159,7 +1159,7 @@ The architecture does freeze the boundaries that those choices must respect.
 
 ## 30. Architecture acceptance criteria
 
-This architecture may move from `PROPOSED` to `ACCEPTED` when all statements below are validated:
+Final acceptance criteria — all satisfied:
 
 - [x] Content Engine remains a separate repository from Vision.
 - [x] PostgreSQL is canonical business state.
@@ -1179,7 +1179,7 @@ This architecture may move from `PROPOSED` to `ACCEPTED` when all statements bel
 - [x] Initial deployment may use Docker Compose on one dedicated Content Engine host.
 - [x] No Kubernetes/Temporal/microservice-database split in V1.
 
-After acceptance:
+Historical freeze actions — completed:
 
 1. mark this document `ACCEPTED`;
 2. record new ADRs where needed;

@@ -1548,7 +1548,7 @@ Cross-field/timeline refinements must be included, not only structural Zod valid
 - [x] descriptive editing diagnostics accepted.
 - [x] explicit V1 anti-patterns accepted.
 
-After acceptance:
+Historical freeze actions — completed:
 
 1. freeze `07_EDITING_INTELLIGENCE.md`;
 2. generate EditingProfile seed artifacts;

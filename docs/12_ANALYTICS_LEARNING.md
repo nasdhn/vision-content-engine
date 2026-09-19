@@ -1441,7 +1441,7 @@ docs/spec-artifacts/analytics-learning/
 - [x] weekly report accepted.
 - [x] data-quality/metric-drift policy accepted.
 
-Next:
+Historical spec-sequencing note — completed:
 
 1. freeze Analytics & Learning;
 2. proceed to Security / Observability / Operations.

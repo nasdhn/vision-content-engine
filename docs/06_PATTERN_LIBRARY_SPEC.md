@@ -1148,7 +1148,7 @@ These remain specification artifacts until implementation authorization.
 - [x] Pattern activation/deprecation policy accepted.
 - [x] external Researcher remains deferred.
 
-After acceptance:
+Historical freeze actions — completed:
 
 1. freeze `06_PATTERN_LIBRARY_SPEC.md`;
 2. create strict Pattern Zod artifact;

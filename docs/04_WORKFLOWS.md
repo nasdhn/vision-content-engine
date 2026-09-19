@@ -1010,7 +1010,7 @@ ModelInvocationStatus
 
 # 34. Acceptance criteria
 
-The workflow spec can move to ACCEPTED when:
+Final workflow acceptance criteria — all satisfied:
 
 - [x] Brief lifecycle accepted.
 - [x] Idea lifecycle accepted.
@@ -1032,7 +1032,7 @@ The workflow spec can move to ACCEPTED when:
 - [x] Recovery behavior accepted.
 - [x] Lifecycle enum ownership accepted.
 
-After acceptance:
+Historical freeze actions — completed:
 
 1. mark `04_WORKFLOWS.md` ACCEPTED;
 2. update Decisions/Status/Checklist;
