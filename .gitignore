@@ -63,6 +63,9 @@ credentials.json
 secrets.json
 service-account*.json
 
+# Reproducible generated Prisma client (pnpm prisma:generate)
+packages/database/src/generated/
+
 # Allow deterministic test media fixtures
 !tests/fixtures/**/*.mp4
 !tests/fixtures/**/*.mov

@@ -1,0 +1,23 @@
+{
+  "name": "@vision/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@vision/shared": "workspace:*",
+    "@vision/observability": "workspace:*",
+    "@nestjs/common": "11.2.5",
+    "@nestjs/core": "11.2.5",
+    "@nestjs/platform-express": "11.2.5",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2",
+    "pg": "8.23.0",
+    "ioredis": "5.11.1",
+    "@aws-sdk/client-s3": "3.1136.0",
+    "dotenv": "17.4.2"
+  },
+  "devDependencies": {
+    "@types/pg": "8.23.1"
+  }
+}

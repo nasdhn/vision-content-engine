@@ -1,0 +1,11 @@
+# Frozen specification: preserve manifest hashes.
+docs/0*.md
+docs/1*.md
+docs/DECISIONS.md
+docs/SPEC_*.md
+docs/adr/
+docs/spec-artifacts/
+**/generated/
+**/dist/
+pnpm-lock.yaml
+infra/migration-preview/*.sql

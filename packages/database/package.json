@@ -1,0 +1,11 @@
+{
+  "name": "@vision/database",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@prisma/client": "7.10.0"
+  },
+  "exports": "./src/index.ts"
+}

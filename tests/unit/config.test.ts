@@ -1,0 +1,44 @@
+import { describe, expect, it } from 'vitest';
+import { parseConfig, assertLocalBootstrap } from '../../packages/shared/src/index.js';
+import { configFixture } from '../support/config.js';
+
+describe('bootstrap configuration safety', () => {
+  it('defaults all required kill switches to paused and remote providers to disabled', () => {
+    const config = parseConfig(configFixture);
+    expect(
+      Object.entries(config)
+        .filter(([key]) => key.startsWith('PAUSE_'))
+        .map(([, value]) => value),
+    ).toEqual([true, true, true, true, true]);
+    expect(config.VCE_REAL_PROVIDERS_ENABLED).toBe('false');
+    expect(Object.isFrozen(config)).toBe(true);
+  });
+  it('parses false literally and rejects misspelled booleans or application keys', () => {
+    expect(parseConfig({ ...configFixture, PAUSE_CAPTURE: 'false' }).PAUSE_CAPTURE).toBe(false);
+    expect(() => parseConfig({ ...configFixture, PAUSE_CAPTURE: 'FALSE' })).toThrow();
+    expect(() => parseConfig({ ...configFixture, PAUSE_CAPTUR: 'false' })).toThrow();
+  });
+  it('ignores unrelated shell variables and rejects missing dependencies', () => {
+    expect(() => parseConfig({ ...configFixture, PATH: '/bin' })).not.toThrow();
+    expect(() => parseConfig({ ...configFixture, DATABASE_URL: undefined })).toThrow(
+      'DATABASE_URL',
+    );
+  });
+  it('does not reflect secret-bearing input values in validation errors', () => {
+    expect(() =>
+      parseConfig({ ...configFixture, DATABASE_URL: 'invalid-sensitive-value' }),
+    ).toThrow('Invalid runtime configuration fields: DATABASE_URL');
+  });
+  it('prevents real providers and nonlocal runtime activation during Phase 0', () => {
+    expect(() => parseConfig({ ...configFixture, VCE_REAL_PROVIDERS_ENABLED: 'true' })).toThrow();
+    expect(() =>
+      assertLocalBootstrap(parseConfig({ ...configFixture, VCE_ENV: 'PRODUCTION' })),
+    ).toThrow();
+    expect(() =>
+      assertLocalBootstrap(
+        parseConfig({ ...configFixture, S3_ENDPOINT: 'https://storage.example.test' }),
+      ),
+    ).toThrow();
+    expect(() => assertLocalBootstrap(parseConfig(configFixture))).not.toThrow();
+  });
+});

@@ -1,0 +1,47 @@
+{
+  "name": "vision-content-engine",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=24.21.0 <25",
+    "pnpm": "10.34.5"
+  },
+  "scripts": {
+    "prisma:format": "prisma format",
+    "prisma:validate": "prisma validate",
+    "prisma:generate": "prisma generate",
+    "db:preview": "prisma migrate diff --from-empty --to-schema prisma/schema.prisma --script --output infra/migration-preview/initial.generated.sql",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "check:secrets": "node scripts/check-secrets.mjs",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm check:secrets && pnpm prisma:validate && pnpm test",
+    "dev:api": "tsx --tsconfig tsconfig.json apps/api/src/main.ts",
+    "dev:web": "pnpm --filter @vision/web dev",
+    "build:web": "pnpm --filter @vision/web build",
+    "local:init": "node scripts/init-local.mjs",
+    "infra:up": "docker compose --env-file .env -f infra/compose.yaml up -d --wait --wait-timeout 120",
+    "infra:down": "docker compose --env-file .env -f infra/compose.yaml down",
+    "infra:status": "docker compose --env-file .env -f infra/compose.yaml ps",
+    "test:infra": "tsx scripts/check-local-infra.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.13.6",
+    "dotenv": "17.4.2",
+    "eslint": "10.11.0",
+    "prettier": "3.9.8",
+    "prisma": "7.10.0",
+    "tsx": "4.23.13",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.70.0",
+    "vite": "7.3.6",
+    "vitest": "4.1.11",
+    "zod": "4.6.5"
+  }
+}
