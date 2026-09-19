@@ -1,0 +1,64 @@
+# Environment / secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+coverage/
+.vite/
+.next/
+out/
+
+# Logs
+*.log
+logs/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.example.json
+
+# Playwright
+playwright-report/
+test-results/
+blob-report/
+.auth/
+storageState.json
+storage-state.json
+
+# Media / render temp
+render-work/
+tmp/
+temp/
+.cache/
+*.mp4
+*.mov
+*.mkv
+*.webm
+*.wav
+*.mp3
+
+# Local object storage
+.minio/
+minio-data/
+
+# Prisma/local DB artifacts
+*.db
+*.db-journal
+
+# Misc secrets / credentials
+credentials.json
+secrets.json
+service-account*.json
