@@ -562,3 +562,18 @@ Aucune autre propriété métier ne change. Voir `20_TIME_SEMANTICS_AMENDMENT.md
 Après validation de l'amendement, `spec-v1.0.1` remplace la baseline courante de D-179 ;
 `spec-v1.0`, son tag et son manifeste restent historiques et immuables. Aucun nouveau tag,
 aucune migration appliquée, aucun push et aucune autorisation de Phase 1.
+
+## D-185 — Durable PostgreSQL leases and fencing tokens
+**Date :** 2026-09-19.
+
+**Décision :** `spec-v1.0.2` ajoute les leases JobAttempt et les claims OutboxEvent durables,
+avec nouveaux tokens UUID à chaque prise/reprise, heartbeats persistants, expirations et
+écritures conditionnelles selon `21_DURABLE_LEASES_FENCING_AMENDMENT.md` et ADR-0025.
+L'horloge PostgreSQL est autoritaire ; durées et intervalles restent de la configuration typée.
+Les quatre CHECK SQL canoniques protègent présence et ordre temporel ; le fencing reste
+assuré par les prédicats d'écriture. OutboxEvent.id reste la clé de déduplication transport.
+L'expiration d'une lease n'autorise jamais un retry aveugle d'un effet externe ambigu :
+Publication reste soumise à PUBLISHING_UNKNOWN et à la réconciliation.
+Après validation, spec-v1.0.2 devient la baseline courante ; les tags/manifests précédents
+restent historiques et inchangés. Cette tranche n'autorise ni Phase 1, ni migration appliquée,
+ni commit, création/déplacement/suppression de tag ou push.

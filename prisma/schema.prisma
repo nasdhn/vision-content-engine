@@ -1259,42 +1259,53 @@ model WorkflowRun {
 }
 
 model JobAttempt {
-  id             String           @id @default(uuid(7)) @db.Uuid
-  workflowRunId  String?          @db.Uuid
-  queueName      String
-  jobType        String
-  operationId    String           @db.Uuid
-  bullJobId      String?
-  attemptNumber  Int
-  status         JobAttemptStatus @default(QUEUED)
-  workerId       String?
-  startedAt      DateTime?        @db.Timestamptz(3)
-  finishedAt     DateTime?        @db.Timestamptz(3)
-  failureCode    String?
-  failureMessage String?
-  createdAt      DateTime         @default(now()) @db.Timestamptz(3)
+  id              String           @id @default(uuid(7)) @db.Uuid
+  workflowRunId   String?          @db.Uuid
+  queueName       String
+  jobType         String
+  operationId     String           @db.Uuid
+  bullJobId       String?
+  attemptNumber   Int
+  status          JobAttemptStatus @default(QUEUED)
+  workerId        String?
+  leaseToken      String?          @db.Uuid
+  leaseAcquiredAt DateTime?        @db.Timestamptz(3)
+  heartbeatAt     DateTime?        @db.Timestamptz(3)
+  leaseExpiresAt  DateTime?        @db.Timestamptz(3)
+  startedAt       DateTime?        @db.Timestamptz(3)
+  finishedAt      DateTime?        @db.Timestamptz(3)
+  failureCode     String?
+  failureMessage  String?
+  createdAt       DateTime         @default(now()) @db.Timestamptz(3)
 
   workflowRun WorkflowRun? @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
 
   @@unique([operationId, attemptNumber, jobType])
   @@index([status, queueName, createdAt])
+  @@index([status, leaseExpiresAt])
 }
 
 model OutboxEvent {
-  id            String       @id @default(uuid(7)) @db.Uuid
-  eventType     String
-  aggregateType String
-  aggregateId   String
-  payloadJson   Json
-  status        OutboxStatus @default(PENDING)
-  attemptCount  Int          @default(0)
-  availableAt   DateTime     @default(now()) @db.Timestamptz(3)
-  dispatchedAt  DateTime?    @db.Timestamptz(3)
-  lastError     String?
-  createdAt     DateTime     @default(now()) @db.Timestamptz(3)
+  id               String       @id @default(uuid(7)) @db.Uuid
+  eventType        String
+  aggregateType    String
+  aggregateId      String
+  payloadJson      Json
+  status           OutboxStatus @default(PENDING)
+  attemptCount     Int          @default(0)
+  availableAt      DateTime     @default(now()) @db.Timestamptz(3)
+  dispatchedAt     DateTime?    @db.Timestamptz(3)
+  lastError        String?
+  claimOwner       String?
+  claimToken       String?      @db.Uuid
+  claimedAt        DateTime?    @db.Timestamptz(3)
+  claimHeartbeatAt DateTime?    @db.Timestamptz(3)
+  claimExpiresAt   DateTime?    @db.Timestamptz(3)
+  createdAt        DateTime     @default(now()) @db.Timestamptz(3)
 
   @@index([status, availableAt])
   @@index([aggregateType, aggregateId])
+  @@index([status, availableAt, claimExpiresAt])
 }
 
 model ModelInvocation {

@@ -877,6 +877,10 @@ CREATE TABLE "JobAttempt" (
     "attemptNumber" INTEGER NOT NULL,
     "status" "JobAttemptStatus" NOT NULL DEFAULT 'QUEUED',
     "workerId" TEXT,
+    "leaseToken" UUID,
+    "leaseAcquiredAt" TIMESTAMPTZ(3),
+    "heartbeatAt" TIMESTAMPTZ(3),
+    "leaseExpiresAt" TIMESTAMPTZ(3),
     "startedAt" TIMESTAMPTZ(3),
     "finishedAt" TIMESTAMPTZ(3),
     "failureCode" TEXT,
@@ -898,6 +902,11 @@ CREATE TABLE "OutboxEvent" (
     "availableAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "dispatchedAt" TIMESTAMPTZ(3),
     "lastError" TEXT,
+    "claimOwner" TEXT,
+    "claimToken" UUID,
+    "claimedAt" TIMESTAMPTZ(3),
+    "claimHeartbeatAt" TIMESTAMPTZ(3),
+    "claimExpiresAt" TIMESTAMPTZ(3),
     "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "OutboxEvent_pkey" PRIMARY KEY ("id")
@@ -1273,6 +1282,9 @@ CREATE INDEX "WorkflowRun_rootEntityType_rootEntityId_idx" ON "WorkflowRun"("roo
 CREATE INDEX "JobAttempt_status_queueName_createdAt_idx" ON "JobAttempt"("status", "queueName", "createdAt");
 
 -- CreateIndex
+CREATE INDEX "JobAttempt_status_leaseExpiresAt_idx" ON "JobAttempt"("status", "leaseExpiresAt");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "JobAttempt_operationId_attemptNumber_jobType_key" ON "JobAttempt"("operationId", "attemptNumber", "jobType");
 
 -- CreateIndex
@@ -1280,6 +1292,9 @@ CREATE INDEX "OutboxEvent_status_availableAt_idx" ON "OutboxEvent"("status", "av
 
 -- CreateIndex
 CREATE INDEX "OutboxEvent_aggregateType_aggregateId_idx" ON "OutboxEvent"("aggregateType", "aggregateId");
+
+-- CreateIndex
+CREATE INDEX "OutboxEvent_status_availableAt_claimExpiresAt_idx" ON "OutboxEvent"("status", "availableAt", "claimExpiresAt");
 
 -- CreateIndex
 CREATE INDEX "ModelInvocation_purpose_createdAt_idx" ON "ModelInvocation"("purpose", "createdAt");

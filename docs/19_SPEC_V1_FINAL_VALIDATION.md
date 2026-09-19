@@ -218,3 +218,16 @@ semantics and every other schema property. For this correction only, amendment 2
 After the amendment's validation gates pass, `spec-v1.0.1` becomes the current baseline,
 recorded by its new manifest. The existing `spec-v1.0` tag and manifest remain immutable.
 No tag is created or moved; no SQL is applied. This amendment does not authorize Phase 1.
+
+---
+
+# 12. Post-freeze amendment — spec-v1.0.2 (2026-09-19)
+
+The earlier validation and spec-v1.0.1 amendment records remain historical.
+`docs/21_DURABLE_LEASES_FENCING_AMENDMENT.md` and ADR-0025 add the explicit durable PostgreSQL
+lease/claim and fencing contract, nine nullable fields, two recovery indexes and four manual
+CHECKs. Amendment 21 governs this limited subject; amendment 20 continues to govern UTC instants.
+
+After its validation gates pass, spec-v1.0.2 is the current baseline, covered by a new manifest.
+Both earlier tags and manifests remain immutable. This tranche applies no migration and
+creates no runtime service, commit or Git tag. Phase 1 and Phase 2 remain unauthorized here.

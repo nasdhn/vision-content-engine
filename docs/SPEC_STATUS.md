@@ -111,3 +111,21 @@ The preceding version, tag-creation and first-validation instructions record the
 - No migration is applied. No Git tag is created, moved or deleted. No push is performed.
 
 After validation, stop and report. The historical “Next action” above must not be executed.
+
+## Current baseline amendment — spec-v1.0.2 (2026-09-19)
+
+This update supersedes earlier dated baseline instructions only for the accepted durable
+lease/fencing amendment. Prior freeze and amendment sections remain historical records.
+
+- Current specification after the validation gates: **spec-v1.0.2**.
+- Normative contract: `21_DURABLE_LEASES_FENCING_AMENDMENT.md`, ADR-0025 and D-185.
+- Scope: nine nullable lease/claim fields, two recovery indexes and four manual CHECK constraints.
+- DateTime fields: 103, all Timestamptz(3), including the six new nullable UTC instants.
+- Current manifest: `docs/spec-artifacts/spec-v1.0.2-manifest.json` (153 entries).
+- Historical tags/manifests spec-v1.0 and spec-v1.0.1 stay immutable at their existing commits.
+- Precedence: amendment 21 governs durable leases/fencing; amendment 20 still governs UTC
+  instant semantics. All other accepted precedence and product decisions remain unchanged.
+- Phase 1 remains blocked pending separate explicit authorization after amendment review.
+- This tranche is uncommitted: no migration application, tag operation, push or runtime implementation.
+
+After validation, report and stop. Neither Phase 1 nor Phase 2 starts automatically.

@@ -11,7 +11,57 @@ const manifestSchema = z.object({
   files: z.array(z.object({ path: z.string(), sha256: z.string(), sizeBytes: z.number() })),
 });
 
-const historicalManifestPath = 'docs/spec-artifacts/spec-v1.0-manifest.json';
+const historicalManifests = [
+  {
+    version: 'spec-v1.0',
+    count: 146,
+    hash: 'dede443b3889ddbb614b24f0bd2abfd85603e6f39b50bc14eb951455ef3229cd',
+  },
+  {
+    version: 'spec-v1.0.1',
+    count: 149,
+    hash: '82871f4b71028843455715094b52713e9f010773fe61d110bef4d41fb11c1d1f',
+  },
+] as const;
+const manifestPath = (version: string) => `docs/spec-artifacts/${version}-manifest.json`;
+const leaseDefinitions = {
+  JobAttempt: {
+    fields: {
+      leaseToken: 'String? @db.Uuid',
+      leaseAcquiredAt: 'DateTime? @db.Timestamptz(3)',
+      heartbeatAt: 'DateTime? @db.Timestamptz(3)',
+      leaseExpiresAt: 'DateTime? @db.Timestamptz(3)',
+    },
+    index: '@@index([status, leaseExpiresAt])',
+  },
+  OutboxEvent: {
+    fields: {
+      claimOwner: 'String?',
+      claimToken: 'String? @db.Uuid',
+      claimedAt: 'DateTime? @db.Timestamptz(3)',
+      claimHeartbeatAt: 'DateTime? @db.Timestamptz(3)',
+      claimExpiresAt: 'DateTime? @db.Timestamptz(3)',
+    },
+    index: '@@index([status, availableAt, claimExpiresAt])',
+  },
+} as const;
+
+/** Reverse only the nine declared fields and two indexes to recover historical schema bytes. */
+function withoutDurableLeases(schema: string): string {
+  for (const [model, definition] of Object.entries(leaseDefinitions)) {
+    schema = schema.replace(new RegExp(`model ${model} \\{[^}]*\\}`), (block) =>
+      block
+        .split('\n')
+        .filter(
+          (line) =>
+            !Object.hasOwn(definition.fields, line.trim().split(/\s+/)[0] ?? '') &&
+            line.trim() !== definition.index,
+        )
+        .join('\n'),
+    );
+  }
+  return schema;
+}
 const appendedDocuments = new Set([
   'docs/DECISIONS.md',
   'docs/SPEC_STATUS.md',
@@ -19,42 +69,48 @@ const appendedDocuments = new Set([
 ]);
 const sha256 = (content: string | Buffer) => createHash('sha256').update(content).digest('hex');
 
-it('preserves spec-v1.0 and recovers all 146 historical artifacts by reversing only the amendment', async () => {
-  const bytes = await readFile(historicalManifestPath);
-  expect(sha256(bytes)).toBe('dede443b3889ddbb614b24f0bd2abfd85603e6f39b50bc14eb951455ef3229cd');
-  const manifest = manifestSchema.parse(JSON.parse(bytes.toString()));
-  expect(manifest.specVersion).toBe('spec-v1.0');
-  expect(manifest.fileCount).toBe(146);
-  expect(manifest.files).toHaveLength(146);
-  for (const entry of manifest.files) {
-    let original = await readFile(entry.path);
-    if (entry.path === 'docs/spec-artifacts/schema.prisma') {
-      original = Buffer.from(original.toString().replaceAll(' @db.Timestamptz(3)', ''));
-    } else if (appendedDocuments.has(entry.path)) {
-      // These three records are append-only: their original bytes must remain intact.
-      original = original.subarray(0, entry.sizeBytes);
+it.each(historicalManifests)(
+  'preserves $version manifest and every historical artifact',
+  async ({ version, count, hash }) => {
+    const bytes = await readFile(manifestPath(version));
+    expect(sha256(bytes)).toBe(hash);
+    const manifest = manifestSchema.parse(JSON.parse(bytes.toString()));
+    expect(manifest.specVersion).toBe(version);
+    expect(manifest.fileCount).toBe(count);
+    expect(manifest.files).toHaveLength(count);
+    for (const entry of manifest.files) {
+      let original = await readFile(entry.path);
+      if (entry.path === 'docs/spec-artifacts/schema.prisma') {
+        let schema = withoutDurableLeases(original.toString());
+        if (version === 'spec-v1.0') schema = schema.replaceAll(' @db.Timestamptz(3)', '');
+        original = Buffer.from(schema);
+      } else if (appendedDocuments.has(entry.path)) {
+        // Original bytes remain intact; only dated amendment appendices may follow them.
+        original = original.subarray(0, entry.sizeBytes);
+      }
+      expect(sha256(original), entry.path).toBe(entry.sha256);
+      expect(original.length, entry.path).toBe(entry.sizeBytes);
     }
-    expect(sha256(original), entry.path).toBe(entry.sha256);
-    expect(original.length, entry.path).toBe(entry.sizeBytes);
-  }
-});
+  },
+);
 
-it('validates the current spec-v1.0.1 manifest and parses its JSON/TypeScript', async () => {
+it('validates the current spec-v1.0.2 manifest and parses its JSON/TypeScript', async () => {
   const historical = manifestSchema.parse(
-    JSON.parse(await readFile(historicalManifestPath, 'utf8')),
+    JSON.parse(await readFile(manifestPath('spec-v1.0.1'), 'utf8')),
   );
   const manifest = manifestSchema.parse(
-    JSON.parse(await readFile('docs/spec-artifacts/spec-v1.0.1-manifest.json', 'utf8')),
+    JSON.parse(await readFile(manifestPath('spec-v1.0.2'), 'utf8')),
   );
-  expect(manifest.specVersion).toBe('spec-v1.0.1');
-  expect(manifest.fileCount).toBe(149);
-  expect(manifest.files).toHaveLength(149);
+  expect(manifest.specVersion).toBe('spec-v1.0.2');
+  expect(manifest.fileCount).toBe(153);
+  expect(manifest.files).toHaveLength(153);
   expect(manifest.files.map((entry) => entry.path)).toEqual(
     [
       ...historical.files.map((entry) => entry.path),
-      historicalManifestPath,
-      'docs/20_TIME_SEMANTICS_AMENDMENT.md',
-      'docs/adr/ADR-0024-utc-instants-timestamptz.md',
+      manifestPath('spec-v1.0.1'),
+      'docs/21_DURABLE_LEASES_FENCING_AMENDMENT.md',
+      'docs/adr/ADR-0025-durable-leases-and-fencing.md',
+      'docs/spec-artifacts/final-reconciliation/durable-lease-constraints.sql',
     ].sort(),
   );
   for (const entry of manifest.files) {
@@ -93,12 +149,97 @@ it('copies the canonical Prisma model without semantic changes', async () => {
   expect([...runtime.matchAll(/^enum /gm)]).toHaveLength(49);
   for (const schema of [canonical, runtime]) {
     const fields = [...schema.matchAll(/^\s+\w+\s+(DateTime\??)\s*([^\n]*)$/gm)];
-    expect(fields).toHaveLength(97);
-    expect(fields.filter((field) => field[1] === 'DateTime?')).toHaveLength(24);
+    expect(fields).toHaveLength(103);
+    expect(fields.filter((field) => field[1] === 'DateTime?')).toHaveLength(30);
     for (const field of fields) {
       expect(field[2]?.match(/@db\.Timestamptz\(3\)/g), field[0]).toHaveLength(1);
     }
   }
+});
+
+it('declares the exact nullable lease/claim fields, native types and recovery indexes', async () => {
+  for (const path of ['docs/spec-artifacts/schema.prisma', 'prisma/schema.prisma']) {
+    const schema = await readFile(path, 'utf8');
+    for (const [model, definition] of Object.entries(leaseDefinitions)) {
+      const block = schema.match(new RegExp(`model ${model} \\{[^}]*\\}`))?.[0];
+      expect(block, model).toBeDefined();
+      for (const [field, type] of Object.entries(definition.fields)) {
+        const matches = [...(block ?? '').matchAll(new RegExp(`^\\s+${field}\\s+([^\n]+)$`, 'gm'))];
+        expect(matches, `${path}:${model}.${field}`).toHaveLength(1);
+        expect(matches[0]?.[1]?.replace(/\s/g, '')).toBe(type.replace(/\s/g, ''));
+      }
+      expect(block).toContain(definition.index);
+    }
+  }
+  const sql = await readFile('infra/migration-preview/initial.generated.sql', 'utf8');
+  expect(sql.match(/TIMESTAMPTZ\(3\)/g)).toHaveLength(103);
+  expect(sql).not.toMatch(/\bTIMESTAMP\s*\(/);
+  for (const [model, definition] of Object.entries(leaseDefinitions)) {
+    const table = sql.match(new RegExp(`CREATE TABLE "${model}" \\([\\s\\S]*?\n\\);`))?.[0];
+    for (const [field, type] of Object.entries(definition.fields)) {
+      const native = type.includes('Timestamptz')
+        ? 'TIMESTAMPTZ(3)'
+        : type.includes('Uuid')
+          ? 'UUID'
+          : 'TEXT';
+      expect(table).toContain(`"${field}" ${native},`);
+    }
+  }
+  expect(sql).toContain(
+    'CREATE INDEX "JobAttempt_status_leaseExpiresAt_idx" ON "JobAttempt"("status", "leaseExpiresAt");',
+  );
+  expect(sql).toContain(
+    'CREATE INDEX "OutboxEvent_status_availableAt_claimExpiresAt_idx" ON "OutboxEvent"("status", "availableAt", "claimExpiresAt");',
+  );
+});
+
+it('defines manual lease CHECKs with active presence and nullable historical time ordering', async () => {
+  const sql = await readFile(
+    'docs/spec-artifacts/final-reconciliation/durable-lease-constraints.sql',
+    'utf8',
+  );
+  expect(sql.match(/ADD CONSTRAINT/g)).toHaveLength(4);
+  for (const [model, state, owner, token, acquired, heartbeat, expires, presence, order] of [
+    [
+      'JobAttempt',
+      'RUNNING',
+      'workerId',
+      'leaseToken',
+      'leaseAcquiredAt',
+      'heartbeatAt',
+      'leaseExpiresAt',
+      'running_lease_required',
+      'lease_time_order',
+    ],
+    [
+      'OutboxEvent',
+      'DISPATCHING',
+      'claimOwner',
+      'claimToken',
+      'claimedAt',
+      'claimHeartbeatAt',
+      'claimExpiresAt',
+      'dispatching_claim_required',
+      'claim_time_order',
+    ],
+  ] as const) {
+    const block = sql
+      .match(new RegExp(`ALTER TABLE "${model}"([\\s\\S]*?);`))?.[1]
+      ?.replace(/\s+/g, ' ');
+    expect(block).toContain(
+      `ADD CONSTRAINT "${model}_${presence}" CHECK ( "status" <> '${state}' OR (`,
+    );
+    for (const field of [owner, token, acquired, heartbeat, expires])
+      expect(block).toContain(`"${field}" IS NOT NULL`);
+    expect(block).toContain(`ADD CONSTRAINT "${model}_${order}" CHECK (`);
+    expect(block).toContain(
+      `("${expires}" IS NULL OR "${acquired}" IS NULL OR "${expires}" > "${acquired}")`,
+    );
+    expect(block).toContain(
+      `("${heartbeat}" IS NULL OR "${acquired}" IS NULL OR "${heartbeat}" >= "${acquired}")`,
+    );
+  }
+  expect(sql).not.toMatch(/\b(?:CURRENT_TIMESTAMP|NOW|clock_timestamp)\b/i);
 });
 
 it('retains exactly the canonical workspace boundaries', async () => {
