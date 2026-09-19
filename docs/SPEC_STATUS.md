@@ -91,3 +91,23 @@ spec-v1.0
 ```
 
 Then implementation may begin with Phase 0 only when explicitly requested.
+
+## Current baseline amendment — 2026-09-19
+
+The preceding version, tag-creation and first-validation instructions record the historical
+`spec-v1.0` freeze. This dated status update supersedes them for the current baseline only.
+
+- Current specification: **`spec-v1.0.1`**, activated after the validation gates in
+  `20_TIME_SEMANTICS_AMENDMENT.md` pass.
+- Accepted change: all 97 V1 DateTime fields persist UTC instants as `@db.Timestamptz(3)`;
+  no other domain change. See ADR-0024 and D-184.
+- Current manifest: `docs/spec-artifacts/spec-v1.0.1-manifest.json` (149 entries).
+- Historical baseline: tag `spec-v1.0` remains at `f2450f34d7f55a4ce4cf950b5c7557d03c7e3549`;
+  `spec-v1.0-manifest.json` stays byte-for-byte unchanged.
+- Precedence: amendment 20 overrides earlier documents only for time semantics and baseline
+  versioning. The existing precedence still applies to everything else.
+- Phase 0 delivery: `f256c182672c9d50e55da96ec6927d5da040a585`.
+- Authorization now: specification amendment and its validation only. **Phase 1 is NOT authorized.**
+- No migration is applied. No Git tag is created, moved or deleted. No push is performed.
+
+After validation, stop and report. The historical “Next action” above must not be executed.

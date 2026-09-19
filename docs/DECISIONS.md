@@ -551,3 +551,14 @@ Toute modification significative doit ajouter une entrée datée.
 
 ## D-183 — External policy/licence gates remain activation-time checks
 **Décision :** TikTok/Instagram/YouTube/provider terms et licence Remotion sont re-vérifiés avant activation réelle sans changer silencieusement la spec.
+
+## D-184 — UTC instants persisted as timestamptz(3)
+**Date :** 2026-09-19.
+
+**Décision :** amendement explicite `spec-v1.0.1` : tous les 97 champs `DateTime` / `DateTime?`
+V1 représentent des instants UTC et portent `@db.Timestamptz(3)`. `Europe/Paris` reste limité
+à la présentation et à l'interprétation des saisies UI avant conversion en instant.
+Aucune autre propriété métier ne change. Voir `20_TIME_SEMANTICS_AMENDMENT.md` et ADR-0024.
+Après validation de l'amendement, `spec-v1.0.1` remplace la baseline courante de D-179 ;
+`spec-v1.0`, son tag et son manifeste restent historiques et immuables. Aucun nouveau tag,
+aucune migration appliquée, aucun push et aucune autorisation de Phase 1.

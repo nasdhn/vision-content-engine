@@ -391,10 +391,10 @@ model Campaign {
   slug              String             @unique
   objective         String?
   status            CampaignStatus     @default(DRAFT)
-  startsAt          DateTime?
-  endsAt            DateTime?
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
+  startsAt          DateTime? @db.Timestamptz(3)
+  endsAt            DateTime? @db.Timestamptz(3)
+  createdAt         DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime           @updatedAt @db.Timestamptz(3)
 
   briefs            Brief[]
   experiments       Experiment[]
@@ -419,8 +419,8 @@ model Brief {
   preferredFormats   Json?
   targetPlatforms    Json?
   targetContentCount Int?
-  createdAt          DateTime    @default(now())
-  updatedAt          DateTime    @updatedAt
+  createdAt          DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime    @updatedAt @db.Timestamptz(3)
 
   campaign           Campaign       @relation(fields: [campaignId], references: [id], onDelete: Restrict)
   versions           BriefVersion[]
@@ -435,7 +435,7 @@ model BriefVersion {
   briefId         String           @db.Uuid
   version         Int
   payloadJson     Json
-  createdAt       DateTime         @default(now())
+  createdAt       DateTime         @default(now()) @db.Timestamptz(3)
   createdBy       String?
 
   brief           Brief            @relation(fields: [briefId], references: [id], onDelete: Restrict)
@@ -452,8 +452,8 @@ model Idea {
   sourceType        IdeaSourceType
   sourceReferenceId String?        @db.Uuid
   status            IdeaStatus     @default(DRAFT)
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  createdAt         DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime       @updatedAt @db.Timestamptz(3)
 
   brief             Brief?             @relation(fields: [briefId], references: [id], onDelete: SetNull)
   sourceReference   SourceReference?   @relation(fields: [sourceReferenceId], references: [id], onDelete: SetNull)
@@ -470,11 +470,11 @@ model SourceReference {
   title        String
   url          String?
   publisher    String?
-  observedAt   DateTime?
-  retrievedAt  DateTime?
+  observedAt   DateTime? @db.Timestamptz(3)
+  retrievedAt  DateTime? @db.Timestamptz(3)
   contentHash  String?
   metadataJson Json?
-  createdAt    DateTime            @default(now())
+  createdAt    DateTime            @default(now()) @db.Timestamptz(3)
 
   ideas        Idea[]
 
@@ -488,9 +488,9 @@ model KnowledgeSnapshot {
   version     Int
   contentHash String
   status      DefinitionStatus @default(DRAFT)
-  effectiveAt DateTime
+  effectiveAt DateTime @db.Timestamptz(3)
   payloadJson Json
-  createdAt   DateTime         @default(now())
+  createdAt   DateTime         @default(now()) @db.Timestamptz(3)
   createdBy   String?
 
   modelInvocations ModelInvocation[]
@@ -506,8 +506,8 @@ model Pattern {
   name      String
   category  String?
   status    PatternStatus @default(DRAFT)
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  createdAt DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime      @updatedAt @db.Timestamptz(3)
 
   versions  PatternVersion[]
 }
@@ -529,7 +529,7 @@ model PatternVersion {
   sourceType          String?
   sourceMetadataJson  Json?
   confidence          Float?
-  createdAt           DateTime         @default(now())
+  createdAt           DateTime         @default(now()) @db.Timestamptz(3)
   createdBy           String?
 
   pattern             Pattern          @relation(fields: [patternId], references: [id], onDelete: Restrict)
@@ -543,8 +543,8 @@ model Concept {
   ideaId       String?       @db.Uuid
   briefId      String        @db.Uuid
   status       ConceptStatus @default(DRAFT)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  createdAt    DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime      @updatedAt @db.Timestamptz(3)
 
   idea         Idea?         @relation(fields: [ideaId], references: [id], onDelete: SetNull)
   brief        Brief         @relation(fields: [briefId], references: [id], onDelete: Restrict)
@@ -571,7 +571,7 @@ model ConceptVersion {
   rationale                String?
   creatorType              CreatorType
   creatorModelInvocationId String?          @db.Uuid
-  createdAt                DateTime         @default(now())
+  createdAt                DateTime         @default(now()) @db.Timestamptz(3)
 
   concept                  Concept          @relation(fields: [conceptId], references: [id], onDelete: Restrict)
   briefVersion             BriefVersion     @relation(fields: [briefVersionId], references: [id], onDelete: Restrict)
@@ -590,8 +590,8 @@ model Script {
   id        String       @id @default(uuid(7)) @db.Uuid
   conceptId String       @unique @db.Uuid
   status    ScriptStatus @default(DRAFT)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  createdAt DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime     @updatedAt @db.Timestamptz(3)
 
   concept   Concept         @relation(fields: [conceptId], references: [id], onDelete: Restrict)
   versions  ScriptVersion[]
@@ -607,7 +607,7 @@ model ScriptVersion {
   segmentsJson        Json?
   estimatedDurationMs Int?
   voiceMode           VoiceMode        @default(NATURAL_USER_VOICE)
-  createdAt           DateTime         @default(now())
+  createdAt           DateTime         @default(now()) @db.Timestamptz(3)
   createdByType       CreatorType
   modelInvocationId   String?          @db.Uuid
 
@@ -624,8 +624,8 @@ model CreativePlan {
   id          String             @id @default(uuid(7)) @db.Uuid
   conceptId   String             @unique @db.Uuid
   status      CreativePlanStatus @default(DRAFT)
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
+  createdAt   DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime           @updatedAt @db.Timestamptz(3)
 
   concept     Concept               @relation(fields: [conceptId], references: [id], onDelete: Restrict)
   versions    CreativePlanVersion[]
@@ -648,7 +648,7 @@ model CreativePlanVersion {
   ctaJson                    Json?
   platformConsiderationsJson Json?
   modelInvocationId          String?          @db.Uuid
-  createdAt                  DateTime         @default(now())
+  createdAt                  DateTime         @default(now()) @db.Timestamptz(3)
 
   creativePlan               CreativePlan          @relation(fields: [creativePlanId], references: [id], onDelete: Restrict)
   scriptVersion              ScriptVersion         @relation(fields: [scriptVersionId], references: [id], onDelete: Restrict)
@@ -674,8 +674,8 @@ model RecordingRequest {
   scriptSegmentRef      String?
   shotInstructionsJson  Json?
   status                RecordingRequestStatus @default(PENDING)
-  createdAt             DateTime               @default(now())
-  completedAt           DateTime?
+  createdAt             DateTime               @default(now()) @db.Timestamptz(3)
+  completedAt           DateTime? @db.Timestamptz(3)
 
   creativePlanVersion   CreativePlanVersion    @relation(fields: [creativePlanVersionId], references: [id], onDelete: Restrict)
   recordings            Recording[]
@@ -691,7 +691,7 @@ model Recording {
   takeNumber         Int
   status             RecordingStatus @default(UPLOADED)
   notes              String?
-  createdAt          DateTime        @default(now())
+  createdAt          DateTime        @default(now()) @db.Timestamptz(3)
 
   recordingRequest   RecordingRequest @relation(fields: [recordingRequestId], references: [id], onDelete: Restrict)
   asset              Asset            @relation(fields: [assetId], references: [id], onDelete: Restrict)
@@ -719,8 +719,8 @@ model Asset {
   sourceType            AssetSourceType
   sourceEntityType      String?
   sourceEntityId        String?
-  createdAt             DateTime               @default(now())
-  deletedAt             DateTime?
+  createdAt             DateTime               @default(now()) @db.Timestamptz(3)
+  deletedAt             DateTime? @db.Timestamptz(3)
 
   recordings            Recording[]
   captureRunAssets      CaptureRunAsset[]
@@ -747,7 +747,7 @@ model AssetDerivation {
   transformationProfileKey     String
   transformationProfileVersion String
   metadataJson                 Json?
-  createdAt                    DateTime            @default(now())
+  createdAt                    DateTime            @default(now()) @db.Timestamptz(3)
 
   sourceAsset                  Asset               @relation("AssetDerivationSource", fields: [sourceAssetId], references: [id], onDelete: Restrict)
   derivedAsset                 Asset               @relation("AssetDerivationDerived", fields: [derivedAssetId], references: [id], onDelete: Restrict)
@@ -761,8 +761,8 @@ model CaptureScenario {
   key       String           @unique
   name      String
   status    DefinitionStatus @default(DRAFT)
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
+  createdAt DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime         @updatedAt @db.Timestamptz(3)
 
   versions  CaptureScenarioVersion[]
 }
@@ -776,7 +776,7 @@ model CaptureScenarioVersion {
   inputSchemaJson   Json?
   outputSpecJson    Json?
   browserConfigJson Json?
-  createdAt         DateTime        @default(now())
+  createdAt         DateTime        @default(now()) @db.Timestamptz(3)
   createdBy         String?
 
   captureScenario   CaptureScenario @relation(fields: [captureScenarioId], references: [id], onDelete: Restrict)
@@ -791,11 +791,11 @@ model CaptureRun {
   creativePlanVersionId    String?          @db.Uuid
   operationId              String           @default(uuid(7)) @unique @db.Uuid
   status                   CaptureRunStatus @default(PENDING)
-  startedAt                DateTime?
-  finishedAt               DateTime?
+  startedAt                DateTime? @db.Timestamptz(3)
+  finishedAt               DateTime? @db.Timestamptz(3)
   failureCode              String?
   failureMessage           String?
-  createdAt                DateTime         @default(now())
+  createdAt                DateTime         @default(now()) @db.Timestamptz(3)
 
   captureScenarioVersion   CaptureScenarioVersion @relation(fields: [captureScenarioVersionId], references: [id], onDelete: Restrict)
   creativePlanVersion      CreativePlanVersion?    @relation(fields: [creativePlanVersionId], references: [id], onDelete: SetNull)
@@ -810,7 +810,7 @@ model CaptureRunAsset {
   assetId      String           @db.Uuid
   role         CaptureAssetRole
   sequence     Int?
-  createdAt    DateTime         @default(now())
+  createdAt    DateTime         @default(now()) @db.Timestamptz(3)
 
   captureRun   CaptureRun @relation(fields: [captureRunId], references: [id], onDelete: Restrict)
   asset        Asset      @relation(fields: [assetId], references: [id], onDelete: Restrict)
@@ -825,8 +825,8 @@ model Template {
   name      String
   category  String?
   status    DefinitionStatus @default(DRAFT)
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
+  createdAt DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime         @updatedAt @db.Timestamptz(3)
 
   versions  TemplateVersion[]
 }
@@ -844,7 +844,7 @@ model TemplateVersion {
   capabilitiesJson          Json?
   rendererVersion           String
   sourceRevision            String?
-  createdAt                 DateTime               @default(now())
+  createdAt                 DateTime               @default(now()) @db.Timestamptz(3)
 
   template                  Template               @relation(fields: [templateId], references: [id], onDelete: Restrict)
   assets                    TemplateVersionAsset[]
@@ -859,7 +859,7 @@ model TemplateVersionAsset {
   assetId           String            @db.Uuid
   role              TemplateAssetRole
   slotKey           String?
-  createdAt         DateTime          @default(now())
+  createdAt         DateTime          @default(now()) @db.Timestamptz(3)
 
   templateVersion   TemplateVersion @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
   asset             Asset           @relation(fields: [assetId], references: [id], onDelete: Restrict)
@@ -873,8 +873,8 @@ model EditingProfile {
   key       String           @unique
   name      String
   status    DefinitionStatus @default(DRAFT)
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
+  createdAt DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime         @updatedAt @db.Timestamptz(3)
 
   versions  EditingProfileVersion[]
 }
@@ -892,7 +892,7 @@ model EditingProfileVersion {
   hookRulesJson        Json?
   endingRulesJson      Json?
   greenScreenRulesJson Json?
-  createdAt            DateTime               @default(now())
+  createdAt            DateTime               @default(now()) @db.Timestamptz(3)
 
   editingProfile       EditingProfile         @relation(fields: [editingProfileId], references: [id], onDelete: Restrict)
   creativePlanVersions CreativePlanVersion[]
@@ -905,8 +905,8 @@ model EditingPlan {
   id             String            @id @default(uuid(7)) @db.Uuid
   creativePlanId String            @unique @db.Uuid
   status         EditingPlanStatus @default(DRAFT)
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  createdAt      DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime          @updatedAt @db.Timestamptz(3)
 
   creativePlan   CreativePlan        @relation(fields: [creativePlanId], references: [id], onDelete: Restrict)
   versions       EditingPlanVersion[]
@@ -927,7 +927,7 @@ model EditingPlanVersion {
   greenScreenPlanJson     Json?
   renderSettingsJson      Json?
   modelInvocationId       String?               @db.Uuid
-  createdAt               DateTime              @default(now())
+  createdAt               DateTime              @default(now()) @db.Timestamptz(3)
 
   editingPlan             EditingPlan           @relation(fields: [editingPlanId], references: [id], onDelete: Restrict)
   creativePlanVersion     CreativePlanVersion   @relation(fields: [creativePlanVersionId], references: [id], onDelete: Restrict)
@@ -946,8 +946,8 @@ model Render {
   operationId          String       @default(uuid(7)) @unique @db.Uuid
   status               RenderStatus @default(REQUESTED)
   approvedAssetId      String?      @db.Uuid
-  createdAt            DateTime     @default(now())
-  updatedAt            DateTime     @updatedAt
+  createdAt            DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime     @updatedAt @db.Timestamptz(3)
 
   editingPlanVersion   EditingPlanVersion @relation(fields: [editingPlanVersionId], references: [id], onDelete: Restrict)
   approvedAsset        Asset?             @relation("ApprovedRenderAsset", fields: [approvedAssetId], references: [id], onDelete: SetNull)
@@ -965,7 +965,7 @@ model RenderInputAsset {
   role      RenderInputRole
   slotKey   String?
   sequence  Int?
-  createdAt DateTime        @default(now())
+  createdAt DateTime        @default(now()) @db.Timestamptz(3)
 
   render    Render @relation(fields: [renderId], references: [id], onDelete: Restrict)
   asset     Asset  @relation(fields: [assetId], references: [id], onDelete: Restrict)
@@ -981,8 +981,8 @@ model RenderAttempt {
   status            AttemptStatus    @default(QUEUED)
   workerVersion     String?
   rendererVersion   String?
-  startedAt         DateTime?
-  finishedAt        DateTime?
+  startedAt         DateTime? @db.Timestamptz(3)
+  finishedAt        DateTime? @db.Timestamptz(3)
   failureCode       String?
   failureMessage    String?
   outputAssetId     String?          @db.Uuid
@@ -991,7 +991,7 @@ model RenderAttempt {
   creativeQaResult            CreativeQaResult?
   creativeQaJson              Json?
   creativeQaModelInvocationId String?          @db.Uuid
-  createdAt                   DateTime         @default(now())
+  createdAt                   DateTime         @default(now()) @db.Timestamptz(3)
 
   render            Render           @relation(fields: [renderId], references: [id], onDelete: Restrict)
   outputAsset              Asset?           @relation("RenderOutputAsset", fields: [outputAssetId], references: [id], onDelete: SetNull)
@@ -1014,7 +1014,7 @@ model Approval {
   comment          String?
   actorType        ApprovalActorType
   actorId          String?
-  createdAt        DateTime            @default(now())
+  createdAt        DateTime            @default(now()) @db.Timestamptz(3)
 
   conceptVersion   ConceptVersion?     @relation(fields: [conceptVersionId], references: [id], onDelete: Restrict)
   render           Render?             @relation(fields: [renderId], references: [id], onDelete: Restrict)
@@ -1032,8 +1032,8 @@ model PlatformAccount {
   status           PlatformAccountStatus @default(ACTIVE)
   credentialsRef   String?
   capabilitiesJson Json?
-  createdAt        DateTime              @default(now())
-  updatedAt        DateTime              @updatedAt
+  createdAt        DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime              @updatedAt @db.Timestamptz(3)
 
   publications     Publication[]
 
@@ -1049,14 +1049,14 @@ model Publication {
   trackingCode      String                    @default(uuid(7)) @unique @db.Uuid
   deliveryMode      PublicationDeliveryMode
   status            PublicationStatus           @default(DRAFT)
-  scheduledAt       DateTime?
-  publishedAt       DateTime?
+  scheduledAt       DateTime? @db.Timestamptz(3)
+  publishedAt       DateTime? @db.Timestamptz(3)
   remotePostId      String?
   remoteUrl         String?
   mediaAssetId      String?            @db.Uuid
   metadataJson      Json
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  createdAt         DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime          @updatedAt @db.Timestamptz(3)
 
   render            Render                     @relation(fields: [renderId], references: [id], onDelete: Restrict)
   platformAccount   PlatformAccount            @relation(fields: [platformAccountId], references: [id], onDelete: Restrict)
@@ -1080,15 +1080,15 @@ model PublicationAttempt {
   publicationId        String                    @db.Uuid
   attemptNumber        Int
   status               AttemptStatus             @default(QUEUED)
-  startedAt            DateTime?
-  finishedAt           DateTime?
+  startedAt            DateTime? @db.Timestamptz(3)
+  finishedAt           DateTime? @db.Timestamptz(3)
   remoteRequestId      String?
   remotePostId         String?
   responseClass        PublicationResponseClass?
   responseMetadataJson Json?
   failureCode          String?
   failureMessage       String?
-  createdAt            DateTime                  @default(now())
+  createdAt            DateTime                  @default(now()) @db.Timestamptz(3)
 
   publication          Publication               @relation(fields: [publicationId], references: [id], onDelete: Restrict)
 
@@ -1100,13 +1100,13 @@ model MetricSnapshotRaw {
   id                    String   @id @default(uuid(7)) @db.Uuid
   publicationId         String   @db.Uuid
   platform              Platform
-  collectedAt           DateTime
+  collectedAt           DateTime @db.Timestamptz(3)
   providerSchemaVersion String?
   collectionMethod      MetricCollectionMethod
   collectionOperationId String                 @unique @db.Uuid
   payloadJson           Json
   payloadHash           String?
-  createdAt             DateTime @default(now())
+  createdAt             DateTime @default(now()) @db.Timestamptz(3)
 
   publication           Publication                @relation(fields: [publicationId], references: [id], onDelete: Restrict)
   normalizedSnapshots   MetricSnapshotNormalized[]
@@ -1119,7 +1119,7 @@ model MetricSnapshotNormalized {
   id                   String             @id @default(uuid(7)) @db.Uuid
   publicationId        String             @db.Uuid
   rawSnapshotId        String             @db.Uuid
-  collectedAt          DateTime
+  collectedAt          DateTime @db.Timestamptz(3)
   views                BigInt?
   engagedViews         BigInt?
   reach                BigInt?
@@ -1140,7 +1140,7 @@ model MetricSnapshotNormalized {
   comparabilityJson    Json?
   normalizerVersion    String
   metricSemanticsVersion String
-  createdAt            DateTime           @default(now())
+  createdAt            DateTime           @default(now()) @db.Timestamptz(3)
 
   publication          Publication        @relation(fields: [publicationId], references: [id], onDelete: Restrict)
   rawSnapshot          MetricSnapshotRaw  @relation(fields: [rawSnapshotId], references: [id], onDelete: Restrict)
@@ -1154,7 +1154,7 @@ model AttributionEvent {
   publicationId     String?                   @db.Uuid
   campaignId        String?                   @db.Uuid
   eventType         AttributionEventType
-  occurredAt        DateTime
+  occurredAt        DateTime @db.Timestamptz(3)
   source            String?
   sourceSystem      AttributionSourceSystem
   externalEventId   String
@@ -1164,7 +1164,7 @@ model AttributionEvent {
   valueAmountMinor  BigInt?
   valueCurrency     String?
   metadataJson      Json?
-  createdAt         DateTime                  @default(now())
+  createdAt         DateTime                  @default(now()) @db.Timestamptz(3)
 
   publication       Publication?              @relation(fields: [publicationId], references: [id], onDelete: SetNull)
   campaign          Campaign?                 @relation(fields: [campaignId], references: [id], onDelete: SetNull)
@@ -1182,9 +1182,9 @@ model Experiment {
   hypothesis    String
   primaryMetric String?
   status        ExperimentStatus @default(DRAFT)
-  startedAt     DateTime?
-  endedAt       DateTime?
-  createdAt     DateTime         @default(now())
+  startedAt     DateTime? @db.Timestamptz(3)
+  endedAt       DateTime? @db.Timestamptz(3)
+  createdAt     DateTime         @default(now()) @db.Timestamptz(3)
 
   campaign      Campaign?        @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   arms          ExperimentArm[]
@@ -1199,7 +1199,7 @@ model ExperimentArm {
   conceptVersionId String?         @db.Uuid
   publicationId    String?         @db.Uuid
   variablesJson    Json
-  createdAt        DateTime        @default(now())
+  createdAt        DateTime        @default(now()) @db.Timestamptz(3)
 
   experiment       Experiment      @relation(fields: [experimentId], references: [id], onDelete: Restrict)
   conceptVersion   ConceptVersion? @relation(fields: [conceptVersionId], references: [id], onDelete: SetNull)
@@ -1218,7 +1218,7 @@ model Insight {
   confidence        InsightConfidence
   evidenceJson      Json
   limitationsJson   Json?
-  createdAt         DateTime          @default(now())
+  createdAt         DateTime          @default(now()) @db.Timestamptz(3)
   modelInvocationId String?           @db.Uuid
 
   modelInvocation   ModelInvocation?  @relation("InsightInvocation", fields: [modelInvocationId], references: [id], onDelete: SetNull)
@@ -1234,7 +1234,7 @@ model Recommendation {
   description         String?
   recommendedTestJson Json?
   status              RecommendationStatus @default(PROPOSED)
-  createdAt           DateTime             @default(now())
+  createdAt           DateTime             @default(now()) @db.Timestamptz(3)
 
   insight             Insight?             @relation(fields: [insightId], references: [id], onDelete: SetNull)
 
@@ -1248,10 +1248,10 @@ model WorkflowRun {
   rootEntityId   String
   status         WorkflowStatus @default(PENDING)
   currentStep    String?
-  startedAt      DateTime?
-  finishedAt     DateTime?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  startedAt      DateTime? @db.Timestamptz(3)
+  finishedAt     DateTime? @db.Timestamptz(3)
+  createdAt      DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime       @updatedAt @db.Timestamptz(3)
 
   jobAttempts    JobAttempt[]
 
@@ -1269,11 +1269,11 @@ model JobAttempt {
   attemptNumber  Int
   status         JobAttemptStatus @default(QUEUED)
   workerId       String?
-  startedAt      DateTime?
-  finishedAt     DateTime?
+  startedAt      DateTime? @db.Timestamptz(3)
+  finishedAt     DateTime? @db.Timestamptz(3)
   failureCode    String?
   failureMessage String?
-  createdAt      DateTime         @default(now())
+  createdAt      DateTime         @default(now()) @db.Timestamptz(3)
 
   workflowRun    WorkflowRun?     @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
 
@@ -1289,10 +1289,10 @@ model OutboxEvent {
   payloadJson   Json
   status        OutboxStatus @default(PENDING)
   attemptCount  Int          @default(0)
-  availableAt   DateTime     @default(now())
-  dispatchedAt  DateTime?
+  availableAt   DateTime     @default(now()) @db.Timestamptz(3)
+  dispatchedAt  DateTime? @db.Timestamptz(3)
   lastError     String?
-  createdAt     DateTime     @default(now())
+  createdAt     DateTime     @default(now()) @db.Timestamptz(3)
 
   @@index([status, availableAt])
   @@index([aggregateType, aggregateId])
@@ -1324,10 +1324,10 @@ model ModelInvocation {
   relatedEntityType    String?
   relatedEntityId      String?
   validationJson       Json?
-  startedAt            DateTime
-  finishedAt           DateTime?
+  startedAt            DateTime @db.Timestamptz(3)
+  finishedAt           DateTime? @db.Timestamptz(3)
   failureCode          String?
-  createdAt            DateTime              @default(now())
+  createdAt            DateTime              @default(now()) @db.Timestamptz(3)
 
   knowledgeSnapshot    KnowledgeSnapshot      @relation(fields: [knowledgeSnapshotId], references: [id], onDelete: Restrict)
   attempts             ModelInvocationAttempt[]
@@ -1356,7 +1356,7 @@ model ModelInvocationAttempt {
   responseHash         String?
   requestPayloadRef    String?
   responsePayloadRef   String?
-  rawPayloadExpiresAt  DateTime?
+  rawPayloadExpiresAt  DateTime? @db.Timestamptz(3)
   inputTokens          Int?
   outputTokens         Int?
   cachedInputTokens    Int?
@@ -1365,9 +1365,9 @@ model ModelInvocationAttempt {
   costCurrency         String?
   validationJson       Json?
   failureCode          String?
-  startedAt            DateTime
-  finishedAt           DateTime?
-  createdAt            DateTime              @default(now())
+  startedAt            DateTime @db.Timestamptz(3)
+  finishedAt           DateTime? @db.Timestamptz(3)
+  createdAt            DateTime              @default(now()) @db.Timestamptz(3)
 
   modelInvocation      ModelInvocation       @relation(fields: [modelInvocationId], references: [id], onDelete: Restrict)
 
@@ -1387,8 +1387,8 @@ model CostEntry {
   modelInvocationId String?      @db.Uuid
   renderAttemptId   String?      @db.Uuid
   publicationId     String?      @db.Uuid
-  occurredAt        DateTime
-  createdAt         DateTime     @default(now())
+  occurredAt        DateTime @db.Timestamptz(3)
+  createdAt         DateTime     @default(now()) @db.Timestamptz(3)
   metadataJson      Json?
 
   modelInvocation   ModelInvocation? @relation(fields: [modelInvocationId], references: [id], onDelete: SetNull)
@@ -1413,7 +1413,7 @@ model AuditEvent {
   beforeJson       Json?
   afterJson        Json?
   metadataJson     Json?
-  createdAt        DateTime       @default(now())
+  createdAt        DateTime       @default(now()) @db.Timestamptz(3)
 
   @@index([subjectType, subjectId, createdAt])
   @@index([action, createdAt])

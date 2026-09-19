@@ -205,3 +205,16 @@ Remotion licence re-check at activation
 ```
 
 These choices must respect the accepted interfaces, tests and stop conditions.
+
+---
+
+# 11. Post-freeze amendment — spec-v1.0.1 (2026-09-19)
+
+Sections 1–10 remain the historical validation record for `spec-v1.0`.
+The accepted `docs/20_TIME_SEMANTICS_AMENDMENT.md` and ADR-0024 now correct only the native
+PostgreSQL type of all 97 DateTime fields to `@db.Timestamptz(3)`, preserving UTC instant
+semantics and every other schema property. For this correction only, amendment 20 takes precedence.
+
+After the amendment's validation gates pass, `spec-v1.0.1` becomes the current baseline,
+recorded by its new manifest. The existing `spec-v1.0` tag and manifest remain immutable.
+No tag is created or moved; no SQL is applied. This amendment does not authorize Phase 1.

@@ -155,10 +155,10 @@ CREATE TABLE "Campaign" (
     "slug" TEXT NOT NULL,
     "objective" TEXT,
     "status" "CampaignStatus" NOT NULL DEFAULT 'DRAFT',
-    "startsAt" TIMESTAMP(3),
-    "endsAt" TIMESTAMP(3),
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "startsAt" TIMESTAMPTZ(3),
+    "endsAt" TIMESTAMPTZ(3),
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "Campaign_pkey" PRIMARY KEY ("id")
 );
@@ -180,8 +180,8 @@ CREATE TABLE "Brief" (
     "preferredFormats" JSONB,
     "targetPlatforms" JSONB,
     "targetContentCount" INTEGER,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "Brief_pkey" PRIMARY KEY ("id")
 );
@@ -192,7 +192,7 @@ CREATE TABLE "BriefVersion" (
     "briefId" UUID NOT NULL,
     "version" INTEGER NOT NULL,
     "payloadJson" JSONB NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "createdBy" TEXT,
 
     CONSTRAINT "BriefVersion_pkey" PRIMARY KEY ("id")
@@ -207,8 +207,8 @@ CREATE TABLE "Idea" (
     "sourceType" "IdeaSourceType" NOT NULL,
     "sourceReferenceId" UUID,
     "status" "IdeaStatus" NOT NULL DEFAULT 'DRAFT',
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "Idea_pkey" PRIMARY KEY ("id")
 );
@@ -220,11 +220,11 @@ CREATE TABLE "SourceReference" (
     "title" TEXT NOT NULL,
     "url" TEXT,
     "publisher" TEXT,
-    "observedAt" TIMESTAMP(3),
-    "retrievedAt" TIMESTAMP(3),
+    "observedAt" TIMESTAMPTZ(3),
+    "retrievedAt" TIMESTAMPTZ(3),
     "contentHash" TEXT,
     "metadataJson" JSONB,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "SourceReference_pkey" PRIMARY KEY ("id")
 );
@@ -236,9 +236,9 @@ CREATE TABLE "KnowledgeSnapshot" (
     "version" INTEGER NOT NULL,
     "contentHash" TEXT NOT NULL,
     "status" "DefinitionStatus" NOT NULL DEFAULT 'DRAFT',
-    "effectiveAt" TIMESTAMP(3) NOT NULL,
+    "effectiveAt" TIMESTAMPTZ(3) NOT NULL,
     "payloadJson" JSONB NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "createdBy" TEXT,
 
     CONSTRAINT "KnowledgeSnapshot_pkey" PRIMARY KEY ("id")
@@ -251,8 +251,8 @@ CREATE TABLE "Pattern" (
     "name" TEXT NOT NULL,
     "category" TEXT,
     "status" "PatternStatus" NOT NULL DEFAULT 'DRAFT',
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "Pattern_pkey" PRIMARY KEY ("id")
 );
@@ -275,7 +275,7 @@ CREATE TABLE "PatternVersion" (
     "sourceType" TEXT,
     "sourceMetadataJson" JSONB,
     "confidence" DOUBLE PRECISION,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "createdBy" TEXT,
 
     CONSTRAINT "PatternVersion_pkey" PRIMARY KEY ("id")
@@ -287,8 +287,8 @@ CREATE TABLE "Concept" (
     "ideaId" UUID,
     "briefId" UUID NOT NULL,
     "status" "ConceptStatus" NOT NULL DEFAULT 'DRAFT',
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "Concept_pkey" PRIMARY KEY ("id")
 );
@@ -309,7 +309,7 @@ CREATE TABLE "ConceptVersion" (
     "rationale" TEXT,
     "creatorType" "CreatorType" NOT NULL,
     "creatorModelInvocationId" UUID,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "ConceptVersion_pkey" PRIMARY KEY ("id")
 );
@@ -319,8 +319,8 @@ CREATE TABLE "Script" (
     "id" UUID NOT NULL,
     "conceptId" UUID NOT NULL,
     "status" "ScriptStatus" NOT NULL DEFAULT 'DRAFT',
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "Script_pkey" PRIMARY KEY ("id")
 );
@@ -336,7 +336,7 @@ CREATE TABLE "ScriptVersion" (
     "segmentsJson" JSONB,
     "estimatedDurationMs" INTEGER,
     "voiceMode" "VoiceMode" NOT NULL DEFAULT 'NATURAL_USER_VOICE',
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "createdByType" "CreatorType" NOT NULL,
     "modelInvocationId" UUID,
 
@@ -348,8 +348,8 @@ CREATE TABLE "CreativePlan" (
     "id" UUID NOT NULL,
     "conceptId" UUID NOT NULL,
     "status" "CreativePlanStatus" NOT NULL DEFAULT 'DRAFT',
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "CreativePlan_pkey" PRIMARY KEY ("id")
 );
@@ -371,7 +371,7 @@ CREATE TABLE "CreativePlanVersion" (
     "ctaJson" JSONB,
     "platformConsiderationsJson" JSONB,
     "modelInvocationId" UUID,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "CreativePlanVersion_pkey" PRIMARY KEY ("id")
 );
@@ -386,8 +386,8 @@ CREATE TABLE "RecordingRequest" (
     "scriptSegmentRef" TEXT,
     "shotInstructionsJson" JSONB,
     "status" "RecordingRequestStatus" NOT NULL DEFAULT 'PENDING',
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "completedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "completedAt" TIMESTAMPTZ(3),
 
     CONSTRAINT "RecordingRequest_pkey" PRIMARY KEY ("id")
 );
@@ -400,7 +400,7 @@ CREATE TABLE "Recording" (
     "takeNumber" INTEGER NOT NULL,
     "status" "RecordingStatus" NOT NULL DEFAULT 'UPLOADED',
     "notes" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Recording_pkey" PRIMARY KEY ("id")
 );
@@ -425,8 +425,8 @@ CREATE TABLE "Asset" (
     "sourceType" "AssetSourceType" NOT NULL,
     "sourceEntityType" TEXT,
     "sourceEntityId" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "deletedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "deletedAt" TIMESTAMPTZ(3),
 
     CONSTRAINT "Asset_pkey" PRIMARY KEY ("id")
 );
@@ -441,7 +441,7 @@ CREATE TABLE "AssetDerivation" (
     "transformationProfileKey" TEXT NOT NULL,
     "transformationProfileVersion" TEXT NOT NULL,
     "metadataJson" JSONB,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "AssetDerivation_pkey" PRIMARY KEY ("id")
 );
@@ -452,8 +452,8 @@ CREATE TABLE "CaptureScenario" (
     "key" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "status" "DefinitionStatus" NOT NULL DEFAULT 'DRAFT',
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "CaptureScenario_pkey" PRIMARY KEY ("id")
 );
@@ -468,7 +468,7 @@ CREATE TABLE "CaptureScenarioVersion" (
     "inputSchemaJson" JSONB,
     "outputSpecJson" JSONB,
     "browserConfigJson" JSONB,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "createdBy" TEXT,
 
     CONSTRAINT "CaptureScenarioVersion_pkey" PRIMARY KEY ("id")
@@ -481,11 +481,11 @@ CREATE TABLE "CaptureRun" (
     "creativePlanVersionId" UUID,
     "operationId" UUID NOT NULL,
     "status" "CaptureRunStatus" NOT NULL DEFAULT 'PENDING',
-    "startedAt" TIMESTAMP(3),
-    "finishedAt" TIMESTAMP(3),
+    "startedAt" TIMESTAMPTZ(3),
+    "finishedAt" TIMESTAMPTZ(3),
     "failureCode" TEXT,
     "failureMessage" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "CaptureRun_pkey" PRIMARY KEY ("id")
 );
@@ -496,7 +496,7 @@ CREATE TABLE "CaptureRunAsset" (
     "assetId" UUID NOT NULL,
     "role" "CaptureAssetRole" NOT NULL,
     "sequence" INTEGER,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "CaptureRunAsset_pkey" PRIMARY KEY ("captureRunId","assetId","role")
 );
@@ -508,8 +508,8 @@ CREATE TABLE "Template" (
     "name" TEXT NOT NULL,
     "category" TEXT,
     "status" "DefinitionStatus" NOT NULL DEFAULT 'DRAFT',
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "Template_pkey" PRIMARY KEY ("id")
 );
@@ -528,7 +528,7 @@ CREATE TABLE "TemplateVersion" (
     "capabilitiesJson" JSONB,
     "rendererVersion" TEXT NOT NULL,
     "sourceRevision" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "TemplateVersion_pkey" PRIMARY KEY ("id")
 );
@@ -539,7 +539,7 @@ CREATE TABLE "TemplateVersionAsset" (
     "assetId" UUID NOT NULL,
     "role" "TemplateAssetRole" NOT NULL,
     "slotKey" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "TemplateVersionAsset_pkey" PRIMARY KEY ("templateVersionId","assetId","role")
 );
@@ -550,8 +550,8 @@ CREATE TABLE "EditingProfile" (
     "key" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "status" "DefinitionStatus" NOT NULL DEFAULT 'DRAFT',
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "EditingProfile_pkey" PRIMARY KEY ("id")
 );
@@ -570,7 +570,7 @@ CREATE TABLE "EditingProfileVersion" (
     "hookRulesJson" JSONB,
     "endingRulesJson" JSONB,
     "greenScreenRulesJson" JSONB,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "EditingProfileVersion_pkey" PRIMARY KEY ("id")
 );
@@ -580,8 +580,8 @@ CREATE TABLE "EditingPlan" (
     "id" UUID NOT NULL,
     "creativePlanId" UUID NOT NULL,
     "status" "EditingPlanStatus" NOT NULL DEFAULT 'DRAFT',
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "EditingPlan_pkey" PRIMARY KEY ("id")
 );
@@ -602,7 +602,7 @@ CREATE TABLE "EditingPlanVersion" (
     "greenScreenPlanJson" JSONB,
     "renderSettingsJson" JSONB,
     "modelInvocationId" UUID,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "EditingPlanVersion_pkey" PRIMARY KEY ("id")
 );
@@ -614,8 +614,8 @@ CREATE TABLE "Render" (
     "operationId" UUID NOT NULL,
     "status" "RenderStatus" NOT NULL DEFAULT 'REQUESTED',
     "approvedAssetId" UUID,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "Render_pkey" PRIMARY KEY ("id")
 );
@@ -627,7 +627,7 @@ CREATE TABLE "RenderInputAsset" (
     "role" "RenderInputRole" NOT NULL,
     "slotKey" TEXT,
     "sequence" INTEGER,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "RenderInputAsset_pkey" PRIMARY KEY ("renderId","assetId","role")
 );
@@ -640,8 +640,8 @@ CREATE TABLE "RenderAttempt" (
     "status" "AttemptStatus" NOT NULL DEFAULT 'QUEUED',
     "workerVersion" TEXT,
     "rendererVersion" TEXT,
-    "startedAt" TIMESTAMP(3),
-    "finishedAt" TIMESTAMP(3),
+    "startedAt" TIMESTAMPTZ(3),
+    "finishedAt" TIMESTAMPTZ(3),
     "failureCode" TEXT,
     "failureMessage" TEXT,
     "outputAssetId" UUID,
@@ -650,7 +650,7 @@ CREATE TABLE "RenderAttempt" (
     "creativeQaResult" "CreativeQaResult",
     "creativeQaJson" JSONB,
     "creativeQaModelInvocationId" UUID,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "RenderAttempt_pkey" PRIMARY KEY ("id")
 );
@@ -666,7 +666,7 @@ CREATE TABLE "Approval" (
     "comment" TEXT,
     "actorType" "ApprovalActorType" NOT NULL,
     "actorId" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Approval_pkey" PRIMARY KEY ("id")
 );
@@ -680,8 +680,8 @@ CREATE TABLE "PlatformAccount" (
     "status" "PlatformAccountStatus" NOT NULL DEFAULT 'ACTIVE',
     "credentialsRef" TEXT,
     "capabilitiesJson" JSONB,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "PlatformAccount_pkey" PRIMARY KEY ("id")
 );
@@ -695,14 +695,14 @@ CREATE TABLE "Publication" (
     "trackingCode" UUID NOT NULL,
     "deliveryMode" "PublicationDeliveryMode" NOT NULL,
     "status" "PublicationStatus" NOT NULL DEFAULT 'DRAFT',
-    "scheduledAt" TIMESTAMP(3),
-    "publishedAt" TIMESTAMP(3),
+    "scheduledAt" TIMESTAMPTZ(3),
+    "publishedAt" TIMESTAMPTZ(3),
     "remotePostId" TEXT,
     "remoteUrl" TEXT,
     "mediaAssetId" UUID,
     "metadataJson" JSONB NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "Publication_pkey" PRIMARY KEY ("id")
 );
@@ -713,15 +713,15 @@ CREATE TABLE "PublicationAttempt" (
     "publicationId" UUID NOT NULL,
     "attemptNumber" INTEGER NOT NULL,
     "status" "AttemptStatus" NOT NULL DEFAULT 'QUEUED',
-    "startedAt" TIMESTAMP(3),
-    "finishedAt" TIMESTAMP(3),
+    "startedAt" TIMESTAMPTZ(3),
+    "finishedAt" TIMESTAMPTZ(3),
     "remoteRequestId" TEXT,
     "remotePostId" TEXT,
     "responseClass" "PublicationResponseClass",
     "responseMetadataJson" JSONB,
     "failureCode" TEXT,
     "failureMessage" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "PublicationAttempt_pkey" PRIMARY KEY ("id")
 );
@@ -731,13 +731,13 @@ CREATE TABLE "MetricSnapshotRaw" (
     "id" UUID NOT NULL,
     "publicationId" UUID NOT NULL,
     "platform" "Platform" NOT NULL,
-    "collectedAt" TIMESTAMP(3) NOT NULL,
+    "collectedAt" TIMESTAMPTZ(3) NOT NULL,
     "providerSchemaVersion" TEXT,
     "collectionMethod" "MetricCollectionMethod" NOT NULL,
     "collectionOperationId" UUID NOT NULL,
     "payloadJson" JSONB NOT NULL,
     "payloadHash" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "MetricSnapshotRaw_pkey" PRIMARY KEY ("id")
 );
@@ -747,7 +747,7 @@ CREATE TABLE "MetricSnapshotNormalized" (
     "id" UUID NOT NULL,
     "publicationId" UUID NOT NULL,
     "rawSnapshotId" UUID NOT NULL,
-    "collectedAt" TIMESTAMP(3) NOT NULL,
+    "collectedAt" TIMESTAMPTZ(3) NOT NULL,
     "views" BIGINT,
     "engagedViews" BIGINT,
     "reach" BIGINT,
@@ -768,7 +768,7 @@ CREATE TABLE "MetricSnapshotNormalized" (
     "comparabilityJson" JSONB,
     "normalizerVersion" TEXT NOT NULL,
     "metricSemanticsVersion" TEXT NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "MetricSnapshotNormalized_pkey" PRIMARY KEY ("id")
 );
@@ -779,7 +779,7 @@ CREATE TABLE "AttributionEvent" (
     "publicationId" UUID,
     "campaignId" UUID,
     "eventType" "AttributionEventType" NOT NULL,
-    "occurredAt" TIMESTAMP(3) NOT NULL,
+    "occurredAt" TIMESTAMPTZ(3) NOT NULL,
     "source" TEXT,
     "sourceSystem" "AttributionSourceSystem" NOT NULL,
     "externalEventId" TEXT NOT NULL,
@@ -789,7 +789,7 @@ CREATE TABLE "AttributionEvent" (
     "valueAmountMinor" BIGINT,
     "valueCurrency" TEXT,
     "metadataJson" JSONB,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "AttributionEvent_pkey" PRIMARY KEY ("id")
 );
@@ -802,9 +802,9 @@ CREATE TABLE "Experiment" (
     "hypothesis" TEXT NOT NULL,
     "primaryMetric" TEXT,
     "status" "ExperimentStatus" NOT NULL DEFAULT 'DRAFT',
-    "startedAt" TIMESTAMP(3),
-    "endedAt" TIMESTAMP(3),
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "startedAt" TIMESTAMPTZ(3),
+    "endedAt" TIMESTAMPTZ(3),
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Experiment_pkey" PRIMARY KEY ("id")
 );
@@ -817,7 +817,7 @@ CREATE TABLE "ExperimentArm" (
     "conceptVersionId" UUID,
     "publicationId" UUID,
     "variablesJson" JSONB NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "ExperimentArm_pkey" PRIMARY KEY ("id")
 );
@@ -831,7 +831,7 @@ CREATE TABLE "Insight" (
     "confidence" "InsightConfidence" NOT NULL,
     "evidenceJson" JSONB NOT NULL,
     "limitationsJson" JSONB,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "modelInvocationId" UUID,
 
     CONSTRAINT "Insight_pkey" PRIMARY KEY ("id")
@@ -845,7 +845,7 @@ CREATE TABLE "Recommendation" (
     "description" TEXT,
     "recommendedTestJson" JSONB,
     "status" "RecommendationStatus" NOT NULL DEFAULT 'PROPOSED',
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Recommendation_pkey" PRIMARY KEY ("id")
 );
@@ -858,10 +858,10 @@ CREATE TABLE "WorkflowRun" (
     "rootEntityId" TEXT NOT NULL,
     "status" "WorkflowStatus" NOT NULL DEFAULT 'PENDING',
     "currentStep" TEXT,
-    "startedAt" TIMESTAMP(3),
-    "finishedAt" TIMESTAMP(3),
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "startedAt" TIMESTAMPTZ(3),
+    "finishedAt" TIMESTAMPTZ(3),
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(3) NOT NULL,
 
     CONSTRAINT "WorkflowRun_pkey" PRIMARY KEY ("id")
 );
@@ -877,11 +877,11 @@ CREATE TABLE "JobAttempt" (
     "attemptNumber" INTEGER NOT NULL,
     "status" "JobAttemptStatus" NOT NULL DEFAULT 'QUEUED',
     "workerId" TEXT,
-    "startedAt" TIMESTAMP(3),
-    "finishedAt" TIMESTAMP(3),
+    "startedAt" TIMESTAMPTZ(3),
+    "finishedAt" TIMESTAMPTZ(3),
     "failureCode" TEXT,
     "failureMessage" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "JobAttempt_pkey" PRIMARY KEY ("id")
 );
@@ -895,10 +895,10 @@ CREATE TABLE "OutboxEvent" (
     "payloadJson" JSONB NOT NULL,
     "status" "OutboxStatus" NOT NULL DEFAULT 'PENDING',
     "attemptCount" INTEGER NOT NULL DEFAULT 0,
-    "availableAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "dispatchedAt" TIMESTAMP(3),
+    "availableAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "dispatchedAt" TIMESTAMPTZ(3),
     "lastError" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "OutboxEvent_pkey" PRIMARY KEY ("id")
 );
@@ -930,10 +930,10 @@ CREATE TABLE "ModelInvocation" (
     "relatedEntityType" TEXT,
     "relatedEntityId" TEXT,
     "validationJson" JSONB,
-    "startedAt" TIMESTAMP(3) NOT NULL,
-    "finishedAt" TIMESTAMP(3),
+    "startedAt" TIMESTAMPTZ(3) NOT NULL,
+    "finishedAt" TIMESTAMPTZ(3),
     "failureCode" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "ModelInvocation_pkey" PRIMARY KEY ("id")
 );
@@ -951,7 +951,7 @@ CREATE TABLE "ModelInvocationAttempt" (
     "responseHash" TEXT,
     "requestPayloadRef" TEXT,
     "responsePayloadRef" TEXT,
-    "rawPayloadExpiresAt" TIMESTAMP(3),
+    "rawPayloadExpiresAt" TIMESTAMPTZ(3),
     "inputTokens" INTEGER,
     "outputTokens" INTEGER,
     "cachedInputTokens" INTEGER,
@@ -960,9 +960,9 @@ CREATE TABLE "ModelInvocationAttempt" (
     "costCurrency" TEXT,
     "validationJson" JSONB,
     "failureCode" TEXT,
-    "startedAt" TIMESTAMP(3) NOT NULL,
-    "finishedAt" TIMESTAMP(3),
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "startedAt" TIMESTAMPTZ(3) NOT NULL,
+    "finishedAt" TIMESTAMPTZ(3),
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "ModelInvocationAttempt_pkey" PRIMARY KEY ("id")
 );
@@ -981,8 +981,8 @@ CREATE TABLE "CostEntry" (
     "modelInvocationId" UUID,
     "renderAttemptId" UUID,
     "publicationId" UUID,
-    "occurredAt" TIMESTAMP(3) NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "occurredAt" TIMESTAMPTZ(3) NOT NULL,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "metadataJson" JSONB,
 
     CONSTRAINT "CostEntry_pkey" PRIMARY KEY ("id")
@@ -1000,7 +1000,7 @@ CREATE TABLE "AuditEvent" (
     "beforeJson" JSONB,
     "afterJson" JSONB,
     "metadataJson" JSONB,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "AuditEvent_pkey" PRIMARY KEY ("id")
 );
