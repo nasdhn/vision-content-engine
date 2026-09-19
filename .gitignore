@@ -62,3 +62,11 @@ minio-data/
 credentials.json
 secrets.json
 service-account*.json
+
+# Allow deterministic test media fixtures
+!tests/fixtures/**/*.mp4
+!tests/fixtures/**/*.mov
+!tests/fixtures/**/*.mkv
+!tests/fixtures/**/*.webm
+!tests/fixtures/**/*.wav
+!tests/fixtures/**/*.mp3
