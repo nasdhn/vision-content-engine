@@ -1038,3 +1038,18 @@ Historical freeze actions — completed:
 2. update Decisions/Status/Checklist;
 3. revise and freeze final Prisma schema draft;
 4. then begin `05_AI_CONTRACTS.md`.
+
+
+## Phase 3 clarification — RecordingRequest reopening (2026-09-20)
+
+Explicitly approved product decision; supplements section 8 without changing historical
+immutable lineage. `ACCEPTED` means at least one currently valid Recording is `SELECTED`.
+Rejecting/deselecting a selected take is allowed. If another valid selected take remains,
+the request stays `ACCEPTED`; otherwise it reopens into `UPLOADED` (recordings exist,
+human selection required). Selecting a valid take again returns it to `ACCEPTED`.
+
+Additional transition: `ACCEPTED → UPLOADED`. Deselection returns a take to `UPLOADED`;
+rejection sets it to `REJECTED`. Take mutation, request status and current input readiness
+are recalculated atomically under concurrency. `ACCEPTED` holds if and only if at least
+one valid selected take exists. Required inputs with no valid selection are not ready
+for new downstream work. Historical immutable plans, renders and assets are unchanged.

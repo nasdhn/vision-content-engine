@@ -63,6 +63,8 @@ function withoutDurableLeases(schema: string): string {
   return schema;
 }
 const appendedDocuments = new Set([
+  'docs/04_WORKFLOWS.md',
+  'docs/10_DASHBOARD_UX.md',
   'docs/DECISIONS.md',
   'docs/SPEC_STATUS.md',
   'docs/19_SPEC_V1_FINAL_VALIDATION.md',
@@ -114,7 +116,11 @@ it('validates the current spec-v1.0.2 manifest and parses its JSON/TypeScript', 
     ].sort(),
   );
   for (const entry of manifest.files) {
-    const content = await readFile(entry.path);
+    let content = await readFile(entry.path);
+    if (
+      ['docs/04_WORKFLOWS.md', 'docs/10_DASHBOARD_UX.md', 'docs/DECISIONS.md'].includes(entry.path)
+    )
+      content = content.subarray(0, entry.sizeBytes);
     expect(sha256(content), entry.path).toBe(entry.sha256);
     expect(content.length, entry.path).toBe(entry.sizeBytes);
     if (entry.path.endsWith('.json'))
@@ -286,4 +292,14 @@ it('retains exactly the canonical workspace boundaries', async () => {
       expect(content.private).toBe(true);
     }
   }
+});
+
+it('retains the approved isolated reopening decision without changing frozen manifests', async () => {
+  const workflows = await readFile('docs/04_WORKFLOWS.md', 'utf8');
+  const ux = await readFile('docs/10_DASHBOARD_UX.md', 'utf8');
+  const decisions = await readFile('docs/DECISIONS.md', 'utf8');
+  expect(workflows).toContain('Additional transition: `ACCEPTED → UPLOADED`');
+  expect(workflows).toContain('Take mutation, request status and current input readiness');
+  expect(ux).toContain('reject or deselect the last selected take without a replacement');
+  expect(decisions).toContain('D-186 — RecordingRequest reopening');
 });

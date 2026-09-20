@@ -11,7 +11,9 @@
     "scripts/**/*.ts",
     "prisma.config.ts",
     "vitest.config.ts",
-    "vitest.postgres.config.ts"
+    "vitest.postgres.config.ts",
+    "playwright.config.ts",
+    "vitest.storage.config.ts"
   ],
   "exclude": ["node_modules", "**/dist", "packages/database/src/generated"]
 }

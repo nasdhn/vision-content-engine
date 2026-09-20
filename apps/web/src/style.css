@@ -1,0 +1,195 @@
+:root {
+  font-family: Inter, system-ui, sans-serif;
+  color: #19382d;
+  background: #f4f6f2;
+  line-height: 1.5;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+main {
+  max-width: 1050px;
+  margin: auto;
+  padding: 32px 24px 80px;
+}
+header,
+.request-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+h1 {
+  font-size: 2.5rem;
+  letter-spacing: -0.04em;
+  margin: 4px 0;
+}
+h2 {
+  margin-top: 32px;
+}
+h3 {
+  margin: 0;
+}
+.eyebrow {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+article,
+form {
+  background: white;
+  border: 1px solid #cedbd2;
+  border-radius: 16px;
+  padding: 24px;
+  margin: 20px 0;
+}
+form {
+  max-width: 480px;
+}
+form label,
+form input {
+  display: block;
+  width: 100%;
+  margin: 12px 0;
+}
+input {
+  padding: 10px;
+  font: inherit;
+}
+button {
+  background: #204e3d;
+  color: white;
+  padding: 10px 16px;
+  border: 1px solid #204e3d;
+  border-radius: 8px;
+  font: inherit;
+  cursor: pointer;
+  min-height: 44px;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+:focus-visible {
+  outline: 3px solid #b36911;
+  outline-offset: 3px;
+}
+.badge {
+  background: #edf2db;
+  padding: 5px 12px;
+  border-radius: 20px;
+}
+.instructions {
+  display: grid;
+  grid-template-columns: 1fr 150px;
+  gap: 24px;
+}
+blockquote {
+  border-left: 3px solid #759663;
+  padding: 12px 20px;
+  margin: 16px 0;
+  white-space: pre-line;
+  font-size: 1.2rem;
+}
+dl {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+}
+dt {
+  font-weight: 600;
+}
+dd {
+  margin: 0 0 8px;
+}
+figure {
+  margin: 0;
+  align-self: center;
+}
+svg {
+  max-height: 180px;
+  width: 100%;
+}
+figcaption,
+small {
+  font-size: 0.8rem;
+}
+.drop {
+  background: #f4f6f2;
+  border: 1px dashed #709284;
+  padding: 20px;
+  border-radius: 8px;
+}
+.drop label,
+.drop small {
+  display: block;
+}
+.takes {
+  list-style: none;
+  padding: 0;
+}
+.takes li {
+  border-top: 1px solid #cedbd2;
+  padding: 16px 0;
+}
+video {
+  display: block;
+  width: 100%;
+  max-height: 400px;
+  background: #13271f;
+}
+audio {
+  max-width: 100%;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+.error {
+  padding: 12px;
+  border: 1px solid #9e342a;
+  color: #81291e;
+  background: #fff0ed;
+}
+.warning {
+  color: #744409;
+}
+@media (max-width: 600px) {
+  main {
+    padding: 20px 16px;
+  }
+  header,
+  .request-head {
+    align-items: start;
+    flex-direction: column;
+  }
+  .instructions {
+    grid-template-columns: 1fr;
+  }
+  figure {
+    max-width: 140px;
+  }
+  article {
+    padding: 16px;
+  }
+}
+.drop input {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+.instructions > div {
+  min-width: 0;
+}
+dd,
+blockquote {
+  overflow-wrap: anywhere;
+}
+audio {
+  width: 100%;
+}

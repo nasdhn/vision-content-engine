@@ -16,10 +16,12 @@ import {
   pendingConceptSelection,
 } from './concept-selection.js';
 
+import { Recordings } from './recordings.js';
 import { Patterns } from './patterns.js';
 import { Knowledge } from './knowledge.js';
 
 export class UnitOfWork {
+  readonly recordings: Recordings;
   readonly knowledge: Knowledge;
   readonly patterns: Patterns;
   readonly versions: Versions;
@@ -27,6 +29,7 @@ export class UnitOfWork {
     private readonly tx: Transaction,
     private readonly actor: Actor,
   ) {
+    this.recordings = new Recordings(tx, actor);
     this.versions = new Versions(tx, actor);
     this.knowledge = new Knowledge(tx, actor);
     this.patterns = new Patterns(tx, actor);

@@ -10,6 +10,7 @@
     "@vision/database": "workspace:*",
     "@vision/domain": "workspace:*",
     "@vision/ai": "workspace:*",
-    "zod": "4.6.5"
+    "zod": "4.6.5",
+    "@vision/media": "workspace:*"
   }
 }

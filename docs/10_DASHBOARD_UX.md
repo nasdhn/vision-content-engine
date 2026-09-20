@@ -1306,3 +1306,11 @@ Historical spec-sequencing note — completed:
 2. generate screen/action spec artifacts;
 3. update Decisions/Status/Checklist;
 4. proceed to Distribution.
+
+
+## Phase 3 clarification — selection override (2026-09-20)
+
+The user may reject or deselect the last selected take without a replacement. The request
+then reopens into `UPLOADED`, displays that human selection is required, and no longer
+satisfies input readiness for future production. Reselecting a valid take restores
+`ACCEPTED`. See the approved reopening clarification in `04_WORKFLOWS.md`.

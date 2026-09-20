@@ -610,6 +610,7 @@ export class AIContentService {
         result.modelInvocationId,
       );
       await u.markProductionReady(roots.script.id, roots.plan.id);
+      await u.recordings.prepare(cpv.id);
       return { ...result, scriptVersion: sv, creativePlanVersion: cpv };
     }, execution);
   }

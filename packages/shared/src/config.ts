@@ -16,6 +16,8 @@ const url = (protocols: string[]) =>
 
 const environmentSchema = z
   .object({
+    VCE_LOCAL_ACCESS_KEY: secret.optional(),
+    VCE_WEB_ORIGIN: z.literal('http://localhost:5174').default('http://localhost:5174'),
     VCE_ENV: z.enum(['LOCAL', 'STAGING_CAPTURE', 'PRODUCTION']).default('LOCAL'),
     VCE_API_HOST: z.literal('127.0.0.1').default('127.0.0.1'),
     VCE_API_PORT: z.coerce.number().int().min(1024).max(65535).default(3100),

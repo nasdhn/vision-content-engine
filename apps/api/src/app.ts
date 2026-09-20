@@ -4,6 +4,9 @@ import { NestFactory } from '@nestjs/core';
 import { checkReadiness } from '@vision/observability';
 import type { ReadinessProbes } from '@vision/observability';
 
+import { RecordingController, RECORDINGS } from './recordings.js';
+import type { RecordingApiOptions } from './recordings.js';
+
 const PROBES = Symbol('bootstrap-readiness-probes');
 
 @Controller()
@@ -23,8 +26,14 @@ class HealthController {
   }
 }
 
-export async function createApi(probes: ReadinessProbes) {
-  @Module({ controllers: [HealthController], providers: [{ provide: PROBES, useValue: probes }] })
+export async function createApi(probes: ReadinessProbes, recordings?: RecordingApiOptions) {
+  @Module({
+    controllers: [HealthController, ...(recordings ? [RecordingController] : [])],
+    providers: [
+      { provide: PROBES, useValue: probes },
+      ...(recordings ? [{ provide: RECORDINGS, useValue: recordings }] : []),
+    ],
+  })
   class BootstrapModule {}
   return NestFactory.create(BootstrapModule, { logger: false, abortOnError: false });
 }

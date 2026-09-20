@@ -7,6 +7,8 @@ export type OutboxInput = Pick<
   'eventType' | 'aggregateType' | 'aggregateId' | 'payloadJson' | 'availableAt'
 >;
 export const tables = [
+  'Asset',
+  'RecordingRequest',
   'Campaign',
   'Brief',
   'Concept',

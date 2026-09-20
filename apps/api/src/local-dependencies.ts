@@ -54,6 +54,7 @@ export function createLocalDependencies(config: RuntimeConfig) {
   };
   return {
     probes,
+    storage,
     async close() {
       redis.disconnect();
       storage.destroy();

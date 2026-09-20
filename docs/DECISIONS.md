@@ -577,3 +577,15 @@ Publication reste soumise à PUBLISHING_UNKNOWN et à la réconciliation.
 Après validation, spec-v1.0.2 devient la baseline courante ; les tags/manifests précédents
 restent historiques et inchangés. Cette tranche n'autorise ni Phase 1, ni migration appliquée,
 ni commit, création/déplacement/suppression de tag ou push.
+
+
+## D-186 — RecordingRequest reopening on loss of the last valid selected take
+**Date :** 2026-09-20.
+
+**Décision explicitement approuvée :** `ACCEPTED` équivaut à au moins un Recording valide
+`SELECTED`. Rejeter/désélectionner la dernière prise sélectionnée rouvre la demande en
+`UPLOADED`; sélectionner une prise valide la ramène à `ACCEPTED`. Mutation, état et
+recalcul de disponibilité des inputs sont atomiques, y compris en concurrence. Aucun
+remplacement simultané obligatoire. Les lignées immuables historiques restent intactes.
+Clarification isolée des sections recording de `04_WORKFLOWS.md` et `10_DASHBOARD_UX.md`,
+sans nouvelle version de spec, modification de schéma ou de tag.

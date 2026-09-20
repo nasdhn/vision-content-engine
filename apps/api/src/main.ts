@@ -1,4 +1,7 @@
 import 'dotenv/config';
+import { createDatabaseClient } from '@vision/database';
+import { RecordingPackService } from '@vision/application';
+import { S3PrivateStorage } from '@vision/media';
 import { parseConfig } from '@vision/shared';
 import { createApi } from './app.js';
 import { createLocalDependencies } from './local-dependencies.js';
@@ -6,11 +9,25 @@ import { createLocalDependencies } from './local-dependencies.js';
 async function main() {
   const config = parseConfig(process.env);
   const dependencies = createLocalDependencies(config);
+  const db = createDatabaseClient(config.DATABASE_URL);
   try {
-    const app = await createApi(dependencies.probes);
+    if (!config.VCE_LOCAL_ACCESS_KEY || config.VCE_LOCAL_ACCESS_KEY.length < 32)
+      throw new Error('LOCAL_AUTH_NOT_CONFIGURED');
+    const service = new RecordingPackService(
+      db,
+      new S3PrivateStorage(dependencies.storage, config.S3_BUCKET),
+    );
+    await service.recoverInterrupted();
+    await service.prepareExisting();
+    const app = await createApi(dependencies.probes, {
+      service,
+      accessKey: config.VCE_LOCAL_ACCESS_KEY,
+      origin: config.VCE_WEB_ORIGIN,
+    });
     const close = async () => {
       await app.close();
       await dependencies.close();
+      await db.$disconnect();
     };
     process.once('SIGINT', () => {
       void close();
@@ -23,11 +40,12 @@ async function main() {
       JSON.stringify({
         level: 'info',
         service: 'api',
-        message: 'Local Phase 0 health endpoints started',
+        message: 'Local Recording Pack API started',
       }),
     );
   } catch {
     await dependencies.close();
+    await db.$disconnect();
     throw new Error('BOOTSTRAP_STARTUP_FAILED');
   }
 }

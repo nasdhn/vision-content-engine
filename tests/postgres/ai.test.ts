@@ -498,7 +498,12 @@ it('keeps exact historical approval through Creative Director and retains claim 
     editingProfileVersionId: b.pv.id,
   });
   expect(await db.approval.count()).toBe(1);
-  expect(await db.recordingRequest.count()).toBe(0);
+  // Phase 3 materializes the exact immutable Creative Director requirement atomically.
+  expect(await db.recordingRequest.count()).toBe(1);
+  expect(await db.recordingRequest.findFirst()).toMatchObject({
+    creativePlanVersionId: result.creativePlanVersion.id,
+    status: 'READY_TO_RECORD',
+  });
   expect(await db.captureRun.count()).toBe(0);
   const evidence = await db.auditEvent.findFirstOrThrow({
     where: { subjectVersionId: result.creativePlanVersion.id, action: 'Content.claimEvidence' },

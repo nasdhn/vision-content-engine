@@ -1,4 +1,4 @@
-name: Canonical persistence checks
+name: Canonical domain, AI and recording checks
 
 on:
   push:
@@ -23,12 +23,18 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm local:init
       - run: pnpm prisma:generate
+      - name: Verify media probe prerequisite
+        run: ffprobe -version
       - run: pnpm check
       - run: pnpm build:web
-      - name: Start pinned local PostgreSQL
-        run: docker compose --env-file .env -f infra/compose.yaml up -d --wait --wait-timeout 120 postgres
+      - name: Start pinned local dependencies
+        run: docker compose --env-file .env -f infra/compose.yaml up -d --wait --wait-timeout 120
       - run: pnpm db:migrate:local
       - run: pnpm test:postgres
+      - run: pnpm test:infra
+      - run: pnpm test:storage
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:browser
       - name: Verify the reviewed SQL preview is reproducible
         run: |
           pnpm db:preview

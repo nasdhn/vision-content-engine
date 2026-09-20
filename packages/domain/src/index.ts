@@ -38,6 +38,14 @@ export function leaseConfig(input: LeaseConfig): LeaseConfig {
   return Object.freeze({ ...input });
 }
 export const transitions = {
+  recordingRequest: {
+    PENDING: ['READY_TO_RECORD', 'CANCELLED'],
+    READY_TO_RECORD: ['UPLOADED', 'CANCELLED'],
+    UPLOADED: ['ACCEPTED', 'REJECTED', 'CANCELLED'],
+    ACCEPTED: ['UPLOADED'],
+    REJECTED: ['READY_TO_RECORD', 'CANCELLED'],
+    CANCELLED: [],
+  },
   workflow: {
     PENDING: ['RUNNING', 'CANCELLED'],
     RUNNING: ['WAITING', 'SUCCEEDED', 'FAILED', 'CANCELLED'],

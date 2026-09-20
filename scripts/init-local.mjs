@@ -5,6 +5,7 @@ const secret = () => randomBytes(32).toString('hex');
 const databasePassword = secret();
 const redisPassword = secret();
 const values = {
+  VCE_LOCAL_ACCESS_KEY: secret(),
   POSTGRES_PASSWORD: databasePassword,
   REDIS_PASSWORD: redisPassword,
   DATABASE_URL: `postgresql://vce_local:${databasePassword}@127.0.0.1:55432/vision_content_engine`,
@@ -22,7 +23,16 @@ try {
   console.log('Created private .env for LOCAL services. No credentials printed.');
 } catch (error) {
   if (error.code === 'EEXIST') {
-    console.log('.env already exists; preserved unchanged.');
+    const path = new URL('../.env', import.meta.url);
+    const existing = await readFile(path, 'utf8');
+    if (!/^VCE_LOCAL_ACCESS_KEY=/m.test(existing)) {
+      await writeFile(path, existing + `\nVCE_LOCAL_ACCESS_KEY=${values.VCE_LOCAL_ACCESS_KEY}\n`, {
+        mode: 0o600,
+      });
+    }
+    console.log(
+      'Existing LOCAL credentials preserved; missing local access key initialized privately.',
+    );
   } else {
     // eslint-disable-next-line preserve-caught-error -- Do not expose secret-bearing I/O diagnostics.
     throw new Error('Unable to initialize local environment');
