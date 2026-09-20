@@ -1,0 +1,112 @@
+{
+  "identity": {
+    "patternVersionId": "018f0000-0000-7000-8000-000000000002",
+    "patternKey": "PROBLEM_TO_SOLUTION",
+    "name": "Problem → Solution",
+    "version": 1,
+    "category": "PAIN",
+    "tags": ["problem", "solution", "prospecting"]
+  },
+  "thesis": {
+    "description": "Start from one precise prospecting pain and resolve it through a concrete mechanism.",
+    "psychologicalMechanism": "Specific recognition creates relevance; a concise solution gives the viewer a reason to continue.",
+    "whyItMayWork": "It works best when the pain is concrete, frequent and directly connected to a Vision capability.",
+    "whenToUse": [
+      "One sharp customer pain is known.",
+      "The problem can be explained in one sentence."
+    ],
+    "whenNotToUse": [
+      "The problem is generic or invented.",
+      "Vision only partially addresses the problem and this is hidden."
+    ]
+  },
+  "structure": {
+    "hook": {
+      "objective": "State the precise pain.",
+      "shape": "PROBLEM_STATEMENT",
+      "formula": "Name one specific frustrating situation, show its consequence, then introduce the mechanism that removes it.",
+      "timingGuidance": {
+        "targetFirstBeatMs": 500,
+        "maxSetupMs": 1800
+      },
+      "originalExamples": [
+        "Tu ouvres dix sites juste pour savoir si ces entreprises correspondent vraiment à ta cible."
+      ]
+    },
+    "story": [
+      {
+        "order": 0,
+        "role": "HOOK",
+        "objective": "State the precise pain.",
+        "optional": false,
+        "durationWeight": 1.0
+      },
+      {
+        "order": 1,
+        "role": "PAIN",
+        "objective": "Show the consequence of the pain.",
+        "optional": false,
+        "durationWeight": 0.8
+      },
+      {
+        "order": 2,
+        "role": "EXPLANATION",
+        "objective": "Introduce the solution mechanism.",
+        "optional": false,
+        "durationWeight": 1.0
+      },
+      {
+        "order": 3,
+        "role": "PROOF",
+        "objective": "Demonstrate or substantiate the solution.",
+        "optional": false,
+        "durationWeight": 1.3
+      },
+      {
+        "order": 4,
+        "role": "CTA",
+        "objective": "Offer a next step.",
+        "optional": true,
+        "durationWeight": 0.5
+      }
+    ],
+    "visual": {
+      "openingVisualIntent": "Make the problem visible or concrete immediately.",
+      "recommendedVisualModes": ["GREEN_SCREEN_PRESENTER", "PRODUCT_SCREEN", "TEXT_LED"],
+      "proofMoment": "The moment Vision directly addresses the named pain.",
+      "recommendedRevealWindow": {
+        "minMs": 1500,
+        "maxMs": 5000
+      },
+      "visualFailureModes": [
+        "Problem too broad.",
+        "Solution appears before viewer understands the pain."
+      ]
+    },
+    "cta": {
+      "preferredTypes": ["SOFT_DISCOVERY", "TRY_PRODUCT"],
+      "tone": "Helpful, not fear-based.",
+      "placementGuidance": "END",
+      "avoid": ["Invented pain statistics", "Overstating product coverage"]
+    }
+  },
+  "adaptation": {
+    "suitableVisionUseCases": ["Lead qualification", "Prospect filtering", "Company discovery"],
+    "suitableAudiences": ["Freelancers", "Sales teams", "Agencies"],
+    "compatiblePrimaryFormats": ["PROBLEM_SOLUTION", "GREEN_SCREEN_EXPLAINER"],
+    "compatibleEditingProfileKeys": ["PROBLEM_SOLUTION", "CALM_EXPERT_SHORT"]
+  },
+  "constraints": {
+    "forbiddenMoves": ["Fearmongering", "Claiming all prospecting problems are solved."],
+    "commonFailureModes": ["Generic opening.", "Pain unrelated to actual product proof."],
+    "requiresProductProof": true,
+    "requiresHumanPresence": false,
+    "requiresExternalClaimEvidence": false
+  },
+  "provenance": {
+    "sourceType": "INTERNAL_SYNTHESIS",
+    "sourceReferenceIds": [],
+    "createdBy": "HUMAN",
+    "abstractionNotes": "Initial Vision V1 seed defined during product specification."
+  }
+}

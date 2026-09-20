@@ -1,0 +1,117 @@
+{
+  "identity": {
+    "patternVersionId": "018f0000-0000-7000-8000-000000000003",
+    "patternKey": "MISTAKE_CONSEQUENCE_FIX",
+    "name": "Mistake → Consequence → Fix",
+    "version": 1,
+    "category": "EDUCATION",
+    "tags": ["mistake", "education", "fix"]
+  },
+  "thesis": {
+    "description": "Identify a common prospecting mistake, show why it hurts, then demonstrate the correction.",
+    "psychologicalMechanism": "People pay attention to avoidable errors, especially when the correction is concrete and useful.",
+    "whyItMayWork": "The format teaches something useful while creating a natural place for Vision when relevant.",
+    "whenToUse": [
+      "A real recurring mistake is known.",
+      "The correction can be shown or explained clearly."
+    ],
+    "whenNotToUse": [
+      "The 'mistake' is manufactured only to attack competitors.",
+      "The advice is too context-dependent to generalize."
+    ]
+  },
+  "structure": {
+    "hook": {
+      "objective": "Name a recognizable mistake.",
+      "shape": "MISTAKE",
+      "formula": "Name the mistake quickly, show the consequence, explain the correction, then prove the better workflow.",
+      "timingGuidance": {
+        "targetFirstBeatMs": 500,
+        "maxSetupMs": 1800
+      },
+      "originalExamples": [
+        "L’erreur ici, c’est de chercher des prospects avant d’avoir défini ce que tu veux vraiment vérifier."
+      ]
+    },
+    "story": [
+      {
+        "order": 0,
+        "role": "HOOK",
+        "objective": "Name a recognizable mistake.",
+        "optional": false,
+        "durationWeight": 1.0
+      },
+      {
+        "order": 1,
+        "role": "PAIN",
+        "objective": "Show its practical consequence.",
+        "optional": false,
+        "durationWeight": 0.8
+      },
+      {
+        "order": 2,
+        "role": "EXPLANATION",
+        "objective": "Explain why it fails.",
+        "optional": false,
+        "durationWeight": 1.0
+      },
+      {
+        "order": 3,
+        "role": "TRANSFORMATION",
+        "objective": "Show the corrected approach.",
+        "optional": false,
+        "durationWeight": 1.1
+      },
+      {
+        "order": 4,
+        "role": "PROOF",
+        "objective": "Show evidence or product demonstration.",
+        "optional": true,
+        "durationWeight": 1.0
+      }
+    ],
+    "visual": {
+      "openingVisualIntent": "Use the mistaken action itself as the opening visual where possible.",
+      "recommendedVisualModes": ["GREEN_SCREEN_PRESENTER", "TEXT_LED", "PRODUCT_SCREEN"],
+      "proofMoment": "Concrete correction or resulting output.",
+      "recommendedRevealWindow": {
+        "minMs": 2500,
+        "maxMs": 6500
+      },
+      "visualFailureModes": ["Scolding tone.", "Fake universal rule.", "No explanation of why."]
+    },
+    "cta": {
+      "preferredTypes": ["SAVE", "SOFT_DISCOVERY"],
+      "tone": "Educational and respectful.",
+      "placementGuidance": "END",
+      "avoid": ["Humiliating the viewer", "Presenting nuance as absolute truth"]
+    }
+  },
+  "adaptation": {
+    "suitableVisionUseCases": [
+      "Prospecting workflow education",
+      "Qualification mistakes",
+      "Search strategy"
+    ],
+    "suitableAudiences": ["Freelancers", "Beginners in outbound", "Small sales teams"],
+    "compatiblePrimaryFormats": ["GREEN_SCREEN_EXPLAINER", "PROBLEM_SOLUTION"],
+    "compatibleEditingProfileKeys": ["CALM_EXPERT_SHORT", "PROBLEM_SOLUTION"]
+  },
+  "constraints": {
+    "forbiddenMoves": ["Inventing a mistake solely to create controversy."],
+    "commonFailureModes": [
+      "Too moralizing.",
+      "Fix is vague.",
+      "Vision forced into unrelated lesson."
+    ],
+    "requiresProductProof": false,
+    "requiresHumanPresence": true,
+    "requiresExternalClaimEvidence": false
+  },
+  "provenance": {
+    "sourceType": "INTERNAL_SYNTHESIS",
+    "sourceReferenceIds": [],
+    "createdBy": "HUMAN",
+    "abstractionNotes": "Initial Vision V1 seed defined during product specification."
+  }
+}

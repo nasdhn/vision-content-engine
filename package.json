@@ -31,7 +31,8 @@
     "test:infra": "tsx scripts/check-local-infra.ts",
     "test:postgres": "vitest run --config vitest.postgres.config.ts",
     "db:migrate:local": "tsx scripts/migrate-local.ts",
-    "check:phase1": "pnpm check && pnpm test:postgres && pnpm build:web"
+    "check:phase1": "pnpm check && pnpm test:postgres && pnpm build:web",
+    "check:phase2": "pnpm check && pnpm test:postgres && pnpm build:web"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

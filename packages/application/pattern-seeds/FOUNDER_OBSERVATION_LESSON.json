@@ -1,0 +1,113 @@
+{
+  "identity": {
+    "patternVersionId": "018f0000-0000-7000-8000-000000000006",
+    "patternKey": "FOUNDER_OBSERVATION_LESSON",
+    "name": "Founder Observation → Lesson",
+    "version": 1,
+    "category": "FOUNDER",
+    "tags": ["founder", "build-in-public", "lesson"]
+  },
+  "thesis": {
+    "description": "Use a genuine observation from building or operating Vision to teach a broader lesson.",
+    "psychologicalMechanism": "First-person specificity can create credibility and a human connection when the experience is real.",
+    "whyItMayWork": "It lets the founder voice carry useful insight without turning every post into an advertisement.",
+    "whenToUse": [
+      "A genuine observation or experience exists.",
+      "There is a useful lesson beyond self-promotion."
+    ],
+    "whenNotToUse": [
+      "The experience would need to be fabricated.",
+      "The story has no value for the audience."
+    ]
+  },
+  "structure": {
+    "hook": {
+      "objective": "State the genuine observation.",
+      "shape": "OBSERVATION",
+      "formula": "Open with one concrete thing noticed while building/using Vision, then extract a practical lesson.",
+      "timingGuidance": {
+        "targetFirstBeatMs": 500,
+        "maxSetupMs": 1800
+      },
+      "originalExamples": [
+        "En construisant Vision, j’ai remarqué un truc : une recherche de prospects peut être précise et quand même être inutile commercialement."
+      ]
+    },
+    "story": [
+      {
+        "order": 0,
+        "role": "HOOK",
+        "objective": "State the genuine observation.",
+        "optional": false,
+        "durationWeight": 1.0
+      },
+      {
+        "order": 1,
+        "role": "CONTEXT",
+        "objective": "Give just enough real context.",
+        "optional": false,
+        "durationWeight": 0.8
+      },
+      {
+        "order": 2,
+        "role": "EXPLANATION",
+        "objective": "Explain the lesson.",
+        "optional": false,
+        "durationWeight": 1.2
+      },
+      {
+        "order": 3,
+        "role": "TRANSFORMATION",
+        "objective": "Show what changed in thinking or workflow.",
+        "optional": true,
+        "durationWeight": 0.9
+      },
+      {
+        "order": 4,
+        "role": "CTA",
+        "objective": "Optional low-pressure connection to Vision.",
+        "optional": true,
+        "durationWeight": 0.4
+      }
+    ],
+    "visual": {
+      "openingVisualIntent": "Human presenter or authentic product/building visual.",
+      "recommendedVisualModes": ["GREEN_SCREEN_PRESENTER", "PRODUCT_SCREEN", "BROLL"],
+      "proofMoment": "A real example from product work or prospecting.",
+      "recommendedRevealWindow": {
+        "minMs": 2500,
+        "maxMs": 8000
+      },
+      "visualFailureModes": [
+        "Fake founder story.",
+        "Story is only a disguised ad.",
+        "Too much backstory."
+      ]
+    },
+    "cta": {
+      "preferredTypes": ["FOLLOW", "COMMENT", "SOFT_DISCOVERY", "NO_CTA"],
+      "tone": "Personal and useful.",
+      "placementGuidance": "CONTEXT_DEPENDENT",
+      "avoid": ["Invented personal experience", "Performative vulnerability"]
+    }
+  },
+  "adaptation": {
+    "suitableVisionUseCases": ["Building Vision", "Prospecting lessons", "Product decisions"],
+    "suitableAudiences": ["Founders", "Freelancers", "Tech/business audience"],
+    "compatiblePrimaryFormats": ["FOUNDER_STORY", "GREEN_SCREEN_EXPLAINER"],
+    "compatibleEditingProfileKeys": ["FOUNDER_STORY", "CALM_EXPERT_SHORT"]
+  },
+  "constraints": {
+    "forbiddenMoves": ["Fabricating founder experience."],
+    "commonFailureModes": ["Story lacks audience takeaway.", "Vision connection feels forced."],
+    "requiresProductProof": false,
+    "requiresHumanPresence": true,
+    "requiresExternalClaimEvidence": false
+  },
+  "provenance": {
+    "sourceType": "INTERNAL_SYNTHESIS",
+    "sourceReferenceIds": [],
+    "createdBy": "HUMAN",
+    "abstractionNotes": "Initial Vision V1 seed defined during product specification."
+  }
+}

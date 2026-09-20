@@ -8,20 +8,28 @@ import type {
 import { audit, changed, databaseTime, emit, lock } from './transaction.js';
 import type { Actor, OutboxInput, Transaction } from './transaction.js';
 import { Versions } from './versions.js';
-import { validatePublication, validateRender } from './lineage.js';
+import { approvedConcept, validatePublication, validateRender } from './lineage.js';
+import { contentHash, normalize, textHash } from '@vision/contracts/canonical';
 import {
   conceptSelectionAction,
   conceptSelectionDecisionAction,
   pendingConceptSelection,
 } from './concept-selection.js';
 
+import { Patterns } from './patterns.js';
+import { Knowledge } from './knowledge.js';
+
 export class UnitOfWork {
+  readonly knowledge: Knowledge;
+  readonly patterns: Patterns;
   readonly versions: Versions;
   constructor(
     private readonly tx: Transaction,
     private readonly actor: Actor,
   ) {
     this.versions = new Versions(tx, actor);
+    this.knowledge = new Knowledge(tx, actor);
+    this.patterns = new Patterns(tx, actor);
   }
   async createCampaign(data: Pick<Prisma.CampaignCreateInput, 'name' | 'slug' | 'objective'>) {
     const row = await this.tx.campaign.create({
@@ -43,6 +51,118 @@ export class UnitOfWork {
     const row = await this.tx.concept.create({ data: { briefId } });
     await changed(this.tx, this.actor, 'Concept.created', 'Concept', row.id);
     return row;
+  }
+  async linkConceptIdea(conceptId: string, ideaId: string) {
+    await lock(this.tx, 'Concept', conceptId);
+    const concept = await this.tx.concept.findUniqueOrThrow({ where: { id: conceptId } });
+    const idea = await this.tx.idea.findUniqueOrThrow({ where: { id: ideaId } });
+    invariant(
+      concept.ideaId === null &&
+        concept.status === 'DRAFT' &&
+        (!idea.briefId || idea.briefId === concept.briefId),
+      'IDEA_LINEAGE_MISMATCH',
+    );
+    await this.tx.concept.update({ where: { id: conceptId }, data: { ideaId } });
+    await changed(this.tx, this.actor, 'Concept.ideaLinked', 'Concept', conceptId);
+  }
+  async productionRoots(conceptVersionId: string) {
+    const version = await this.tx.conceptVersion.findUniqueOrThrow({
+      where: { id: conceptVersionId },
+    });
+    await lock(this.tx, 'Concept', version.conceptId);
+    await approvedConcept(this.tx, conceptVersionId);
+    const concept = await this.tx.concept.findUniqueOrThrow({ where: { id: version.conceptId } });
+    invariant(concept.status !== 'ARCHIVED', 'CONCEPT_ARCHIVED');
+    const script =
+      (await this.tx.script.findUnique({ where: { conceptId: version.conceptId } })) ??
+      (await this.createScript(version.conceptId));
+    const plan =
+      (await this.tx.creativePlan.findUnique({ where: { conceptId: version.conceptId } })) ??
+      (await this.createCreativePlan(version.conceptId));
+    invariant(
+      !['ARCHIVED', 'SUPERSEDED'].includes(script.status) &&
+        !['ARCHIVED', 'SUPERSEDED'].includes(plan.status),
+      'PRODUCTION_ARCHIVED',
+    );
+    return { script, plan };
+  }
+  /** Atomic with downstream writes: the same validated result cannot be applied twice. */
+  async consumeInvocation(id: string, output: unknown) {
+    await this.tx.$queryRaw`SELECT id FROM "ModelInvocation" WHERE id = ${id}::uuid FOR UPDATE`;
+    const invocation = await this.tx.modelInvocation.findUniqueOrThrow({ where: { id } });
+    invariant(
+      invocation.status === 'SUCCEEDED' && invocation.outputHash === contentHash(output),
+      'VALIDATED_INVOCATION_REQUIRED',
+    );
+    invariant(
+      !(await this.tx.auditEvent.findFirst({
+        where: { subjectId: id, action: 'ModelInvocation.applied' },
+      })),
+      'INVOCATION_ALREADY_APPLIED',
+    );
+    await audit(this.tx, this.actor, 'ModelInvocation.applied', 'ModelInvocation', id);
+  }
+  async rejectRepeatedHooks(hooks: string[]) {
+    await this.tx
+      .$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended('creator-hook-dedup', 0))`;
+    const recent = await this.tx.conceptVersion.findMany({
+      take: 100,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    });
+    invariant(
+      !hooks.some((hook) => recent.some((v) => v.hook && normalize(v.hook) === normalize(hook))),
+      'DUPLICATE_HOOK',
+    );
+  }
+  async rejectRepeatedScript(fullText: string, deliberateSourceVersionId?: string) {
+    await this.tx
+      .$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended('director-script-dedup', 0))`;
+    const recent = await this.tx.scriptVersion.findMany({
+      take: 100,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    });
+    invariant(
+      !recent.some(
+        (v) =>
+          v.conceptVersionId !== deliberateSourceVersionId &&
+          textHash(normalize(v.fullText)) === textHash(normalize(fullText)),
+      ),
+      'DUPLICATE_SCRIPT',
+    );
+  }
+  async preserveClaimEvidence(
+    subjectType: string,
+    subjectId: string,
+    versionId: string,
+    claims: Prisma.InputJsonValue,
+    knowledgeSnapshotId: string,
+    invocationId: string,
+  ) {
+    return this.tx.auditEvent.create({
+      data: {
+        ...this.actor,
+        action: 'Content.claimEvidence',
+        subjectType,
+        subjectId,
+        subjectVersionId: versionId,
+        afterJson: { claims, knowledgeSnapshotId, invocationId },
+      },
+    });
+  }
+  async markProductionReady(scriptId: string, planId: string) {
+    await lock(this.tx, 'Script', scriptId);
+    await lock(this.tx, 'CreativePlan', planId);
+    const script = await this.tx.script.findUniqueOrThrow({ where: { id: scriptId } });
+    const plan = await this.tx.creativePlan.findUniqueOrThrow({ where: { id: planId } });
+    invariant(
+      script.conceptId === plan.conceptId &&
+        !['ARCHIVED', 'SUPERSEDED'].includes(script.status) &&
+        !['ARCHIVED', 'SUPERSEDED'].includes(plan.status),
+      'PRODUCTION_NOT_VALID',
+    );
+    await this.tx.script.update({ where: { id: scriptId }, data: { status: 'READY' } });
+    await this.tx.creativePlan.update({ where: { id: planId }, data: { status: 'READY' } });
+    await changed(this.tx, this.actor, 'CreativePlan.ready', 'CreativePlan', planId);
   }
   async createScript(conceptId: string) {
     const row = await this.tx.script.create({ data: { conceptId } });

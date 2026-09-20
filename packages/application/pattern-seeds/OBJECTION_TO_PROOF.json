@@ -1,0 +1,114 @@
+{
+  "identity": {
+    "patternVersionId": "018f0000-0000-7000-8000-000000000008",
+    "patternKey": "OBJECTION_TO_PROOF",
+    "name": "Objection → Proof",
+    "version": 1,
+    "category": "OBJECTION",
+    "tags": ["objection", "proof", "trust"]
+  },
+  "thesis": {
+    "description": "Start from a real buyer/user objection and answer it with evidence or demonstration.",
+    "psychologicalMechanism": "Addressing a genuine doubt can lower resistance when the response is concrete instead of defensive.",
+    "whyItMayWork": "It is useful for recurring concerns heard from users, prospects or realistic target-customer discovery.",
+    "whenToUse": ["A real objection exists.", "Vision can answer it honestly with proof."],
+    "whenNotToUse": [
+      "The objection is invented for drama.",
+      "The response requires unsupported promises."
+    ]
+  },
+  "structure": {
+    "hook": {
+      "objective": "State the objection clearly.",
+      "shape": "QUESTION",
+      "formula": "State the objection in the audience's own terms, then answer with proof rather than reassurance.",
+      "timingGuidance": {
+        "targetFirstBeatMs": 500,
+        "maxSetupMs": 1800
+      },
+      "originalExamples": [
+        "Une IA de prospection, ça ne va pas juste me sortir des entreprises au hasard ?"
+      ]
+    },
+    "story": [
+      {
+        "order": 0,
+        "role": "HOOK",
+        "objective": "State the objection clearly.",
+        "optional": false,
+        "durationWeight": 1.0
+      },
+      {
+        "order": 1,
+        "role": "OBJECTION",
+        "objective": "Clarify what the concern really means.",
+        "optional": false,
+        "durationWeight": 0.7
+      },
+      {
+        "order": 2,
+        "role": "DEMO",
+        "objective": "Show the product behavior relevant to the concern.",
+        "optional": false,
+        "durationWeight": 1.4
+      },
+      {
+        "order": 3,
+        "role": "PROOF",
+        "objective": "Point to concrete evidence or limitations.",
+        "optional": false,
+        "durationWeight": 1.0
+      },
+      {
+        "order": 4,
+        "role": "CTA",
+        "objective": "Invite the viewer to judge/test it.",
+        "optional": true,
+        "durationWeight": 0.4
+      }
+    ],
+    "visual": {
+      "openingVisualIntent": "Open with presenter/text objection, then move quickly to product evidence.",
+      "recommendedVisualModes": ["GREEN_SCREEN_PRESENTER", "PRODUCT_SCREEN", "TEXT_LED"],
+      "proofMoment": "The specific evidence that answers the objection.",
+      "recommendedRevealWindow": {
+        "minMs": 1800,
+        "maxMs": 5500
+      },
+      "visualFailureModes": [
+        "Strawman objection.",
+        "Defensive tone.",
+        "Promise stronger than proof."
+      ]
+    },
+    "cta": {
+      "preferredTypes": ["TRY_PRODUCT", "COMMENT", "SOFT_DISCOVERY"],
+      "tone": "Transparent and evidence-led.",
+      "placementGuidance": "END",
+      "avoid": ["Invented testimonials", "Dismissive tone"]
+    }
+  },
+  "adaptation": {
+    "suitableVisionUseCases": [
+      "Lead quality objection",
+      "AI trust objection",
+      "Product capability doubts"
+    ],
+    "suitableAudiences": ["Prospective customers", "Sales teams", "Agencies"],
+    "compatiblePrimaryFormats": ["GREEN_SCREEN_EXPLAINER", "PRODUCT_DEMO", "PROBLEM_SOLUTION"],
+    "compatibleEditingProfileKeys": ["CALM_EXPERT_SHORT", "FAST_PRODUCT_DEMO"]
+  },
+  "constraints": {
+    "forbiddenMoves": ["Inventing customer concerns and presenting them as real feedback."],
+    "commonFailureModes": ["Objection nobody has.", "Proof does not actually answer the concern."],
+    "requiresProductProof": true,
+    "requiresHumanPresence": true,
+    "requiresExternalClaimEvidence": false
+  },
+  "provenance": {
+    "sourceType": "INTERNAL_SYNTHESIS",
+    "sourceReferenceIds": [],
+    "createdBy": "HUMAN",
+    "abstractionNotes": "Initial Vision V1 seed defined during product specification."
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "script": {
+    "language": "fr",
+    "fullText": "Vision présente le scénario fictif.",
+    "segments": [
+      {
+        "id": "segment",
+        "text": "Vision présente le scénario fictif."
+      }
+    ],
+    "estimatedDurationSec": 20,
+    "voiceMode": "NATURAL_USER_VOICE"
+  },
+  "creativePlan": {
+    "primaryFormat": "PROBLEM_SOLUTION",
+    "targetDurationSec": 20,
+    "templateVersionId": "018f0000-0000-7000-8000-000000000007",
+    "editingProfileVersionId": "018f0000-0000-7000-8000-000000000008",
+    "scenes": [
+      {
+        "clientKey": "scene",
+        "objective": "Comprendre",
+        "scriptSegmentRefs": ["segment"],
+        "visualIntent": "Texte lisible",
+        "proofRequired": false
+      }
+    ],
+    "recordingRequests": [
+      {
+        "clientKey": "voice",
+        "type": "VOICE",
+        "title": "Enregistrer la voix",
+        "instructions": "Lis le texte du segment à voix naturelle.",
+        "scriptSegmentRefs": ["segment"],
+        "shot": {}
+      }
+    ],
+    "captureRequests": [],
+    "requiredExistingAssetIds": [],
+    "cta": {
+      "type": "SOFT_DISCOVERY",
+      "text": "Découvre le scénario de démonstration.",
+      "placement": "END"
+    },
+    "platformConsiderations": [
+      {
+        "platform": "INSTAGRAM",
+        "notes": []
+      }
+    ]
+  },
+  "factualClaims": [
+    {
+      "text": "Vision présente le scénario fictif.",
+      "type": "PRODUCT_FACT",
+      "verifiedClaimIds": ["fixture-fact"],
+      "disposition": "VERIFIED"
+    }
+  ]
+}

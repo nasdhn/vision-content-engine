@@ -1,0 +1,118 @@
+{
+  "identity": {
+    "patternVersionId": "018f0000-0000-7000-8000-000000000001",
+    "patternKey": "MANUAL_TO_AUTOMATION",
+    "name": "Manual → Automation",
+    "version": 1,
+    "category": "TRANSFORMATION",
+    "tags": ["manual-work", "workflow", "time-saving", "product-proof"]
+  },
+  "thesis": {
+    "description": "Contrast repeated manual prospecting work with a shorter Vision-assisted workflow.",
+    "psychologicalMechanism": "Visible friction creates recognition; a concrete automated alternative creates contrast and relief.",
+    "whyItMayWork": "The before/after operational contrast is easy to understand when the manual steps and product proof are both visible.",
+    "whenToUse": [
+      "The manual workflow is common and visually understandable.",
+      "Vision can genuinely reduce or consolidate the steps."
+    ],
+    "whenNotToUse": [
+      "The alleged manual pain is not real for the audience.",
+      "The product proof cannot be shown clearly."
+    ]
+  },
+  "structure": {
+    "hook": {
+      "objective": "Make the repetitive manual workflow immediately recognizable.",
+      "shape": "COMPARISON",
+      "formula": "Show the repetitive manual process, then pivot quickly to the same objective completed through Vision.",
+      "timingGuidance": {
+        "targetFirstBeatMs": 500,
+        "maxSetupMs": 1800
+      },
+      "originalExamples": ["Tu fais encore ça à la main pour trouver tes prospects ?"]
+    },
+    "story": [
+      {
+        "order": 0,
+        "role": "HOOK",
+        "objective": "Make the repetitive manual workflow immediately recognizable.",
+        "optional": false,
+        "durationWeight": 1.0
+      },
+      {
+        "order": 1,
+        "role": "PAIN",
+        "objective": "Show the repeated steps and friction.",
+        "optional": false,
+        "durationWeight": 1.2
+      },
+      {
+        "order": 2,
+        "role": "TRANSFORMATION",
+        "objective": "Pivot to the Vision-assisted workflow.",
+        "optional": false,
+        "durationWeight": 1.0
+      },
+      {
+        "order": 3,
+        "role": "DEMO",
+        "objective": "Show concrete product proof.",
+        "optional": false,
+        "durationWeight": 1.5
+      },
+      {
+        "order": 4,
+        "role": "CTA",
+        "objective": "Invite discovery without overselling.",
+        "optional": true,
+        "durationWeight": 0.5
+      }
+    ],
+    "visual": {
+      "openingVisualIntent": "Open on visible manual friction before revealing Vision.",
+      "recommendedVisualModes": ["COMPARISON", "PRODUCT_SCREEN", "GREEN_SCREEN_PRESENTER"],
+      "proofMoment": "A concrete Vision output replacing several manual steps.",
+      "recommendedRevealWindow": {
+        "minMs": 1200,
+        "maxMs": 4500
+      },
+      "visualFailureModes": [
+        "Generic AI-saves-time message with no proof.",
+        "Too much setup before the product appears."
+      ]
+    },
+    "cta": {
+      "preferredTypes": ["TRY_PRODUCT", "SOFT_DISCOVERY"],
+      "tone": "Direct and practical.",
+      "placementGuidance": "END",
+      "avoid": ["Artificial urgency", "Unsupported time-saved numbers"]
+    }
+  },
+  "adaptation": {
+    "suitableVisionUseCases": [
+      "B2B prospect discovery",
+      "Manual company research",
+      "Lead qualification"
+    ],
+    "suitableAudiences": ["Freelancers", "Agencies", "Sales teams", "SMBs"],
+    "compatiblePrimaryFormats": ["MANUAL_TO_VISION", "PRODUCT_DEMO"],
+    "compatibleEditingProfileKeys": ["MANUAL_VS_VISION", "FAST_PRODUCT_DEMO"]
+  },
+  "constraints": {
+    "forbiddenMoves": ["Claiming automation that Vision does not actually perform."],
+    "commonFailureModes": [
+      "Manual pain is vague.",
+      "Vision reveal is too late.",
+      "No visible output."
+    ],
+    "requiresProductProof": true,
+    "requiresHumanPresence": false,
+    "requiresExternalClaimEvidence": false
+  },
+  "provenance": {
+    "sourceType": "INTERNAL_SYNTHESIS",
+    "sourceReferenceIds": [],
+    "createdBy": "HUMAN",
+    "abstractionNotes": "Initial Vision V1 seed defined during product specification."
+  }
+}

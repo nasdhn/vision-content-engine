@@ -1,0 +1,25 @@
+{
+  "concepts": [
+    {
+      "clientKey": "candidate",
+      "title": "Un scénario concret",
+      "angle": "Observer la démonstration",
+      "hook": "Comment organiser cette démonstration ?",
+      "audience": "Freelancers",
+      "objective": "Montrer une situation",
+      "hypothesis": "La clarté peut aider à comprendre.",
+      "selectedPatternVersionId": "018f0000-0000-7000-8000-000000000004",
+      "rationale": {
+        "whyThisPattern": "Structure concrète",
+        "whyThisAngle": "Exemple synthétique",
+        "whyThisCouldFitVision": "Démonstration contrôlée",
+        "differentiationFromRecentContent": "Premier scénario"
+      },
+      "formatRecommendation": {
+        "primaryFormat": "PROBLEM_SOLUTION",
+        "targetDurationSec": 20
+      },
+      "factualClaims": []
+    }
+  ]
+}

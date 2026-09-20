@@ -17,7 +17,8 @@ existing versions have no update/delete/upsert API. Inputs accept scalar version
 foreign keys only, never nested writes. A concept revision resets the root to DRAFT unless an
 explicit exact-version selection is awaiting review. In that case the selected review stays pinned;
 the new version still requires its own approval. Prior approved versions retain their historical evidence.
-Knowledge management, seed selection and AI invocation services remain Phase 2 work.
+Phase 2 adds Knowledge/SourceReference curation, pattern seed import and AI invocation accounting.
+See [the Phase 2 application boundary](../application/README.md) for usage and safety semantics.
 
 `submitConcept(versionId)` and `decideConcept(versionId, decision)` remain implicit latest-version
 flows: historical IDs fail with STALE_VERSION. A trusted USER can instead call

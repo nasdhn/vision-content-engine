@@ -1,0 +1,91 @@
+{
+  "conceptVersion": {
+    "id": "018f0000-0000-7000-8000-000000000005",
+    "conceptId": "018f0000-0000-7000-8000-000000000006",
+    "version": 1,
+    "title": "Un scénario concret",
+    "selectedPatternVersionId": "018f0000-0000-7000-8000-000000000004"
+  },
+  "brandKnowledge": {
+    "id": "018f0000-0000-7000-8000-000000000001",
+    "key": "fixture",
+    "version": 1,
+    "contentHash": "fixture",
+    "effectiveAt": "2020-01-01T00:00:00.000Z",
+    "brand": {
+      "name": "Vision",
+      "domain": "example.invalid",
+      "primaryLanguage": "fr",
+      "market": "FRANCE",
+      "tone": ["concret"],
+      "forbiddenTone": ["agressif"]
+    },
+    "product": {
+      "category": "fixture",
+      "description": "Données synthétiques de test uniquement.",
+      "features": [],
+      "useCases": [],
+      "targetCustomers": [],
+      "valuePropositions": []
+    },
+    "commercial": {
+      "pricingClaims": [],
+      "ctas": [
+        {
+          "id": "cta",
+          "type": "SOFT_DISCOVERY",
+          "text": "Découvre le scénario de démonstration."
+        }
+      ]
+    },
+    "claims": {
+      "verified": [
+        {
+          "id": "fixture-fact",
+          "text": "Vision présente le scénario fictif.",
+          "type": "PRODUCT_FACT",
+          "sourceIds": ["018f0000-0000-7000-8000-000000000002"]
+        }
+      ],
+      "forbidden": [
+        {
+          "id": "forbidden",
+          "patternOrMeaning": "résultat garanti",
+          "reason": "aucune garantie"
+        }
+      ]
+    },
+    "visualIdentity": {
+      "allowedAssetIds": [],
+      "notes": ["fixture only"]
+    }
+  },
+  "templateCandidates": [
+    {
+      "templateVersionId": "018f0000-0000-7000-8000-000000000007",
+      "templateKey": "fixture",
+      "capabilities": {},
+      "inputSchemaSummary": {}
+    }
+  ],
+  "editingProfileCandidates": [
+    {
+      "editingProfileVersionId": "018f0000-0000-7000-8000-000000000008",
+      "editingProfileKey": "fixture",
+      "capabilities": []
+    }
+  ],
+  "captureScenarioCandidates": [],
+  "availableAssets": [],
+  "productionCapabilities": {
+    "naturalVoiceAvailable": true,
+    "greenScreenPresenterAvailable": false,
+    "playwrightCaptureAvailable": false
+  },
+  "constraints": {
+    "targetAspectRatio": "9:16",
+    "targetPlatforms": ["INSTAGRAM"],
+    "minDurationSec": 5,
+    "maxDurationSec": 60
+  }
+}

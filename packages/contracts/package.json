@@ -4,5 +4,11 @@
   "private": true,
   "type": "module",
   "license": "UNLICENSED",
-  "exports": "./src/index.ts"
+  "exports": {
+    ".": "./src/index.ts",
+    "./canonical": "./src/canonical.ts"
+  },
+  "dependencies": {
+    "zod": "4.6.5"
+  }
 }
