@@ -853,3 +853,286 @@ it('rejects missing/stale owners before invoking a result callback', async () =>
   ).rejects.toThrow('STALE_LEASE');
   expect(callback).not.toHaveBeenCalled();
 });
+
+async function reviseConcept(b: Awaited<ReturnType<typeof base>>, store = persistence) {
+  return store.transaction(human, (u) =>
+    u.versions.conceptVersion({
+      conceptId: b.concept.id,
+      briefVersionId: b.bv.id,
+      title: 'new revision',
+      creatorType: 'HUMAN',
+    }),
+  );
+}
+it('keeps implicit historical submission and approval stale even during explicit review', async () => {
+  const b = await base(false);
+  const latest = await reviseConcept(b);
+  await expect(persistence.transaction(human, (u) => u.submitConcept(b.cv.id))).rejects.toThrow(
+    'STALE_VERSION',
+  );
+  await expect(
+    persistence.transaction(human, (u) => u.decideConcept(b.cv.id, 'APPROVED')),
+  ).rejects.toThrow('STALE_VERSION');
+  await persistence.transaction(human, (u) => u.selectConceptVersionForReview(b.cv.id));
+  await expect(
+    persistence.transaction(human, (u) => u.decideConcept(b.cv.id, 'APPROVED')),
+  ).rejects.toThrow('STALE_VERSION');
+  await expect(
+    persistence.transaction(human, (u) => u.decideConcept(latest.id, 'APPROVED')),
+  ).rejects.toThrow('EXPLICIT_SELECTION_REQUIRED');
+  expect(await db.approval.count()).toBe(0);
+});
+it('durably submits a historical subject without fabricating a pending Approval', async () => {
+  const b = await base(false);
+  await reviseConcept(b);
+  const selection = await persistence.transaction(human, (u) =>
+    u.selectConceptVersionForReview(b.cv.id),
+  );
+  expect(selection.conceptVersionId).toBe(b.cv.id);
+  expect(await db.auditEvent.findUnique({ where: { id: selection.selectionId } })).toMatchObject({
+    subjectId: b.concept.id,
+    subjectVersionId: b.cv.id,
+    actorType: 'USER',
+    action: 'Concept.versionSelectedForReview',
+  });
+  expect((await db.concept.findUniqueOrThrow({ where: { id: b.concept.id } })).status).toBe(
+    'AWAITING_REVIEW',
+  );
+  expect(await db.approval.count()).toBe(0);
+  const approval = await new Persistence(second).transaction(human, (u) =>
+    u.decideSelectedConcept(selection.selectionId, 'APPROVED'),
+  );
+  expect(approval).toMatchObject({
+    conceptVersionId: b.cv.id,
+    subjectType: 'CONCEPT',
+    decision: 'APPROVED',
+    actorType: 'USER',
+  });
+  expect(
+    await db.auditEvent.findFirst({
+      where: { subjectId: selection.selectionId, action: 'ConceptReviewSelection.decided' },
+    }),
+  ).toMatchObject({ subjectVersionId: b.cv.id, afterJson: { approvalId: approval.id } });
+});
+it('keeps an explicitly selected subject valid across revisions and pins downstream approval lineage', async () => {
+  const b = await base(false);
+  await reviseConcept(b);
+  const selection = await persistence.transaction(human, (u) =>
+    u.selectConceptVersionForReview(b.cv.id),
+  );
+  await reviseConcept(b, new Persistence(second));
+  expect((await db.concept.findUniqueOrThrow({ where: { id: b.concept.id } })).status).toBe(
+    'AWAITING_REVIEW',
+  );
+  const approval = await persistence.transaction(human, (u) =>
+    u.decideSelectedConcept(selection.selectionId, 'APPROVED'),
+  );
+  const latest = await reviseConcept(b);
+  expect(await db.approval.findUnique({ where: { id: approval.id } })).toEqual(approval);
+  expect(await db.conceptVersion.findUnique({ where: { id: b.cv.id } })).toEqual(b.cv);
+  const script = await persistence.transaction(human, (u) =>
+    u.versions.scriptVersion({
+      scriptId: b.script.id,
+      conceptVersionId: b.cv.id,
+      fullText: 'historical approved input',
+      createdByType: 'HUMAN',
+    }),
+  );
+  expect(script.conceptVersionId).toBe(b.cv.id);
+  await expect(
+    persistence.transaction(human, (u) =>
+      u.versions.scriptVersion({
+        scriptId: b.script.id,
+        conceptVersionId: latest.id,
+        fullText: 'unapproved',
+        createdByType: 'HUMAN',
+      }),
+    ),
+  ).rejects.toThrow('CONCEPT_APPROVAL_REQUIRED');
+});
+it('allows explicit selection during an implicit review without approving its formerly latest version', async () => {
+  const b = await base(false);
+  const latest = await reviseConcept(b);
+  await persistence.transaction(human, (u) => u.submitConcept(latest.id));
+  const selection = await persistence.transaction(human, (u) =>
+    u.selectConceptVersionForReview(b.cv.id),
+  );
+  await expect(
+    persistence.transaction(human, (u) => u.decideConcept(latest.id, 'APPROVED')),
+  ).rejects.toThrow('EXPLICIT_SELECTION_REQUIRED');
+  expect(
+    await persistence.transaction(human, (u) =>
+      u.decideSelectedConcept(selection.selectionId, 'APPROVED'),
+    ),
+  ).toHaveProperty('conceptVersionId', b.cv.id);
+});
+it('serializes simultaneous historical selection and revision without losing the selected subject', async () => {
+  const b = await base(false);
+  await reviseConcept(b);
+  const [selection] = await Promise.all([
+    persistence.transaction(human, (u) => u.selectConceptVersionForReview(b.cv.id)),
+    reviseConcept(b, new Persistence(second)),
+  ]);
+  expect((await db.concept.findUniqueOrThrow({ where: { id: b.concept.id } })).status).toBe(
+    'AWAITING_REVIEW',
+  );
+  expect(
+    await persistence.transaction(human, (u) =>
+      u.decideSelectedConcept(selection.selectionId, 'APPROVED'),
+    ),
+  ).toHaveProperty('conceptVersionId', b.cv.id);
+});
+it('serializes selected approval racing with a new version without repinning the decision', async () => {
+  const b = await base(false);
+  await reviseConcept(b);
+  const selection = await persistence.transaction(human, (u) =>
+    u.selectConceptVersionForReview(b.cv.id),
+  );
+  const [approval, latest] = await Promise.all([
+    persistence.transaction(human, (u) =>
+      u.decideSelectedConcept(selection.selectionId, 'APPROVED'),
+    ),
+    reviseConcept(b, new Persistence(second)),
+  ]);
+  expect(approval.conceptVersionId).toBe(b.cv.id);
+  expect(await db.approval.count({ where: { conceptVersionId: latest.id } })).toBe(0);
+  expect(await db.approval.count()).toBe(1);
+});
+it('permits only one concurrent decision for an explicit selection and rejects replay', async () => {
+  const b = await base(false);
+  await reviseConcept(b);
+  const selection = await persistence.transaction(human, (u) =>
+    u.selectConceptVersionForReview(b.cv.id),
+  );
+  const outcomes = await Promise.allSettled([
+    persistence.transaction(human, (u) =>
+      u.decideSelectedConcept(selection.selectionId, 'APPROVED'),
+    ),
+    new Persistence(second).transaction(human, (u) =>
+      u.decideSelectedConcept(selection.selectionId, 'REJECTED'),
+    ),
+  ]);
+  expect(outcomes.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+  expect(await db.approval.count()).toBe(1);
+  expect(
+    await db.auditEvent.count({
+      where: { subjectId: selection.selectionId, action: 'ConceptReviewSelection.decided' },
+    }),
+  ).toBe(1);
+  await expect(
+    persistence.transaction(human, (u) =>
+      u.decideSelectedConcept(selection.selectionId, 'APPROVED'),
+    ),
+  ).rejects.toThrow('CONCEPT_SELECTION_RESOLVED');
+});
+it('does not let a competing explicit selection overwrite the durable review subject', async () => {
+  const b = await base(false);
+  const latest = await reviseConcept(b);
+  const results = await Promise.allSettled([
+    persistence.transaction(human, (u) => u.selectConceptVersionForReview(b.cv.id)),
+    new Persistence(second).transaction(human, (u) => u.selectConceptVersionForReview(latest.id)),
+  ]);
+  const winners = results.filter((r) => r.status === 'fulfilled');
+  expect(winners).toHaveLength(1);
+  const winner = winners[0]!;
+  const approval = await persistence.transaction(human, (u) =>
+    u.decideSelectedConcept(winner.value.selectionId, 'APPROVED'),
+  );
+  expect(approval.conceptVersionId).toBe(winner.value.conceptVersionId);
+});
+it('requires a trusted USER for selection and decision and rejects fabricated selection handles', async () => {
+  const b = await base(false);
+  await reviseConcept(b);
+  for (const actor of [
+    { actorType: 'SYSTEM' as const },
+    { actorType: 'WORKER' as const, actorId: 'worker' },
+    { actorType: 'AI' as const, actorId: 'ai' },
+    { actorType: 'USER' as const },
+  ]) {
+    await expect(
+      persistence.transaction(actor, (u) => u.selectConceptVersionForReview(b.cv.id)),
+    ).rejects.toThrow('HUMAN_APPROVAL_REQUIRED');
+    await expect(
+      persistence.transaction(actor, (u) => u.decideSelectedConcept(randomUUID(), 'APPROVED')),
+    ).rejects.toThrow('HUMAN_APPROVAL_REQUIRED');
+  }
+  await expect(
+    persistence.transaction(human, (u) => u.decideSelectedConcept(randomUUID(), 'APPROVED')),
+  ).rejects.toThrow('INVALID_CONCEPT_SELECTION');
+  const ordinaryAudit = await persistence.transaction(human, (u) =>
+    u.audit('unrelated', 'Concept', b.concept.id, b.cv.id),
+  );
+  await expect(
+    persistence.transaction(human, (u) => u.decideSelectedConcept(ordinaryAudit.id, 'APPROVED')),
+  ).rejects.toThrow('INVALID_CONCEPT_SELECTION');
+  expect(await db.approval.count()).toBe(0);
+});
+it('consumes rejected selections while preserving subsequent default latest review behavior', async () => {
+  const b = await base(false);
+  await reviseConcept(b);
+  const selection = await persistence.transaction(human, (u) =>
+    u.selectConceptVersionForReview(b.cv.id),
+  );
+  await persistence.transaction(human, (u) =>
+    u.decideSelectedConcept(selection.selectionId, 'REJECTED'),
+  );
+  const latest = await reviseConcept(b);
+  expect((await db.concept.findUniqueOrThrow({ where: { id: b.concept.id } })).status).toBe(
+    'DRAFT',
+  );
+  await persistence.transaction(human, (u) => u.submitConcept(latest.id));
+  await persistence.transaction(human, (u) => u.decideConcept(latest.id, 'APPROVED'));
+  await expect(
+    persistence.transaction(human, (u) =>
+      u.decideSelectedConcept(selection.selectionId, 'APPROVED'),
+    ),
+  ).rejects.toThrow('CONCEPT_SELECTION_RESOLVED');
+  expect(await db.approval.findFirst({ where: { conceptVersionId: b.cv.id } })).toHaveProperty(
+    'decision',
+    'REJECTED',
+  );
+});
+it('rolls back selection state, subject audit and submission outbox atomically', async () => {
+  const b = await base(false);
+  await reviseConcept(b);
+  const before = await db.outboxEvent.count();
+  await expect(
+    persistence.transaction(human, async (u) => {
+      await u.selectConceptVersionForReview(b.cv.id);
+      throw new Error('ROLLBACK_SELECTION');
+    }),
+  ).rejects.toThrow('ROLLBACK_SELECTION');
+  expect(await db.auditEvent.count({ where: { action: 'Concept.versionSelectedForReview' } })).toBe(
+    0,
+  );
+  expect(await db.outboxEvent.count()).toBe(before);
+  expect((await db.concept.findUniqueOrThrow({ where: { id: b.concept.id } })).status).toBe(
+    'DRAFT',
+  );
+});
+it('rolls back a selected decision with its consumption marker and keeps the selection usable', async () => {
+  const b = await base(false);
+  await reviseConcept(b);
+  const selection = await persistence.transaction(human, (u) =>
+    u.selectConceptVersionForReview(b.cv.id),
+  );
+  const before = await db.outboxEvent.count();
+  await expect(
+    persistence.transaction(human, async (u) => {
+      await u.decideSelectedConcept(selection.selectionId, 'APPROVED');
+      throw new Error('ROLLBACK_DECISION');
+    }),
+  ).rejects.toThrow('ROLLBACK_DECISION');
+  expect(await db.approval.count()).toBe(0);
+  expect(
+    await db.auditEvent.count({
+      where: { subjectId: selection.selectionId, action: 'ConceptReviewSelection.decided' },
+    }),
+  ).toBe(0);
+  expect(await db.outboxEvent.count()).toBe(before);
+  expect(
+    await new Persistence(second).transaction(human, (u) =>
+      u.decideSelectedConcept(selection.selectionId, 'APPROVED'),
+    ),
+  ).toHaveProperty('conceptVersionId', b.cv.id);
+});

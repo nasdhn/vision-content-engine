@@ -14,9 +14,27 @@ AuditEvent and OutboxEvent rows in the same transaction. CostEntry preserves Dec
 `unit.versions` appends Brief, Concept, Script, CreativePlan, EditingPlan, Pattern, Template,
 EditingProfile and CaptureScenario versions. Root-row locks serialize version allocation;
 existing versions have no update/delete/upsert API. Inputs accept scalar version data and exact
-foreign keys only, never nested writes. A concept revision resets the root to DRAFT and requires
-approval of that exact new ConceptVersion. Prior approved versions retain their historical evidence.
+foreign keys only, never nested writes. A concept revision resets the root to DRAFT unless an
+explicit exact-version selection is awaiting review. In that case the selected review stays pinned;
+the new version still requires its own approval. Prior approved versions retain their historical evidence.
 Knowledge management, seed selection and AI invocation services remain Phase 2 work.
+
+`submitConcept(versionId)` and `decideConcept(versionId, decision)` remain implicit latest-version
+flows: historical IDs fail with STALE_VERSION. A trusted USER can instead call
+`selectConceptVersionForReview(versionId)` to deliberately submit an exact version, including a
+historical one, from DRAFT or an existing implicit AWAITING_REVIEW. It returns a durable selectionId.
+`decideSelectedConcept(selectionId, decision)` resolves that persisted subject without accepting a
+replacement version ID. Pending explicit review cannot be overwritten by another selection or
+decided through the implicit API. Creating newer versions never invalidates the pending selection.
+
+Approval requires a terminal decision in the existing schema, so submission does not fabricate an
+Approval. AuditEvent records `Concept.versionSelectedForReview` with the exact subjectVersionId.
+The final decision creates the ordinary Approval bound to that same ConceptVersion and records
+`ConceptReviewSelection.decided`, linked to the selection and approval IDs. Selection consumption,
+Approval, root state, audit and outbox are atomic. Concept row locks serialize submissions, revisions
+and decisions; competing/replayed decisions cannot consume a selection twice. Pending selection
+lookup uses identity and consumption rather than transaction timestamps. No schema change or
+generic stale-check bypass is involved. Raw SQL/admin access remains the trusted boundary above.
 
 Only USER actors with a nonempty identity can decide ConceptVersion and Render approvals.
 The caller must supply a trusted authenticated identity; authentication wiring belongs to a later

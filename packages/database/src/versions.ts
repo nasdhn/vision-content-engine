@@ -3,6 +3,7 @@ import type { Prisma } from './generated/prisma/client.js';
 import { changed, lock } from './transaction.js';
 import type { Transaction, Actor } from './transaction.js';
 import { validateScript, validateCreative, validateEditing } from './lineage.js';
+import { pendingConceptSelection } from './concept-selection.js';
 
 /** Append-only API: no update, delete, upsert or nested relation mutation. */
 export class Versions {
@@ -71,7 +72,10 @@ export class Versions {
       where: { id: data.briefVersionId },
     });
     assertSameLineage(concept.briefId, brief.briefId);
-    await this.tx.concept.update({ where: { id: concept.id }, data: { status: 'DRAFT' } });
+    // A deliberate selection pins its own review subject; a new version cannot replace it.
+    if (!(await pendingConceptSelection(this.tx, concept.id))) {
+      await this.tx.concept.update({ where: { id: concept.id }, data: { status: 'DRAFT' } });
+    }
     const latest = await this.tx.conceptVersion.aggregate({
       where: { conceptId: data.conceptId },
       _max: { version: true },

@@ -9,6 +9,11 @@ import { audit, changed, databaseTime, emit, lock } from './transaction.js';
 import type { Actor, OutboxInput, Transaction } from './transaction.js';
 import { Versions } from './versions.js';
 import { validatePublication, validateRender } from './lineage.js';
+import {
+  conceptSelectionAction,
+  conceptSelectionDecisionAction,
+  pendingConceptSelection,
+} from './concept-selection.js';
 
 export class UnitOfWork {
   readonly versions: Versions;
@@ -88,6 +93,87 @@ export class UnitOfWork {
       orderBy: { version: 'desc' },
     });
     invariant(latest.id === version.id, 'STALE_VERSION');
+    invariant(!(await pendingConceptSelection(this.tx, concept.id)), 'EXPLICIT_SELECTION_REQUIRED');
+    return this.recordConceptDecision(concept.id, version.id, decision, comment);
+  }
+  /** Deliberate USER selection of an exact version, independent of the latest-version flow. */
+  async selectConceptVersionForReview(conceptVersionId: string) {
+    assertHuman(this.actor);
+    const version = await this.tx.conceptVersion.findUniqueOrThrow({
+      where: { id: conceptVersionId },
+    });
+    await lock(this.tx, 'Concept', version.conceptId);
+    const concept = await this.tx.concept.findUniqueOrThrow({ where: { id: version.conceptId } });
+    invariant(!(await pendingConceptSelection(this.tx, concept.id)), 'CONCEPT_SELECTION_PENDING');
+    if (concept.status !== 'AWAITING_REVIEW') {
+      assertTransition('concept', concept.status, 'AWAITING_REVIEW');
+    }
+    const selection = await audit(
+      this.tx,
+      this.actor,
+      conceptSelectionAction,
+      'Concept',
+      concept.id,
+      version.id,
+    );
+    await this.tx.concept.update({
+      where: { id: concept.id },
+      data: { status: 'AWAITING_REVIEW' },
+    });
+    await changed(this.tx, this.actor, 'Concept.submitted', 'Concept', concept.id, version.id);
+    return { selectionId: selection.id, conceptVersionId: version.id };
+  }
+  /** Resolve the persisted subject; the caller cannot substitute another version at decision time. */
+  async decideSelectedConcept(
+    selectionId: string,
+    decision: 'APPROVED' | 'REJECTED',
+    comment?: string,
+  ) {
+    assertHuman(this.actor);
+    const selection = await this.tx.auditEvent.findFirst({
+      where: {
+        id: selectionId,
+        action: conceptSelectionAction,
+        subjectType: 'Concept',
+        actorType: 'USER',
+        actorId: { not: null },
+        subjectVersionId: { not: null },
+      },
+    });
+    invariant(selection?.subjectVersionId, 'INVALID_CONCEPT_SELECTION');
+    await lock(this.tx, 'Concept', selection.subjectId);
+    const pending = await pendingConceptSelection(this.tx, selection.subjectId);
+    invariant(pending?.id === selection.id, 'CONCEPT_SELECTION_RESOLVED');
+    const version = await this.tx.conceptVersion.findUniqueOrThrow({
+      where: { id: pending.conceptVersionId },
+    });
+    invariant(version.conceptId === selection.subjectId, 'LINEAGE_MISMATCH');
+    const approval = await this.recordConceptDecision(
+      version.conceptId,
+      version.id,
+      decision,
+      comment,
+    );
+    await this.tx.auditEvent.create({
+      data: {
+        ...this.actor,
+        action: conceptSelectionDecisionAction,
+        subjectType: 'ConceptReviewSelection',
+        subjectId: selection.id,
+        subjectVersionId: version.id,
+        afterJson: { approvalId: approval.id },
+      },
+    });
+    return approval;
+  }
+  /** Both callers hold the same Concept lock; the existing Approval remains the final authority. */
+  private async recordConceptDecision(
+    conceptId: string,
+    conceptVersionId: string,
+    decision: 'APPROVED' | 'REJECTED',
+    comment?: string,
+  ) {
+    const concept = await this.tx.concept.findUniqueOrThrow({ where: { id: conceptId } });
     assertTransition('concept', concept.status, decision);
     const result = await this.tx.approval.create({
       data: {
@@ -106,7 +192,7 @@ export class UnitOfWork {
       `Concept.${decision.toLowerCase()}`,
       'Concept',
       concept.id,
-      version.id,
+      conceptVersionId,
     );
     return result;
   }
