@@ -4,5 +4,12 @@
   "private": true,
   "type": "module",
   "license": "UNLICENSED",
-  "exports": "./src/index.ts"
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@vision/contracts": "workspace:*",
+    "@vision/database": "workspace:*",
+    "@vision/domain": "workspace:*",
+    "@vision/media": "workspace:*",
+    "playwright": "1.63.0"
+  }
 }

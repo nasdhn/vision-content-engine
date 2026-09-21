@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, it } from 'vitest';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { postgresFixture } from '../../packages/database/test/support.js';
 import { Persistence, createDatabaseClient } from '../../packages/database/src/index.js';
 import { RecordingPackService } from '../../packages/application/src/recording-pack.js';
@@ -266,6 +266,111 @@ it('recovers interrupted uploads conservatively, rejects late completion and ret
   ).rejects.toThrow('UPLOAD_ALREADY_FINALIZED');
   expect(storage.objects.has(a.objectKey)).toBe(true);
   expect((await db.asset.findUniqueOrThrow({ where: { id: a.id } })).status).toBe('FAILED');
+});
+
+it('marks canonical capture requirements ready automatically after the matching CaptureRun succeeds', async () => {
+  const g = await recordingGraph(db);
+
+  const scenario = await db.captureScenario.create({
+    data: {
+      key: `fixture-capture-${randomUUID()}`,
+      name: 'Fixture capture readiness',
+      status: 'ACTIVE',
+    },
+  });
+
+  const canonicalCaptureScenarioVersionId = randomUUID();
+
+  const scenarioVersion = await db.captureScenarioVersion.create({
+    data: {
+      captureScenarioId: scenario.id,
+      version: 1,
+      targetEnvironment: 'fixture',
+      stepsJson: [],
+      inputSchemaJson: {},
+      outputSpecJson: [],
+      browserConfigJson: {
+        specVersionId: canonicalCaptureScenarioVersionId,
+      },
+    },
+  });
+
+  const next = await p.transaction(human, async (u) => {
+    const version = await u.versions.creativePlanVersion({
+      creativePlanId: g.plan.id,
+      scriptVersionId: g.sv.id,
+      primaryFormat: 'VOICE',
+      templateVersionId: g.tv.id,
+      editingProfileVersionId: g.pv.id,
+      scenePlanJson: {},
+      requiredRecordingsJson: [],
+      requiredCapturesJson: [
+        {
+          clientKey: 'capture-positive',
+          captureScenarioVersionId: canonicalCaptureScenarioVersionId,
+          scenarioInput: {},
+          desiredOutputs: [],
+          editorialPurpose: 'Prove capture readiness integration.',
+        },
+      ],
+      requiredAssetsJson: [],
+    });
+
+    await u.recordings.prepare(version.id);
+
+    return version;
+  });
+
+  expect(await p.transaction(human, (u) => u.recordings.refresh(next.id))).toMatchObject({
+    ready: false,
+    recordingsReady: true,
+    capturesReady: false,
+    assetsReady: true,
+  });
+
+  expect(
+    await db.creativePlan.findUniqueOrThrow({
+      where: { id: g.plan.id },
+    }),
+  ).toMatchObject({
+    status: 'WAITING_FOR_INPUTS',
+  });
+
+  const run = await p.transaction(human, (u) =>
+    u.captures.beginRun({
+      captureScenarioVersionId: scenarioVersion.id,
+      creativePlanVersionId: next.id,
+      operationId: randomUUID(),
+    }),
+  );
+
+  await p.transaction(human, (u) => u.captures.startRun(run.id));
+
+  await p.transaction(human, (u) => u.captures.succeedRun(run.id));
+
+  /*
+   * No manual recordings.refresh() here.
+   *
+   * succeedRun() itself must have refreshed the CreativePlan
+   * in the same transaction.
+   */
+  expect(
+    await db.creativePlan.findUniqueOrThrow({
+      where: { id: g.plan.id },
+    }),
+  ).toMatchObject({
+    status: 'READY_FOR_EDITING',
+  });
+
+  /*
+   * Read-only confirmation after the automatic transition.
+   */
+  expect(await p.transaction(human, (u) => u.recordings.refresh(next.id))).toMatchObject({
+    ready: true,
+    recordingsReady: true,
+    capturesReady: true,
+    assetsReady: true,
+  });
 });
 
 it('old-version selection cannot mark a newer CreativePlanVersion ready', async () => {

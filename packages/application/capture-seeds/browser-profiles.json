@@ -1,0 +1,35 @@
+{
+  "version": "v1",
+  "profiles": {
+    "VISION_DESKTOP_CAPTURE_V1": {
+      "browser": "CHROMIUM",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "deviceScaleFactor": 1,
+      "locale": "fr-FR",
+      "timezoneId": "Europe/Paris",
+      "reducedMotion": "NO_PREFERENCE",
+      "colorScheme": "LIGHT",
+      "recordVideo": true,
+      "recordVideoSize": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "VISION_DESKTOP_SCREENSHOT_V1": {
+      "browser": "CHROMIUM",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "deviceScaleFactor": 1,
+      "locale": "fr-FR",
+      "timezoneId": "Europe/Paris",
+      "reducedMotion": "REDUCE",
+      "colorScheme": "LIGHT",
+      "recordVideo": false
+    }
+  }
+}

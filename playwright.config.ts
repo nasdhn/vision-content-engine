@@ -12,6 +12,13 @@ export default defineConfig({
   },
   webServer: [
     {
+      command: 'pnpm exec tsx --tsconfig tsconfig.json tests/browser/capture-server.ts',
+      url: 'http://127.0.0.1:3201/healthz',
+      reuseExistingServer: false,
+      timeout: 30000,
+      gracefulShutdown: { signal: 'SIGTERM', timeout: 10000 },
+    },
+    {
       command: 'pnpm exec tsx --tsconfig tsconfig.json tests/browser/server.ts',
       url: 'http://127.0.0.1:3100/healthz',
       reuseExistingServer: false,

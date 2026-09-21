@@ -128,7 +128,23 @@ importers:
 
   apps/worker-analytics: {}
 
-  apps/worker-capture: {}
+  apps/worker-capture:
+    dependencies:
+      '@vision/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@vision/database':
+        specifier: workspace:*
+        version: link:../../packages/database
+      '@vision/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@vision/media':
+        specifier: workspace:*
+        version: link:../../packages/media
+      playwright:
+        specifier: 1.63.0
+        version: 1.63.0
 
   apps/worker-publish: {}
 

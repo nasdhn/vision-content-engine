@@ -19,6 +19,7 @@ export const tables = [
   'EditingProfile',
   'Pattern',
   'CaptureScenario',
+  'CaptureRun',
   'Render',
   'WorkflowRun',
   'JobAttempt',

@@ -19,9 +19,11 @@ import {
 import { Recordings } from './recordings.js';
 import { Patterns } from './patterns.js';
 import { Knowledge } from './knowledge.js';
+import { Captures } from './captures.js';
 
 export class UnitOfWork {
   readonly recordings: Recordings;
+  readonly captures: Captures;
   readonly knowledge: Knowledge;
   readonly patterns: Patterns;
   readonly versions: Versions;
@@ -30,6 +32,7 @@ export class UnitOfWork {
     private readonly actor: Actor,
   ) {
     this.recordings = new Recordings(tx, actor);
+    this.captures = new Captures(tx, actor);
     this.versions = new Versions(tx, actor);
     this.knowledge = new Knowledge(tx, actor);
     this.patterns = new Patterns(tx, actor);

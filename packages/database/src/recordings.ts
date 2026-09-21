@@ -1,12 +1,19 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { RecordingRequestSpecSchema } from '@vision/contracts';
+import { CaptureRequestSpecSchema, RecordingRequestSpecSchema } from '@vision/contracts';
 import { assertHuman, assertTransition, invariant } from '@vision/domain';
 import { changed, databaseTime, lock } from './transaction.js';
 import type { Actor, Transaction } from './transaction.js';
 import type { Prisma } from './generated/prisma/client.js';
 
 const specs = z.array(RecordingRequestSpecSchema);
+const captureSpecs = z.array(CaptureRequestSpecSchema);
+
+const persistedCaptureBrowserConfig = z
+  .object({
+    specVersionId: z.string().uuid(),
+  })
+  .passthrough();
 const validAsset = { status: 'READY' as const, deletedAt: null };
 const assetMetadata = z
   .object({
@@ -137,8 +144,65 @@ export class Recordings {
       }
       recordingsReady &&= selected;
     }
-    // Capture execution is Phase 4. Unfulfilled declared captures must never be treated as ready.
-    const capturesReady = z.array(z.unknown()).parse(v.requiredCapturesJson ?? []).length === 0;
+    const captureRequirements = captureSpecs.safeParse(v.requiredCapturesJson ?? []);
+
+    /*
+     * Invalid/legacy persisted capture requirements fail closed:
+     * they can never make a CreativePlan ready, but they also do not
+     * make refresh() throw while old rows still exist.
+     */
+    let capturesReady = captureRequirements.success;
+
+    if (captureRequirements.success) {
+      const successfulRuns = await this.tx.captureRun.findMany({
+        where: {
+          creativePlanVersionId: versionId,
+          status: 'SUCCEEDED',
+        },
+        select: {
+          captureScenarioVersion: {
+            select: {
+              browserConfigJson: true,
+            },
+          },
+        },
+      });
+
+      const available = new Map<string, number>();
+
+      for (const run of successfulRuns) {
+        const parsed = persistedCaptureBrowserConfig.safeParse(
+          run.captureScenarioVersion.browserConfigJson,
+        );
+
+        if (!parsed.success) {
+          capturesReady = false;
+          break;
+        }
+
+        const specVersionId = parsed.data.specVersionId;
+
+        available.set(specVersionId, (available.get(specVersionId) ?? 0) + 1);
+      }
+
+      if (capturesReady) {
+        for (const requirement of captureRequirements.data) {
+          const count = available.get(requirement.captureScenarioVersionId) ?? 0;
+
+          if (count <= 0) {
+            capturesReady = false;
+            break;
+          }
+
+          /*
+           * One successful CaptureRun satisfies one capture request.
+           * This matters when a plan requests the same scenario twice.
+           */
+          available.set(requirement.captureScenarioVersionId, count - 1);
+        }
+      }
+    }
+
     const assets = z.array(z.string().uuid()).parse(v.requiredAssetsJson ?? []);
     const assetsReady =
       (await this.tx.asset.count({ where: { id: { in: assets }, ...validAsset } })) ===
