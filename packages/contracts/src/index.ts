@@ -34,4 +34,12 @@ export {
 export {
   EditingIntelligenceInputSchema,
   EditingIntelligenceOutputSchema,
+  EditingBlockerReasonCodeSchema,
+  EditingBlockerRecoverabilitySchema,
+  EditingBlockerEvidenceSchema,
+  EditingBlockerRequiredActionSchema,
+  EditingBlockerSpecSchema,
+  EditingIntelligencePlanResultSchema,
+  EditingIntelligenceBlockedResultSchema,
+  EditingIntelligenceOutputV11Schema,
 } from './editing-intelligence.js';

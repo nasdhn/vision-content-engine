@@ -600,3 +600,14 @@ déterministes. Le champ est nullable uniquement pour préserver les lignes hist
 nouveau EditingPlanVersion produit par Editing Intelligence doit le renseigner et prouver
 l'exact `ModelInvocation` appliqué avant passage à READY. Les manifests spec-v1.0.x
 historiques restent immuables.
+
+## D-188 — Structured Editing Intelligence blocker is a successful first-class result
+**Date :** 2026-09-21.
+
+**Décision :** `spec-v1.0.4` conserve le contrat/prompt Editing Intelligence 1.0.0 comme
+historique et introduit 1.1.0 avec une union stricte `PLAN | BLOCKED`. Un `BLOCKED` valide est
+un ModelInvocation `SUCCEEDED`, evidence-bound, non retrié comme erreur provider et persisté
+dans `EditingBlocker`; il ne crée jamais d'EditingPlanVersion partiel. Un blocker plus récent
+supersède l'OPEN précédent pour la même CreativePlanVersion; un plan valide ultérieur le
+résout. Un EditingPlan root précédemment READY repasse DRAFT tant que l'évaluation courante
+est bloquée, sans mutation des versions/renders historiques.

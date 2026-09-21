@@ -213,3 +213,11 @@ provider/cost side effects
 rollback notes
 next phase NOT started
 ```
+
+---
+
+## Phase 5 amendment — structured blocker closure
+
+Before Phase 5 is considered complete, Editing Intelligence must represent an impossible edit as
+a first-class `BLOCKED` result, persist it without creating a fake EditingPlanVersion, preserve
+exact ModelInvocation lineage, and resolve/supersede blocker state deterministically.

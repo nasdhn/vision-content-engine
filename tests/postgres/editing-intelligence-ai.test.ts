@@ -5,7 +5,7 @@ import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
 import { AIProviderGateway } from '../../packages/ai/src/index.js';
 import type { ModelPolicy, ProviderRequest } from '../../packages/ai/src/index.js';
 import {
-  EditingIntelligenceOutputSchema,
+  EditingIntelligenceOutputV11Schema,
   TechnicalQaReportSchema,
 } from '../../packages/contracts/src/index.js';
 import {
@@ -293,118 +293,147 @@ function validOutput(request: ProviderRequest) {
 
   const assetId = input.assets[0]!.assetId;
 
-  return EditingIntelligenceOutputSchema.parse({
-    masterDurationMs: 10_000,
+  return EditingIntelligenceOutputV11Schema.parse({
+    kind: 'PLAN',
+    plan: {
+      masterDurationMs: 10_000,
 
-    selectedAssets: [
-      {
-        assetId,
-        role: 'PRODUCT_CAPTURE',
-
-        sourceInMs: 0,
-
-        sourceOutMs: 10_000,
-
-        reason: 'Preuve produit principale.',
-      },
-    ],
-
-    timeline: [
-      {
-        id: 'product-main',
-
-        startMs: 0,
-
-        endMs: 10_000,
-
-        layer: 'PRODUCT',
-
-        zIndex: 10,
-
-        source: {
-          type: 'ASSET',
-
+      selectedAssets: [
+        {
           assetId,
+          role: 'PRODUCT_CAPTURE',
+
+          sourceInMs: 0,
+
+          sourceOutMs: 10_000,
+
+          reason: 'Preuve produit principale.',
         },
+      ],
 
-        composition: {
-          opacity: 1,
+      timeline: [
+        {
+          id: 'product-main',
 
-          region: {
-            x: 0,
+          startMs: 0,
 
-            y: 0,
+          endMs: 10_000,
 
-            width: 1,
+          layer: 'PRODUCT',
 
-            height: 1,
+          zIndex: 10,
+
+          source: {
+            type: 'ASSET',
+
+            assetId,
           },
 
-          scaleMode: 'CROP',
+          composition: {
+            opacity: 1,
+
+            region: {
+              x: 0,
+
+              y: 0,
+
+              width: 1,
+
+              height: 1,
+            },
+
+            scaleMode: 'CROP',
+          },
+
+          purpose: 'Montrer la preuve Vision.',
         },
+      ],
 
-        purpose: 'Montrer la preuve Vision.',
-      },
-    ],
+      productFocus: [
+        {
+          startMs: 1_000,
 
-    productFocus: [
-      {
-        startMs: 1_000,
+          endMs: 5_000,
 
-        endMs: 5_000,
+          assetId,
 
-        assetId,
+          region: {
+            x: 0.2,
 
-        region: {
-          x: 0.2,
+            y: 0.2,
 
-          y: 0.2,
+            width: 0.7,
 
-          width: 0.7,
+            height: 0.4,
+          },
 
-          height: 0.4,
+          behavior: 'STATIC_CROP',
+
+          reason: 'Maintenir le résultat lisible.',
         },
+      ],
 
-        behavior: 'STATIC_CROP',
+      captions: [],
 
-        reason: 'Maintenir le résultat lisible.',
+      onScreenText: [],
+
+      presenter: [],
+
+      audio: {
+        sfx: [],
       },
-    ],
 
-    captions: [],
+      transitions: [],
 
-    onScreenText: [],
+      renderSettings: {
+        width: 1080,
 
-    presenter: [],
+        height: 1920,
 
-    audio: {
-      sfx: [],
+        fps: 30,
+
+        codecProfileKey: 'SOCIAL_H264_AAC_V1',
+
+        audioProfileKey: 'SOCIAL_VOICE_MASTER_V1',
+      },
+
+      rationale: {
+        hookStrategy: 'Preuve immédiatement visible.',
+
+        pacingStrategy: 'Rapide mais lisible.',
+
+        attentionStrategy: 'Un seul focus produit dominant.',
+
+        proofStrategy: 'La capture Vision reste prioritaire.',
+
+        endingStrategy: 'Fin nette sans temps mort.',
+      },
     },
+  });
+}
 
-    transitions: [],
+function blockedOutput(request: ProviderRequest) {
+  const input = request.envelope.input as {
+    assets: { assetId: string }[];
+    scriptVersion: { segments: { id: string }[] };
+  };
 
-    renderSettings: {
-      width: 1080,
-
-      height: 1920,
-
-      fps: 30,
-
-      codecProfileKey: 'SOCIAL_H264_AAC_V1',
-
-      audioProfileKey: 'SOCIAL_VOICE_MASTER_V1',
-    },
-
-    rationale: {
-      hookStrategy: 'Preuve immédiatement visible.',
-
-      pacingStrategy: 'Rapide mais lisible.',
-
-      attentionStrategy: 'Un seul focus produit dominant.',
-
-      proofStrategy: 'La capture Vision reste prioritaire.',
-
-      endingStrategy: 'Fin nette sans temps mort.',
+  return EditingIntelligenceOutputV11Schema.parse({
+    kind: 'BLOCKED',
+    blocker: {
+      reasonCode: 'SCRIPT_ASSET_MISMATCH',
+      recoverability: 'RECOVERABLE_WITH_INPUT',
+      summary: 'La preuve disponible ne couvre pas le segment narratif requis.',
+      evidence: {
+        assetIds: [input.assets[0]!.assetId],
+        scriptSegmentIds: [input.scriptVersion.segments[0]!.id],
+        constraintKeys: ['SCRIPT', 'PRODUCT_PROOF'],
+      },
+      requiredAction: {
+        type: 'RECAPTURE_PRODUCT_PROOF',
+        detail: 'Capturer une preuve produit qui correspond au segment narratif.',
+        requestedAssetRoles: ['PRODUCT_CAPTURE'],
+      },
     },
   });
 }
@@ -442,10 +471,12 @@ it('generates and persists a hard-validated EditingPlan through the production A
   expect(provider.calls[0]!.envelope.prompt).toMatchObject({
     key: 'editing-intelligence',
 
-    version: '1.0.0',
+    version: '1.1.0',
   });
 
-  expect(result.output.selectedAssets[0]!.assetId).toBe(data.productAsset.id);
+  expect(result.output.kind).toBe('PLAN');
+  if (result.output.kind !== 'PLAN') throw new Error('EXPECTED_PLAN');
+  expect(result.output.plan.selectedAssets[0]!.assetId).toBe(data.productAsset.id);
 
   const invocation = await db.modelInvocation.findUniqueOrThrow({
     where: {
@@ -458,7 +489,7 @@ it('generates and persists a hard-validated EditingPlan through the production A
 
     promptKey: 'editing-intelligence',
 
-    promptVersion: '1.0.0',
+    promptVersion: '1.1.0',
 
     knowledgeSnapshotId: data.knowledge.id,
   });
@@ -468,21 +499,21 @@ it('generates and persists a hard-validated EditingPlan through the production A
 
   expect(editingVersion.modelInvocationId).toBe(requestId);
 
-  expect(editingVersion.planSpecJson).toEqual(result.output);
+  expect(editingVersion.planSpecJson).toEqual(result.output.plan);
 
-  expect(editingVersion.timelineJson).toEqual(result.output.timeline);
+  expect(editingVersion.timelineJson).toEqual(result.output.plan.timeline);
 
-  expect(editingVersion.captionPlanJson).toEqual(result.output.captions);
+  expect(editingVersion.captionPlanJson).toEqual(result.output.plan.captions);
 
-  expect(editingVersion.audioPlanJson).toEqual(result.output.audio);
+  expect(editingVersion.audioPlanJson).toEqual(result.output.plan.audio);
 
-  expect(editingVersion.visualFocusJson).toEqual(result.output.productFocus);
+  expect(editingVersion.visualFocusJson).toEqual(result.output.plan.productFocus);
 
-  expect(editingVersion.transitionPlanJson).toEqual(result.output.transitions);
+  expect(editingVersion.transitionPlanJson).toEqual(result.output.plan.transitions);
 
-  expect(editingVersion.greenScreenPlanJson).toEqual(result.output.presenter);
+  expect(editingVersion.greenScreenPlanJson).toEqual(result.output.plan.presenter);
 
-  expect(editingVersion.renderSettingsJson).toEqual(result.output.renderSettings);
+  expect(editingVersion.renderSettingsJson).toEqual(result.output.plan.renderSettings);
 
   expect(
     await db.editingPlan.findUniqueOrThrow({
@@ -593,7 +624,9 @@ it('pins exact RenderInputAssets and compiles a deterministic RenderPayload', as
     rendererVersion: 'v1',
   });
 
-  expect(payload.editingPlan).toEqual(result.output);
+  expect(result.output.kind).toBe('PLAN');
+  if (result.output.kind !== 'PLAN') throw new Error('EXPECTED_PLAN');
+  expect(payload.editingPlan).toEqual(result.output.plan);
 
   expect(payload.provenance).toMatchObject({
     editingPlanVersionId: editingVersion.id,
@@ -661,13 +694,179 @@ it('refuses READY promotion without exact validated invocation evidence', async 
   expect(await db.editingPlanVersion.count()).toBe(0);
 });
 
+it('persists a structured blocker as a successful non-retried AI result without creating a fake plan', async () => {
+  const data = await setup();
+  const provider = new FakeAIProvider(async (request) => reply(blockedOutput(request)));
+  const requestId = randomUUID();
+
+  const result = await service(provider).generatePlan(
+    {
+      requestId,
+      knowledgeSnapshotId: data.knowledge.id,
+      creativePlanVersionId: data.creativePlanVersion.id,
+    },
+    policy,
+    budget,
+  );
+
+  expect(provider.calls).toHaveLength(1);
+  expect(result.output.kind).toBe('BLOCKED');
+  expect(result.editingPlanVersion).toBeNull();
+  expect(result.editingBlocker).toMatchObject({
+    status: 'OPEN',
+    creativePlanVersionId: data.creativePlanVersion.id,
+    modelInvocationId: requestId,
+    reasonCode: 'SCRIPT_ASSET_MISMATCH',
+    recoverability: 'RECOVERABLE_WITH_INPUT',
+  });
+  expect(await db.editingPlanVersion.count()).toBe(0);
+  expect(await db.editingPlan.count()).toBe(0);
+  expect(await db.modelInvocation.findUniqueOrThrow({ where: { id: requestId } })).toMatchObject({
+    status: 'SUCCEEDED',
+    promptVersion: '1.1.0',
+    outputSchemaVersion: '1.1.0',
+  });
+  expect(await db.modelInvocationAttempt.count({ where: { modelInvocationId: requestId } })).toBe(
+    1,
+  );
+});
+
+it('rejects blocker evidence that references an asset outside the supplied context without retry', async () => {
+  const data = await setup();
+  const provider = new FakeAIProvider(async (request) => {
+    const output = blockedOutput(request);
+    if (output.kind !== 'BLOCKED') throw new Error('EXPECTED_BLOCKER');
+    output.blocker.evidence.assetIds = [randomUUID()];
+    return reply(output);
+  });
+  const requestId = randomUUID();
+
+  await expect(
+    service(provider).generatePlan(
+      {
+        requestId,
+        knowledgeSnapshotId: data.knowledge.id,
+        creativePlanVersionId: data.creativePlanVersion.id,
+      },
+      policy,
+      budget,
+    ),
+  ).rejects.toThrow('EDITING_BLOCKER_ASSET_EVIDENCE_INVALID');
+
+  expect(provider.calls).toHaveLength(1);
+  expect(await db.editingBlocker.count()).toBe(0);
+  expect(await db.editingPlanVersion.count()).toBe(0);
+  expect(await db.modelInvocation.findUniqueOrThrow({ where: { id: requestId } })).toMatchObject({
+    status: 'FAILED',
+    failureCode: 'EDITING_BLOCKER_ASSET_EVIDENCE_INVALID',
+  });
+});
+
+it('supersedes an older open blocker and resolves the current blocker when a later valid plan succeeds', async () => {
+  const data = await setup();
+
+  const blockerOne = randomUUID();
+  await service(new FakeAIProvider(async (request) => reply(blockedOutput(request)))).generatePlan(
+    {
+      requestId: blockerOne,
+      knowledgeSnapshotId: data.knowledge.id,
+      creativePlanVersionId: data.creativePlanVersion.id,
+    },
+    policy,
+    budget,
+  );
+
+  const blockerTwo = randomUUID();
+  await service(new FakeAIProvider(async (request) => reply(blockedOutput(request)))).generatePlan(
+    {
+      requestId: blockerTwo,
+      knowledgeSnapshotId: data.knowledge.id,
+      creativePlanVersionId: data.creativePlanVersion.id,
+    },
+    policy,
+    budget,
+  );
+
+  expect(
+    await db.editingBlocker.findUniqueOrThrow({ where: { modelInvocationId: blockerOne } }),
+  ).toMatchObject({
+    status: 'SUPERSEDED',
+    resolvedByEditingPlanVersionId: null,
+  });
+  expect(
+    await db.editingBlocker.findUniqueOrThrow({ where: { modelInvocationId: blockerTwo } }),
+  ).toMatchObject({
+    status: 'OPEN',
+  });
+
+  const planResult = await service(
+    new FakeAIProvider(async (request) => reply(validOutput(request))),
+  ).generatePlan(
+    {
+      requestId: randomUUID(),
+      knowledgeSnapshotId: data.knowledge.id,
+      creativePlanVersionId: data.creativePlanVersion.id,
+    },
+    policy,
+    budget,
+  );
+
+  expect(planResult.output.kind).toBe('PLAN');
+  expect(planResult.editingPlanVersion).not.toBeNull();
+
+  const resolved = await db.editingBlocker.findUniqueOrThrow({
+    where: { modelInvocationId: blockerTwo },
+  });
+  expect(resolved).toMatchObject({
+    status: 'RESOLVED',
+    resolvedByEditingPlanVersionId: planResult.editingPlanVersion!.id,
+  });
+  expect(resolved.closedAt).not.toBeNull();
+  expect(await db.editingBlocker.count({ where: { status: 'OPEN' } })).toBe(0);
+});
+
+it('demotes a previously READY EditingPlan root when a newer evaluation becomes blocked', async () => {
+  const data = await setup();
+
+  await service(new FakeAIProvider(async (request) => reply(validOutput(request)))).generatePlan(
+    {
+      requestId: randomUUID(),
+      knowledgeSnapshotId: data.knowledge.id,
+      creativePlanVersionId: data.creativePlanVersion.id,
+    },
+    policy,
+    budget,
+  );
+
+  const root = await db.editingPlan.findFirstOrThrow();
+  expect(root.status).toBe('READY');
+
+  await service(new FakeAIProvider(async (request) => reply(blockedOutput(request)))).generatePlan(
+    {
+      requestId: randomUUID(),
+      knowledgeSnapshotId: data.knowledge.id,
+      creativePlanVersionId: data.creativePlanVersion.id,
+    },
+    policy,
+    budget,
+  );
+
+  expect(await db.editingPlan.findUniqueOrThrow({ where: { id: root.id } })).toMatchObject({
+    status: 'DRAFT',
+  });
+  expect(await db.editingPlanVersion.count()).toBe(1);
+  expect(await db.editingBlocker.count({ where: { status: 'OPEN' } })).toBe(1);
+});
+
 it('rejects an Editing Intelligence output that passes JSON schema but violates hard renderer rules', async () => {
   const data = await setup();
 
   const provider = new FakeAIProvider(async (request) => {
     const output = validOutput(request);
 
-    output.timeline[0]!.composition.motionPresetKey = 'INVENTED_AI_ZOOM';
+    if (output.kind !== 'PLAN') throw new Error('EXPECTED_PLAN');
+
+    output.plan.timeline[0]!.composition.motionPresetKey = 'INVENTED_AI_ZOOM';
 
     return reply(output);
   });

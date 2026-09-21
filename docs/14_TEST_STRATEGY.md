@@ -1563,3 +1563,21 @@ Historical spec-sequencing note — completed:
 3. resolve remaining schema/contract debt;
 4. freeze `spec-v1.0`;
 5. produce Codex Master Handoff.
+
+---
+
+# spec-v1.0.4 test amendment — structured Editing Intelligence blockers
+
+Release-blocking Phase 5 tests now additionally prove:
+
+```text
+PLAN | BLOCKED contract fidelity
+blocker evidence whitelist validation
+no EditingPlanVersion on BLOCKED
+no provider retry for a valid blocker
+terminal validation for hallucinated blocker references
+one canonical OPEN blocker per CreativePlanVersion
+supersession and resolution lineage
+READY EditingPlan demotion while blocked
+historical spec-v1.0.3 manifest reconstruction
+```

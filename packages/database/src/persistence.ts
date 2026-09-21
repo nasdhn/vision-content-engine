@@ -10,6 +10,8 @@ import type { Actor, OutboxInput, Transaction } from './transaction.js';
 import { Versions } from './versions.js';
 import { approvedConcept, validatePublication, validateRender } from './lineage.js';
 import {
+  EditingIntelligenceBlockedResultSchema,
+  EditingIntelligencePlanResultSchema,
   EditingPlanSpecSchema,
   TechnicalQaReportSchema,
   TemplateRuntimeContractSchema,
@@ -221,6 +223,148 @@ export class UnitOfWork {
     return row;
   }
 
+  async recordEditingBlocker(
+    creativePlanVersionId: string,
+    modelInvocationId: string,
+    output: unknown,
+  ) {
+    const parsed = EditingIntelligenceBlockedResultSchema.parse(output);
+
+    const creativePlanVersion = await this.tx.creativePlanVersion.findUniqueOrThrow({
+      where: { id: creativePlanVersionId },
+    });
+
+    await lock(this.tx, 'CreativePlan', creativePlanVersion.creativePlanId);
+
+    const invocation = await this.tx.modelInvocation.findUniqueOrThrow({
+      where: { id: modelInvocationId },
+    });
+
+    invariant(
+      invocation.status === 'SUCCEEDED' && invocation.outputHash === contentHash(parsed),
+      'VALIDATED_INVOCATION_REQUIRED',
+    );
+
+    const appliedInvocation = await this.tx.auditEvent.findFirst({
+      where: {
+        subjectId: invocation.id,
+        subjectType: 'ModelInvocation',
+        action: 'ModelInvocation.applied',
+      },
+    });
+
+    invariant(appliedInvocation, 'VALIDATED_INVOCATION_REQUIRED');
+
+    const now = await databaseTime(this.tx);
+    const open = await this.tx.editingBlocker.findMany({
+      where: { creativePlanVersionId, status: 'OPEN' },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+
+    for (const blocker of open) {
+      await this.tx.editingBlocker.update({
+        where: { id: blocker.id },
+        data: { status: 'SUPERSEDED', closedAt: now },
+      });
+      await changed(
+        this.tx,
+        this.actor,
+        'EditingBlocker.superseded',
+        'EditingBlocker',
+        blocker.id,
+        creativePlanVersionId,
+      );
+    }
+
+    const blocker = await this.tx.editingBlocker.create({
+      data: {
+        creativePlanVersionId,
+        modelInvocationId,
+        reasonCode: parsed.blocker.reasonCode,
+        recoverability: parsed.blocker.recoverability,
+        blockerSpecJson: parsed as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    await changed(
+      this.tx,
+      this.actor,
+      'EditingBlocker.opened',
+      'EditingBlocker',
+      blocker.id,
+      creativePlanVersionId,
+    );
+
+    const editingPlan = await this.tx.editingPlan.findUnique({
+      where: { creativePlanId: creativePlanVersion.creativePlanId },
+    });
+
+    if (editingPlan?.status === 'READY') {
+      await lock(this.tx, 'EditingPlan', editingPlan.id);
+      await this.tx.editingPlan.update({
+        where: { id: editingPlan.id },
+        data: { status: 'DRAFT' },
+      });
+      await changed(
+        this.tx,
+        this.actor,
+        'EditingPlan.blocked',
+        'EditingPlan',
+        editingPlan.id,
+        creativePlanVersionId,
+      );
+    }
+
+    return blocker;
+  }
+
+  async resolveEditingBlockers(creativePlanVersionId: string, editingPlanVersionId: string) {
+    const creativePlanVersion = await this.tx.creativePlanVersion.findUniqueOrThrow({
+      where: { id: creativePlanVersionId },
+    });
+
+    await lock(this.tx, 'CreativePlan', creativePlanVersion.creativePlanId);
+
+    const editingPlanVersion = await this.tx.editingPlanVersion.findUniqueOrThrow({
+      where: { id: editingPlanVersionId },
+    });
+
+    invariant(
+      editingPlanVersion.creativePlanVersionId === creativePlanVersionId,
+      'EDITING_BLOCKER_RESOLUTION_LINEAGE_MISMATCH',
+    );
+
+    const open = await this.tx.editingBlocker.findMany({
+      where: { creativePlanVersionId, status: 'OPEN' },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+
+    if (open.length === 0) return [];
+
+    const now = await databaseTime(this.tx);
+
+    for (const blocker of open) {
+      await this.tx.editingBlocker.update({
+        where: { id: blocker.id },
+        data: {
+          status: 'RESOLVED',
+          resolvedByEditingPlanVersionId: editingPlanVersionId,
+          closedAt: now,
+        },
+      });
+      await changed(
+        this.tx,
+        this.actor,
+        'EditingBlocker.resolved',
+        'EditingBlocker',
+        blocker.id,
+        editingPlanVersionId,
+      );
+    }
+
+    return open.map((blocker) => blocker.id);
+  }
+
   async markEditingPlanReady(editingPlanVersionId: string) {
     const version = await this.tx.editingPlanVersion.findUniqueOrThrow({
       where: {
@@ -243,9 +387,15 @@ export class UnitOfWork {
       },
     });
 
+    const currentPlanEnvelope = EditingIntelligencePlanResultSchema.parse({
+      kind: 'PLAN',
+      plan: parsedEditingPlan.data,
+    });
+
     invariant(
       invocation.status === 'SUCCEEDED' &&
-        invocation.outputHash === contentHash(parsedEditingPlan.data),
+        (invocation.outputHash === contentHash(parsedEditingPlan.data) ||
+          invocation.outputHash === contentHash(currentPlanEnvelope)),
       'VALIDATED_INVOCATION_REQUIRED',
     );
 

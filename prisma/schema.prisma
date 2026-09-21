@@ -658,6 +658,7 @@ model CreativePlanVersion {
   recordingRequests     RecordingRequest[]
   captureRuns           CaptureRun[]
   editingPlanVersions   EditingPlanVersion[]
+  editingBlockers       EditingBlocker[]
 
   @@unique([creativePlanId, version])
   @@index([scriptVersionId])
@@ -929,12 +930,13 @@ model EditingPlanVersion {
   modelInvocationId       String?  @db.Uuid
   createdAt               DateTime @default(now()) @db.Timestamptz(3)
 
-  editingPlan           EditingPlan           @relation(fields: [editingPlanId], references: [id], onDelete: Restrict)
-  creativePlanVersion   CreativePlanVersion   @relation(fields: [creativePlanVersionId], references: [id], onDelete: Restrict)
-  editingProfileVersion EditingProfileVersion @relation(fields: [editingProfileVersionId], references: [id], onDelete: Restrict)
-  templateVersion       TemplateVersion       @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
-  modelInvocation       ModelInvocation?      @relation("EditingPlanInvocation", fields: [modelInvocationId], references: [id], onDelete: SetNull)
-  renders               Render[]
+  editingPlan             EditingPlan           @relation(fields: [editingPlanId], references: [id], onDelete: Restrict)
+  creativePlanVersion     CreativePlanVersion   @relation(fields: [creativePlanVersionId], references: [id], onDelete: Restrict)
+  editingProfileVersion   EditingProfileVersion @relation(fields: [editingProfileVersionId], references: [id], onDelete: Restrict)
+  templateVersion         TemplateVersion       @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
+  modelInvocation         ModelInvocation?      @relation("EditingPlanInvocation", fields: [modelInvocationId], references: [id], onDelete: SetNull)
+  renders                 Render[]
+  resolvedEditingBlockers EditingBlocker[]      @relation("EditingBlockerResolution")
 
   @@unique([editingPlanId, version])
   @@index([creativePlanVersionId])
@@ -1346,6 +1348,7 @@ model ModelInvocation {
   scriptVersions       ScriptVersion[]          @relation("ScriptInvocation")
   creativePlanVersions CreativePlanVersion[]    @relation("CreativePlanInvocation")
   editingPlanVersions  EditingPlanVersion[]     @relation("EditingPlanInvocation")
+  editingBlockers      EditingBlocker[]         @relation("EditingBlockerInvocation")
   creativeQaAttempts   RenderAttempt[]          @relation("CreativeQaInvocation")
   insights             Insight[]                @relation("InsightInvocation")
   costEntries          CostEntry[]
@@ -1429,4 +1432,44 @@ model AuditEvent {
 
   @@index([subjectType, subjectId, createdAt])
   @@index([action, createdAt])
+}
+
+enum EditingBlockerStatus {
+  OPEN
+  RESOLVED
+  SUPERSEDED
+}
+
+enum EditingBlockerReasonCode {
+  ASSET_QUALITY_INSUFFICIENT
+  PROOF_COVERAGE_INSUFFICIENT
+  SCRIPT_ASSET_MISMATCH
+  PRESENTER_COVERAGE_INSUFFICIENT
+  VOICE_COVERAGE_INSUFFICIENT
+  CREATIVE_PLAN_CONSTRAINT_CONFLICT
+}
+
+enum EditingBlockerRecoverability {
+  RECOVERABLE_WITH_INPUT
+  REQUIRES_CREATIVE_PLAN_REVISION
+}
+
+model EditingBlocker {
+  id                             String                       @id @default(uuid(7)) @db.Uuid
+  creativePlanVersionId          String                       @db.Uuid
+  modelInvocationId              String                       @unique @db.Uuid
+  status                         EditingBlockerStatus         @default(OPEN)
+  reasonCode                     EditingBlockerReasonCode
+  recoverability                 EditingBlockerRecoverability
+  blockerSpecJson                Json
+  resolvedByEditingPlanVersionId String?                      @db.Uuid
+  createdAt                      DateTime                     @default(now()) @db.Timestamptz(3)
+  closedAt                       DateTime?                    @db.Timestamptz(3)
+
+  creativePlanVersion          CreativePlanVersion @relation(fields: [creativePlanVersionId], references: [id], onDelete: Restrict)
+  modelInvocation              ModelInvocation     @relation("EditingBlockerInvocation", fields: [modelInvocationId], references: [id], onDelete: Restrict)
+  resolvedByEditingPlanVersion EditingPlanVersion? @relation("EditingBlockerResolution", fields: [resolvedByEditingPlanVersionId], references: [id], onDelete: Restrict)
+
+  @@index([creativePlanVersionId, status, createdAt])
+  @@index([status, createdAt])
 }

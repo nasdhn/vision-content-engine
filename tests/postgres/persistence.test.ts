@@ -172,6 +172,7 @@ it('deploys the reviewed migration once with exact catalog constraints and UTC t
   expect(migrations.map((migration) => migration.migration_name)).toEqual([
     '20260919000000_initial_canonical',
     '20260921120000_phase5_editing_plan_spec',
+    '20260921154500_phase5_editing_blockers',
   ]);
 
   for (const migration of migrations) {
@@ -216,14 +217,35 @@ it('deploys the reviewed migration once with exact catalog constraints and UTC t
     (SELECT count(*)::int FROM information_schema.columns WHERE table_schema='public' AND table_name <> '_prisma_migrations' AND data_type='timestamp with time zone' AND datetime_precision=3) AS temporal,
     (SELECT count(*)::int FROM information_schema.columns WHERE table_schema='public' AND data_type='timestamp without time zone') AS wrong`;
   expect(catalog).toEqual({
-    tables: 50,
-    enums: 49,
-    fk: 72,
-    checks: 6,
-    indexes: 157,
-    temporal: 103,
+    tables: 51,
+    enums: 52,
+    fk: 75,
+    checks: 7,
+    indexes: 162,
+    temporal: 105,
     wrong: 0,
   });
+
+  const [blockerLifecycle] = await db.$queryRaw<{ constraint_name: string; definition: string }[]>`
+    SELECT conname AS constraint_name, pg_get_constraintdef(oid) AS definition
+    FROM pg_constraint
+    WHERE connamespace = 'public'::regnamespace
+      AND conname = 'EditingBlocker_closed_state_check'
+  `;
+  expect(blockerLifecycle?.constraint_name).toBe('EditingBlocker_closed_state_check');
+  expect(blockerLifecycle?.definition).toContain('resolvedByEditingPlanVersionId');
+  expect(blockerLifecycle?.definition).toContain('closedAt');
+
+  const openIndex = await db.$queryRaw<{ indexdef: string }[]>`
+    SELECT indexdef
+    FROM pg_indexes
+    WHERE schemaname = 'public'
+      AND indexname = 'EditingBlocker_one_open_per_creative_plan_version'
+  `;
+  expect(openIndex).toHaveLength(1);
+  expect(openIndex[0]?.indexdef).toContain('creativePlanVersionId');
+  expect(openIndex[0]?.indexdef).toMatch(/WHERE .*OPEN/);
+
   expect(await db.$queryRaw`SHOW TimeZone`).toEqual([{ TimeZone: 'UTC' }]);
 });
 

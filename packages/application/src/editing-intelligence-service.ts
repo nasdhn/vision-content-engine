@@ -1,6 +1,9 @@
 import { z } from 'zod';
 
-import { EditingIntelligenceInputSchema, EditingIntelligenceOutputSchema } from '@vision/contracts';
+import {
+  EditingIntelligenceInputSchema,
+  EditingIntelligenceOutputV11Schema,
+} from '@vision/contracts';
 import type { AIProviderGateway, ModelPolicy } from '@vision/ai';
 import type { Budget, Prisma, PrismaClient } from '@vision/database';
 import { Persistence } from '@vision/database';
@@ -17,11 +20,75 @@ const aiActor = {
 
 const validatorAssetKindSchema = z.enum(['VIDEO', 'AUDIO', 'IMAGE', 'FONT', 'OTHER']);
 
+const revisionConstraintKeys = new Set([
+  'CREATIVE_PLAN',
+  'TEMPLATE',
+  'EDITING_PROFILE',
+  'DURATION',
+]);
+
 export type EditingIntelligenceOptions = {
   requestId: string;
   knowledgeSnapshotId: string;
   creativePlanVersionId: string;
 };
+
+type EditingInput = z.infer<typeof EditingIntelligenceInputSchema>;
+type EditingOutput = z.infer<typeof EditingIntelligenceOutputV11Schema>;
+
+function validateStructuredBlocker(input: EditingInput, output: EditingOutput) {
+  if (output.kind !== 'BLOCKED') return;
+
+  const { blocker } = output;
+  const availableAssetIds = new Set(input.assets.map((asset) => asset.assetId));
+  const scriptSegmentIds = new Set(input.scriptVersion.segments.map((segment) => segment.id));
+
+  invariant(
+    blocker.evidence.assetIds.every((assetId) => availableAssetIds.has(assetId)),
+    'EDITING_BLOCKER_ASSET_EVIDENCE_INVALID',
+  );
+  invariant(
+    blocker.evidence.scriptSegmentIds.every((segmentId) => scriptSegmentIds.has(segmentId)),
+    'EDITING_BLOCKER_SEGMENT_EVIDENCE_INVALID',
+  );
+
+  switch (blocker.reasonCode) {
+    case 'ASSET_QUALITY_INSUFFICIENT':
+      invariant(blocker.evidence.assetIds.length > 0, 'EDITING_BLOCKER_EVIDENCE_INSUFFICIENT');
+      break;
+    case 'PROOF_COVERAGE_INSUFFICIENT':
+      invariant(
+        blocker.evidence.constraintKeys.includes('PRODUCT_PROOF'),
+        'EDITING_BLOCKER_EVIDENCE_INSUFFICIENT',
+      );
+      break;
+    case 'SCRIPT_ASSET_MISMATCH':
+      invariant(
+        blocker.evidence.assetIds.length > 0 && blocker.evidence.scriptSegmentIds.length > 0,
+        'EDITING_BLOCKER_EVIDENCE_INSUFFICIENT',
+      );
+      break;
+    case 'PRESENTER_COVERAGE_INSUFFICIENT':
+      invariant(
+        blocker.evidence.constraintKeys.includes('PRESENTER'),
+        'EDITING_BLOCKER_EVIDENCE_INSUFFICIENT',
+      );
+      break;
+    case 'VOICE_COVERAGE_INSUFFICIENT':
+      invariant(
+        blocker.evidence.constraintKeys.includes('VOICE_MODE') &&
+          blocker.evidence.scriptSegmentIds.length > 0,
+        'EDITING_BLOCKER_EVIDENCE_INSUFFICIENT',
+      );
+      break;
+    case 'CREATIVE_PLAN_CONSTRAINT_CONFLICT':
+      invariant(
+        blocker.evidence.constraintKeys.some((key) => revisionConstraintKeys.has(key)),
+        'EDITING_BLOCKER_EVIDENCE_INSUFFICIENT',
+      );
+      break;
+  }
+}
 
 export class EditingIntelligenceService {
   private readonly persistence: Persistence;
@@ -64,7 +131,7 @@ export class EditingIntelligenceService {
         prompt: {
           key: 'editing-intelligence',
 
-          version: '1.0.0',
+          version: '1.1.0',
         },
 
         knowledgeSnapshot: {
@@ -83,18 +150,25 @@ export class EditingIntelligenceService {
       {
         input: EditingIntelligenceInputSchema,
 
-        output: EditingIntelligenceOutputSchema,
+        output: EditingIntelligenceOutputV11Schema,
 
         validate: (input, output) => {
+          if (output.kind === 'BLOCKED') {
+            validateStructuredBlocker(input, output);
+            return;
+          }
+
+          const plan = output.plan;
+
           invariant(
-            output.masterDurationMs >= input.durationConstraints.minMs &&
-              output.masterDurationMs <= input.durationConstraints.maxMs,
+            plan.masterDurationMs >= input.durationConstraints.minMs &&
+              plan.masterDurationMs <= input.durationConstraints.maxMs,
             'EDITING_DURATION_OUT_OF_BOUNDS',
           );
 
           const segmentIds = new Set(input.scriptVersion.segments.map((segment) => segment.id));
 
-          for (const caption of output.captions)
+          for (const caption of plan.captions)
             invariant(
               !caption.segmentRef || segmentIds.has(caption.segmentRef),
               'CAPTION_SEGMENT_NOT_FOUND',
@@ -120,7 +194,7 @@ export class EditingIntelligenceService {
             ];
           });
 
-          validateEditingPlan(output, {
+          validateEditingPlan(plan, {
             availableAssets,
 
             profile: context.profile,
@@ -146,6 +220,27 @@ export class EditingIntelligenceService {
       budget,
     );
 
+    if (result.output.kind === 'BLOCKED') {
+      const editingBlocker = await this.persistence.transaction(aiActor, async (unit) => {
+        await unit.consumeInvocation(result.modelInvocationId, result.output);
+
+        return unit.recordEditingBlocker(
+          context.input.creativePlanVersion.id,
+          result.modelInvocationId,
+          result.output,
+        );
+      });
+
+      return {
+        ...result,
+        context: context.input,
+        editingPlanVersion: null,
+        editingBlocker,
+      };
+    }
+
+    const plan = result.output.plan;
+
     const editingPlanVersion = await this.persistence.transaction(aiActor, async (unit) => {
       await unit.consumeInvocation(result.modelInvocationId, result.output);
 
@@ -162,26 +257,27 @@ export class EditingIntelligenceService {
 
         templateVersionId: context.input.creativePlanVersion.templateVersionId,
 
-        planSpecJson: result.output as Prisma.InputJsonValue,
+        planSpecJson: plan as Prisma.InputJsonValue,
 
-        timelineJson: result.output.timeline as Prisma.InputJsonValue,
+        timelineJson: plan.timeline as Prisma.InputJsonValue,
 
-        captionPlanJson: result.output.captions as Prisma.InputJsonValue,
+        captionPlanJson: plan.captions as Prisma.InputJsonValue,
 
-        audioPlanJson: result.output.audio as Prisma.InputJsonValue,
+        audioPlanJson: plan.audio as Prisma.InputJsonValue,
 
-        visualFocusJson: result.output.productFocus as Prisma.InputJsonValue,
+        visualFocusJson: plan.productFocus as Prisma.InputJsonValue,
 
-        transitionPlanJson: result.output.transitions as Prisma.InputJsonValue,
+        transitionPlanJson: plan.transitions as Prisma.InputJsonValue,
 
-        greenScreenPlanJson: result.output.presenter as Prisma.InputJsonValue,
+        greenScreenPlanJson: plan.presenter as Prisma.InputJsonValue,
 
-        renderSettingsJson: result.output.renderSettings as Prisma.InputJsonValue,
+        renderSettingsJson: plan.renderSettings as Prisma.InputJsonValue,
 
         modelInvocationId: result.modelInvocationId,
       });
 
       await unit.markEditingPlanReady(version.id);
+      await unit.resolveEditingBlockers(context.input.creativePlanVersion.id, version.id);
 
       return version;
     });
@@ -190,6 +286,7 @@ export class EditingIntelligenceService {
       ...result,
       context: context.input,
       editingPlanVersion,
+      editingBlocker: null,
     };
   }
 }

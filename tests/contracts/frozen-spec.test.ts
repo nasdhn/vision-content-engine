@@ -27,6 +27,11 @@ const historicalManifests = [
     count: 153,
     hash: 'c6962f0bd4eddc7351bfc891cc76256c1fd2e209c536b845ebb14a74aea401cc',
   },
+  {
+    version: 'spec-v1.0.3',
+    count: 156,
+    hash: 'fba6ac915405dc6be3ef07f33c6fd7485561f736f9b6adf49d0cdd28ed34a96b',
+  },
 ] as const;
 const manifestPath = (version: string) => `docs/spec-artifacts/${version}-manifest.json`;
 const leaseDefinitions = {
@@ -73,11 +78,29 @@ function withoutPhase5EditingPlanSpec(schema: string): string {
     .filter((line) => !/^\s*planSpecJson\s+Json\?\s*$/.test(line))
     .join('\n');
 }
+function withoutPhase5EditingBlockers(schema: string): string {
+  schema = schema
+    .split('\n')
+    .filter(
+      (line) =>
+        !/^\s*editingBlockers\s+EditingBlocker\[\]/.test(line) &&
+        !/^\s*resolvedEditingBlockers\s+EditingBlocker\[\]/.test(line),
+    )
+    .join('\n');
+
+  const marker = '\n\nenum EditingBlockerStatus {\n';
+  const offset = schema.indexOf(marker);
+  return offset === -1 ? schema : `${schema.slice(0, offset)}\n`;
+}
 
 const appendedDocuments = new Set([
   'docs/04_WORKFLOWS.md',
+  'docs/07_EDITING_INTELLIGENCE.md',
   'docs/10_DASHBOARD_UX.md',
+  'docs/14_TEST_STRATEGY.md',
+  'docs/16_IMPLEMENTATION_PLAN.md',
   'docs/DECISIONS.md',
+  'docs/SPEC_FREEZE_CHECKLIST.md',
   'docs/SPEC_STATUS.md',
   'docs/19_SPEC_V1_FINAL_VALIDATION.md',
 ]);
@@ -95,8 +118,10 @@ it.each(historicalManifests)(
     for (const entry of manifest.files) {
       let original = await readFile(entry.path);
       if (entry.path === 'docs/spec-artifacts/schema.prisma') {
-        let schema = withoutPhase5EditingPlanSpec(original.toString());
-        if (version !== 'spec-v1.0.2') schema = withoutDurableLeases(schema);
+        let schema = withoutPhase5EditingBlockers(original.toString());
+        if (version !== 'spec-v1.0.3') schema = withoutPhase5EditingPlanSpec(schema);
+        if (!['spec-v1.0.2', 'spec-v1.0.3'].includes(version))
+          schema = withoutDurableLeases(schema);
         if (version === 'spec-v1.0') schema = schema.replaceAll(' @db.Timestamptz(3)', '');
         original = Buffer.from(schema);
       } else if (appendedDocuments.has(entry.path)) {
@@ -109,22 +134,24 @@ it.each(historicalManifests)(
   },
 );
 
-it('validates the current spec-v1.0.3 manifest and parses its JSON/TypeScript', async () => {
+it('validates the current spec-v1.0.4 manifest and parses its JSON/TypeScript', async () => {
   const historical = manifestSchema.parse(
-    JSON.parse(await readFile(manifestPath('spec-v1.0.2'), 'utf8')),
-  );
-  const manifest = manifestSchema.parse(
     JSON.parse(await readFile(manifestPath('spec-v1.0.3'), 'utf8')),
   );
-  expect(manifest.specVersion).toBe('spec-v1.0.3');
-  expect(manifest.fileCount).toBe(156);
-  expect(manifest.files).toHaveLength(156);
+  const manifest = manifestSchema.parse(
+    JSON.parse(await readFile(manifestPath('spec-v1.0.4'), 'utf8')),
+  );
+  expect(manifest.specVersion).toBe('spec-v1.0.4');
+  expect(manifest.fileCount).toBe(161);
+  expect(manifest.files).toHaveLength(161);
   expect(manifest.files.map((entry) => entry.path)).toEqual(
     [
       ...historical.files.map((entry) => entry.path),
-      manifestPath('spec-v1.0.2'),
-      'docs/22_PHASE5_EDITING_PLAN_PERSISTENCE_AMENDMENT.md',
-      'docs/adr/ADR-0026-editing-plan-lossless-snapshot.md',
+      manifestPath('spec-v1.0.3'),
+      'docs/23_PHASE5_STRUCTURED_EDITING_BLOCKER_AMENDMENT.md',
+      'docs/adr/ADR-0027-structured-editing-blocker.md',
+      'docs/spec-artifacts/ai-contracts/editing-intelligence-prompt.v1.1.json',
+      'docs/spec-artifacts/ai-contracts/editing-intelligence-v1.1.ts',
     ].sort(),
   );
   for (const entry of manifest.files) {
@@ -159,16 +186,43 @@ it('copies the canonical Prisma model without semantic changes', async () => {
       .replace(/@default\(uuid\(7\)\)\s+@unique/g, '@unique @default(uuid(7))')
       .replace(/\s/g, '');
   expect(normalize(runtime) === normalize(canonical)).toBe(true);
-  expect([...runtime.matchAll(/^model /gm)]).toHaveLength(50);
-  expect([...runtime.matchAll(/^enum /gm)]).toHaveLength(49);
+  expect([...runtime.matchAll(/^model /gm)]).toHaveLength(51);
+  expect([...runtime.matchAll(/^enum /gm)]).toHaveLength(52);
   for (const schema of [canonical, runtime]) {
     const fields = [...schema.matchAll(/^\s+\w+\s+(DateTime\??)\s*([^\n]*)$/gm)];
-    expect(fields).toHaveLength(103);
-    expect(fields.filter((field) => field[1] === 'DateTime?')).toHaveLength(30);
+    expect(fields).toHaveLength(105);
+    expect(fields.filter((field) => field[1] === 'DateTime?')).toHaveLength(31);
     for (const field of fields) {
       expect(field[2]?.match(/@db\.Timestamptz\(3\)/g), field[0]).toHaveLength(1);
     }
   }
+});
+
+it('defines structured EditingBlocker persistence and one-open-blocker fencing', async () => {
+  for (const path of ['docs/spec-artifacts/schema.prisma', 'prisma/schema.prisma']) {
+    const schema = await readFile(path, 'utf8');
+    const block = schema.match(/model EditingBlocker \{[\s\S]*?\n\}/)?.[0];
+    expect(block, path).toBeDefined();
+    expect(block).toContain('creativePlanVersionId');
+    expect(block).toContain('modelInvocationId');
+    expect(block).toContain('blockerSpecJson');
+    expect(block).toContain('resolvedByEditingPlanVersionId');
+    expect(block).toContain('createdAt');
+    expect(block).toContain('closedAt');
+    expect(schema).toContain('enum EditingBlockerStatus');
+    expect(schema).toContain('enum EditingBlockerReasonCode');
+    expect(schema).toContain('enum EditingBlockerRecoverability');
+  }
+
+  const sql = await readFile(
+    'prisma/migrations/20260921154500_phase5_editing_blockers/migration.sql',
+    'utf8',
+  );
+  expect(sql).toContain('CREATE TABLE "EditingBlocker"');
+  expect(sql).toContain('"EditingBlocker_closed_state_check"');
+  expect(sql.replace(/\s+/g, ' ')).toContain(
+    'CREATE UNIQUE INDEX "EditingBlocker_one_open_per_creative_plan_version" ON "EditingBlocker"("creativePlanVersionId") WHERE "status" = \'OPEN\';',
+  );
 });
 
 it('declares the exact nullable lease/claim fields, native types and recovery indexes', async () => {

@@ -1555,3 +1555,22 @@ Historical freeze actions — completed:
 3. generate EditingPlan Zod spec artifacts;
 4. update Decisions/Status/Checklist;
 5. proceed to `08_VIDEO_ENGINE.md`.
+
+---
+
+# spec-v1.0.4 amendment — structured blocker runtime contract
+
+The historical sections above remain normative. The previously stated requirement to return a
+structured blocker is now implemented by Editing Intelligence contract/prompt `1.1.0`.
+
+A runtime result is exactly one of:
+
+```text
+PLAN    -> complete EditingPlanSpec
+BLOCKED -> evidence-bound EditingBlockerSpec
+```
+
+`BLOCKED` is a successful editorial conclusion. It never creates a partial EditingPlanVersion,
+never authorizes the renderer, and never retries solely because production is blocked. Exact
+semantics and persistence are defined by `23_PHASE5_STRUCTURED_EDITING_BLOCKER_AMENDMENT.md`
+and ADR-0027.

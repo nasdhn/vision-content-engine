@@ -146,3 +146,21 @@ persistence.
   Video Engine tranche. Distribution is not activated by this amendment.
 
 After validation, the historical earlier baseline sections remain dated records.
+
+## Current baseline amendment — spec-v1.0.4 (2026-09-21)
+
+This update supersedes earlier dated baseline instructions only for the structured Editing
+Intelligence blocker contract.
+
+- Current specification after validation: **spec-v1.0.4**.
+- Normative contract: `23_PHASE5_STRUCTURED_EDITING_BLOCKER_AMENDMENT.md`, ADR-0027 and D-188.
+- Editing Intelligence 1.0.0 remains historical; runtime generation moves to prompt/contract 1.1.0.
+- Output is `PLAN | BLOCKED`; a valid blocker is a successful ModelInvocation and creates no
+  EditingPlanVersion.
+- `EditingBlocker` provides canonical OPEN/RESOLVED/SUPERSEDED lineage.
+- Current manifest: `docs/spec-artifacts/spec-v1.0.4-manifest.json` (161 entries).
+- Historical manifests through spec-v1.0.3 remain byte-for-byte immutable.
+- Amendments 20, 21 and 22 continue to govern UTC instants, durable leases/fencing and lossless
+  EditingPlan persistence respectively.
+- This amendment remains inside the authorized Phase 5 Editing Intelligence / Video Engine
+  scope. Distribution is not activated.

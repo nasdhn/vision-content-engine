@@ -118,3 +118,8 @@ Mark an item `[x]` only after explicit validation.
 - [x] inspection-first rules
 - [x] Master Prompt
 - [x] final spec tag `spec-v1.0`
+
+## spec-v1.0.4 amendment
+- [x] structured Editing Intelligence blocker contract (`PLAN | BLOCKED`)
+- [x] blocker evidence whitelist and retry semantics
+- [x] canonical blocker persistence / resolution lineage
