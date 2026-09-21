@@ -13,3 +13,4 @@ export * from './render-payload-compiler.js';
 export * from './render-payload-builder.js';
 export * from './video-renderer.js';
 export * from './technical-qa.js';
+export * from './dashboard-read.js';

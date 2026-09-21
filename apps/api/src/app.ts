@@ -3,11 +3,24 @@ import { Controller, Get, Inject, Module, ServiceUnavailableException } from '@n
 import { NestFactory } from '@nestjs/core';
 import { checkReadiness } from '@vision/observability';
 import type { ReadinessProbes } from '@vision/observability';
+import type { DashboardReadService, RecordingPackService } from '@vision/application';
 
+import {
+  LOCAL_SESSION,
+  LocalSessionController,
+  LocalSessionService,
+  type LocalSessionOptions,
+} from './auth.js';
+import { DashboardController, DASHBOARD } from './dashboard.js';
 import { RecordingController, RECORDINGS } from './recordings.js';
-import type { RecordingApiOptions } from './recordings.js';
 
 const PROBES = Symbol('bootstrap-readiness-probes');
+
+export type ApiBusinessOptions = {
+  auth: LocalSessionOptions;
+  recordings?: RecordingPackService;
+  dashboard?: DashboardReadService;
+};
 
 @Controller()
 class HealthController {
@@ -26,14 +39,46 @@ class HealthController {
   }
 }
 
-export async function createApi(probes: ReadinessProbes, recordings?: RecordingApiOptions) {
+export async function createApi(probes: ReadinessProbes, business?: ApiBusinessOptions) {
   @Module({
-    controllers: [HealthController, ...(recordings ? [RecordingController] : [])],
+    controllers: [
+      HealthController,
+      ...(business ? [LocalSessionController] : []),
+      ...(business?.recordings ? [RecordingController] : []),
+      ...(business?.dashboard ? [DashboardController] : []),
+    ],
     providers: [
       { provide: PROBES, useValue: probes },
-      ...(recordings ? [{ provide: RECORDINGS, useValue: recordings }] : []),
+      ...(business
+        ? [
+            {
+              provide: LOCAL_SESSION,
+              useValue: new LocalSessionService(business.auth),
+            },
+          ]
+        : []),
+      ...(business?.recordings
+        ? [
+            {
+              provide: RECORDINGS,
+              useValue: business.recordings,
+            },
+          ]
+        : []),
+      ...(business?.dashboard
+        ? [
+            {
+              provide: DASHBOARD,
+              useValue: business.dashboard,
+            },
+          ]
+        : []),
     ],
   })
   class BootstrapModule {}
-  return NestFactory.create(BootstrapModule, { logger: false, abortOnError: false });
+
+  return NestFactory.create(BootstrapModule, {
+    logger: false,
+    abortOnError: false,
+  });
 }
