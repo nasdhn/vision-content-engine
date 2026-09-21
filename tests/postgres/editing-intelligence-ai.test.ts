@@ -4,14 +4,17 @@ import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
 
 import { AIProviderGateway } from '../../packages/ai/src/index.js';
 import type { ModelPolicy, ProviderRequest } from '../../packages/ai/src/index.js';
-import { EditingIntelligenceOutputSchema } from '../../packages/contracts/src/index.js';
+import {
+  EditingIntelligenceOutputSchema,
+  TechnicalQaReportSchema,
+} from '../../packages/contracts/src/index.js';
 import {
   EditingIntelligenceService,
   EditingProfileRegistry,
   RenderPayloadBuilder,
   TemplateRegistry,
 } from '../../packages/application/src/index.js';
-import type { createDatabaseClient } from '../../packages/database/src/index.js';
+import type { Prisma, createDatabaseClient } from '../../packages/database/src/index.js';
 import { InvocationRepository, Persistence } from '../../packages/database/src/index.js';
 import { postgresFixture } from '../../packages/database/test/support.js';
 import { FakeAIProvider, reply } from '../support/ai-provider.js';
@@ -700,5 +703,106 @@ it('rejects an Editing Intelligence output that passes JSON schema but violates 
     status: 'FAILED',
 
     failureCode: 'PRESET_UNKNOWN',
+  });
+});
+
+it('persists the deterministic render worker lifecycle through technical QA to creative QA', async () => {
+  const data = await setup();
+  const provider = new FakeAIProvider(async (request) => reply(validOutput(request)));
+
+  await service(provider).generatePlan(
+    {
+      requestId: randomUUID(),
+      knowledgeSnapshotId: data.knowledge.id,
+      creativePlanVersionId: data.creativePlanVersion.id,
+    },
+    policy,
+    budget,
+  );
+
+  const editingVersion = await db.editingPlanVersion.findFirstOrThrow();
+  const render = await persistence.transaction(human, (unit) =>
+    unit.requestRender(editingVersion.id),
+  );
+  await persistence.transaction(human, (unit) =>
+    unit.transitionRender(render.id, 'REQUESTED', 'QUEUED'),
+  );
+  const attempt = await persistence.transaction(human, (unit) =>
+    unit.createRenderAttempt(render.id, 'render-worker-v1'),
+  );
+
+  const worker = { actorType: 'WORKER', actorId: 'render-worker-fixture' } as const;
+  await persistence.transaction(worker, (unit) => unit.startRenderAttempt(render.id, attempt.id));
+  await persistence.transaction(worker, (unit) =>
+    unit.enterRenderTechnicalQa(render.id, attempt.id),
+  );
+
+  const output = await persistence.transaction(worker, (unit) =>
+    unit.reserveRenderOutputAsset(attempt.id, {
+      storageProvider: 'fixture',
+      bucket: 'fixture',
+      objectKey: `renders/${render.id}/attempts/1/master.mp4`,
+      mimeType: 'video/mp4',
+    }),
+  );
+
+  const qa = TechnicalQaReportSchema.parse({
+    result: 'PASS',
+    probe: {
+      assetId: output.id,
+      container: 'mov,mp4,m4a,3gp,3g2,mj2',
+      durationMs: 10_000,
+      video: {
+        codec: 'h264',
+        width: 1080,
+        height: 1920,
+        fps: 30,
+        pixelFormat: 'yuv420p',
+        rotationDeg: 0,
+        color: {
+          primaries: 'bt709',
+          transfer: 'bt709',
+          matrix: 'bt709',
+          range: 'tv',
+          hdrKind: 'SDR',
+        },
+      },
+      probeVersion: 'ffprobe-v1',
+    },
+    checks: [],
+    rendererVersion: 'v1',
+    colorProfileKey: 'SDR_BT709_SOCIAL_V1',
+    codecProfileKey: 'SOCIAL_H264_AAC_V1',
+    audioProfileKey: 'SOCIAL_VOICE_MASTER_V1',
+  });
+
+  await persistence.transaction(worker, async (unit) => {
+    await unit.markRenderOutputAssetReady(output.id, {
+      checksumSha256: 'a'.repeat(64),
+      sizeBytes: 1_000_000n,
+      width: 1080,
+      height: 1920,
+      durationMs: 10_000,
+      fps: 30,
+    });
+    await unit.succeedRenderAttempt(
+      render.id,
+      attempt.id,
+      output.id,
+      qa as unknown as Prisma.InputJsonValue,
+    );
+  });
+
+  expect(await db.render.findUniqueOrThrow({ where: { id: render.id } })).toMatchObject({
+    status: 'CREATIVE_QA',
+  });
+  expect(await db.renderAttempt.findUniqueOrThrow({ where: { id: attempt.id } })).toMatchObject({
+    status: 'SUCCEEDED',
+    outputAssetId: output.id,
+    technicalQaJson: qa,
+  });
+  expect(await db.asset.findUniqueOrThrow({ where: { id: output.id } })).toMatchObject({
+    status: 'READY',
+    checksumSha256: 'a'.repeat(64),
   });
 });

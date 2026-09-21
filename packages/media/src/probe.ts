@@ -29,6 +29,7 @@ const output = z.object({
   streams: z.array(stream),
   format: z.object({ format_name: z.string(), duration: z.string().optional() }),
 });
+export type HdrKind = 'SDR' | 'HDR10' | 'HLG' | 'DOLBY_VISION' | 'UNKNOWN_HDR';
 export type MediaProbe = {
   probeVersion: string;
   container: string;
@@ -45,12 +46,15 @@ export type MediaProbe = {
       transfer?: string;
       matrix?: string;
       range?: string;
-      hdrKind: 'SDR';
+      hdrKind: HdrKind;
     };
   };
   audio?: { codec: string; sampleRate: number; channels: number };
 };
-export function parseProbe(raw: unknown): MediaProbe {
+export function parseProbe(
+  raw: unknown,
+  options: Readonly<{ allowHdr?: boolean }> = {},
+): MediaProbe {
   const data = output.parse(raw);
   const v = data.streams.find((s) => s.codec_type === 'video');
   const a = data.streams.find((s) => s.codec_type === 'audio');
@@ -68,15 +72,28 @@ export function parseProbe(raw: unknown): MediaProbe {
     durationMs,
   };
   if (v) {
-    const hdr =
-      ['smpte2084', 'arib-std-b67'].includes(v.color_transfer ?? '') ||
+    const sideDataText = (v.side_data_list ?? []).map((s) => s.side_data_type ?? '').join(' ');
+    const isDolbyVision = /dovi|dolby/i.test(sideDataText);
+    const isHlg = v.color_transfer === 'arib-std-b67';
+    const isHdr10 =
+      v.color_transfer === 'smpte2084' || /mastering display|content light/i.test(sideDataText);
+    const hasHdrIndicators =
+      isDolbyVision ||
+      isHlg ||
+      isHdr10 ||
       v.color_primaries === 'bt2020' ||
       ['bt2020nc', 'bt2020c', 'ictcp'].includes(v.color_space ?? '') ||
-      v.side_data_list?.some((s) =>
-        /dovi|dolby|mastering display|content light/i.test(s.side_data_type ?? ''),
-      ) ||
       /(?:p010|p012|p016|p10|p12|p16)/.test(v.pix_fmt ?? '');
-    invariant(!hdr, 'UNSUPPORTED_HDR_COLOR');
+    const hdrKind: HdrKind = isDolbyVision
+      ? 'DOLBY_VISION'
+      : isHlg
+        ? 'HLG'
+        : isHdr10
+          ? 'HDR10'
+          : hasHdrIndicators
+            ? 'UNKNOWN_HDR'
+            : 'SDR';
+    invariant(options.allowHdr || hdrKind === 'SDR', 'UNSUPPORTED_HDR_COLOR');
     invariant(
       v.width && v.height && v.width <= 8192 && v.height <= 8192,
       'INVALID_VIDEO_DIMENSIONS',
@@ -102,7 +119,7 @@ export function parseProbe(raw: unknown): MediaProbe {
       rotationDeg: rotation,
       ...(v.pix_fmt ? { pixelFormat: v.pix_fmt } : {}),
       color: {
-        hdrKind: 'SDR',
+        hdrKind,
         ...(v.color_primaries ? { primaries: v.color_primaries } : {}),
         ...(v.color_transfer ? { transfer: v.color_transfer } : {}),
         ...(v.color_space ? { matrix: v.color_space } : {}),
@@ -125,7 +142,7 @@ export function parseProbe(raw: unknown): MediaProbe {
   return result;
 }
 /** Arguments are fixed; input is an owned temporary file, never a user URL or command. */
-export function probeFile(path: string): Promise<MediaProbe> {
+function executeProbe(path: string, allowHdr: boolean): Promise<MediaProbe> {
   return new Promise((resolve, reject) => {
     execFile(
       'ffprobe',
@@ -149,13 +166,21 @@ export function probeFile(path: string): Promise<MediaProbe> {
           return;
         }
         try {
-          resolve(parseProbe(JSON.parse(stdout)));
+          resolve(parseProbe(JSON.parse(stdout), { allowHdr }));
         } catch (e) {
           reject(e);
         }
       },
     );
   });
+}
+
+export function probeFile(path: string): Promise<MediaProbe> {
+  return executeProbe(path, false);
+}
+
+export function probeRenderFile(path: string): Promise<MediaProbe> {
+  return executeProbe(path, true);
 }
 export function recordingFeedback(probe: MediaProbe, type: string, targetDurationSec?: number) {
   invariant(type !== 'VOICE' || probe.audio, 'AUDIO_MISSING');

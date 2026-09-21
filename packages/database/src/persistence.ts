@@ -9,7 +9,11 @@ import { audit, changed, databaseTime, emit, lock } from './transaction.js';
 import type { Actor, OutboxInput, Transaction } from './transaction.js';
 import { Versions } from './versions.js';
 import { approvedConcept, validatePublication, validateRender } from './lineage.js';
-import { EditingPlanSpecSchema, TemplateRuntimeContractSchema } from '@vision/contracts';
+import {
+  EditingPlanSpecSchema,
+  TechnicalQaReportSchema,
+  TemplateRuntimeContractSchema,
+} from '@vision/contracts';
 import { contentHash, normalize, textHash } from '@vision/contracts/canonical';
 import {
   conceptSelectionAction,
@@ -615,7 +619,361 @@ export class UnitOfWork {
 
     return attempt;
   }
-  /** Persistence transition only; technical/creative QA execution belongs to later phases. */
+
+  async startRenderAttempt(renderId: string, attemptId: string) {
+    invariant(
+      this.actor.actorType === 'WORKER' && Boolean(this.actor.actorId?.trim()),
+      'WORKER_REQUIRED',
+    );
+
+    await lock(this.tx, 'Render', renderId);
+
+    const [render, attempt] = await Promise.all([
+      this.tx.render.findUniqueOrThrow({ where: { id: renderId } }),
+      this.tx.renderAttempt.findUniqueOrThrow({ where: { id: attemptId } }),
+    ]);
+
+    invariant(attempt.renderId === renderId, 'RENDER_ATTEMPT_LINEAGE_MISMATCH');
+
+    if (render.status === 'RENDERING' && attempt.status === 'RUNNING') return attempt;
+
+    invariant(render.status === 'QUEUED', 'RENDER_NOT_QUEUEABLE');
+    invariant(attempt.status === 'QUEUED', 'RENDER_ATTEMPT_NOT_QUEUEABLE');
+
+    const now = await databaseTime(this.tx);
+
+    const updated = await this.tx.renderAttempt.update({
+      where: { id: attemptId },
+      data: {
+        status: 'RUNNING',
+        startedAt: attempt.startedAt ?? now,
+      },
+    });
+
+    await this.tx.render.update({
+      where: { id: renderId },
+      data: { status: 'RENDERING' },
+    });
+
+    await changed(this.tx, this.actor, 'RenderAttempt.running', 'RenderAttempt', attemptId);
+    await changed(this.tx, this.actor, 'Render.rendering', 'Render', renderId);
+
+    return updated;
+  }
+
+  async enterRenderTechnicalQa(renderId: string, attemptId: string) {
+    invariant(
+      this.actor.actorType === 'WORKER' && Boolean(this.actor.actorId?.trim()),
+      'WORKER_REQUIRED',
+    );
+
+    await lock(this.tx, 'Render', renderId);
+
+    const [render, attempt] = await Promise.all([
+      this.tx.render.findUniqueOrThrow({ where: { id: renderId } }),
+      this.tx.renderAttempt.findUniqueOrThrow({ where: { id: attemptId } }),
+    ]);
+
+    invariant(attempt.renderId === renderId, 'RENDER_ATTEMPT_LINEAGE_MISMATCH');
+    invariant(attempt.status === 'RUNNING', 'RENDER_ATTEMPT_NOT_ACTIVE');
+
+    if (render.status === 'TECHNICAL_QA') return render;
+
+    invariant(render.status === 'RENDERING', 'STALE_STATE');
+    assertTransition('render', render.status, 'TECHNICAL_QA');
+
+    const updated = await this.tx.render.update({
+      where: { id: renderId },
+      data: { status: 'TECHNICAL_QA' },
+    });
+
+    await changed(this.tx, this.actor, 'Render.technical_qa', 'Render', renderId);
+    return updated;
+  }
+
+  async reserveRenderOutputAsset(
+    renderAttemptId: string,
+    data: {
+      storageProvider: string;
+      bucket: string;
+      objectKey: string;
+      mimeType: string;
+    },
+  ) {
+    invariant(
+      this.actor.actorType === 'WORKER' && Boolean(this.actor.actorId?.trim()),
+      'WORKER_REQUIRED',
+    );
+    invariant(data.storageProvider.trim(), 'STORAGE_PROVIDER_REQUIRED');
+    invariant(data.bucket.trim(), 'STORAGE_BUCKET_REQUIRED');
+    invariant(data.objectKey.trim(), 'OBJECT_KEY_REQUIRED');
+    invariant(data.mimeType.trim(), 'MIME_TYPE_REQUIRED');
+
+    const attempt = await this.tx.renderAttempt.findUniqueOrThrow({
+      where: { id: renderAttemptId },
+      include: { render: true },
+    });
+
+    invariant(attempt.status === 'RUNNING', 'RENDER_ATTEMPT_NOT_ACTIVE');
+    invariant(
+      attempt.render.status === 'RENDERING' || attempt.render.status === 'TECHNICAL_QA',
+      'RENDER_NOT_ACTIVE',
+    );
+
+    const existing = await this.tx.asset.findFirst({
+      where: {
+        sourceType: 'RENDER',
+        sourceEntityType: 'RenderAttempt',
+        sourceEntityId: renderAttemptId,
+        objectKey: data.objectKey,
+      },
+    });
+
+    if (existing) {
+      invariant(
+        existing.storageProvider === data.storageProvider &&
+          existing.bucket === data.bucket &&
+          existing.mimeType === data.mimeType &&
+          existing.deletedAt === null,
+        'RENDER_OUTPUT_ASSET_MISMATCH',
+      );
+      invariant(existing.status !== 'FAILED', 'RENDER_OUTPUT_ASSET_FAILED');
+      return existing;
+    }
+
+    const asset = await this.tx.asset.create({
+      data: {
+        kind: 'VIDEO',
+        sourceType: 'RENDER',
+        sourceEntityType: 'RenderAttempt',
+        sourceEntityId: renderAttemptId,
+        storageProvider: data.storageProvider,
+        bucket: data.bucket,
+        objectKey: data.objectKey,
+        mimeType: data.mimeType,
+        status: 'UPLOADING',
+      },
+    });
+
+    await audit(this.tx, this.actor, 'RenderOutputAsset.reserved', 'Asset', asset.id);
+
+    return asset;
+  }
+
+  async markRenderOutputAssetReady(
+    assetId: string,
+    data: {
+      checksumSha256: string;
+      sizeBytes: bigint;
+      width: number;
+      height: number;
+      durationMs: number;
+      fps: number;
+      audioChannels?: number;
+      sampleRate?: number;
+    },
+  ) {
+    invariant(
+      this.actor.actorType === 'WORKER' && Boolean(this.actor.actorId?.trim()),
+      'WORKER_REQUIRED',
+    );
+
+    const asset = await this.tx.asset.findUniqueOrThrow({ where: { id: assetId } });
+    invariant(
+      asset.sourceType === 'RENDER' &&
+        asset.sourceEntityType === 'RenderAttempt' &&
+        asset.deletedAt === null,
+      'RENDER_OUTPUT_ASSET_MISMATCH',
+    );
+
+    if (asset.status === 'READY') {
+      invariant(
+        asset.checksumSha256 === data.checksumSha256 &&
+          asset.sizeBytes === data.sizeBytes &&
+          asset.width === data.width &&
+          asset.height === data.height &&
+          asset.durationMs === data.durationMs &&
+          asset.fps === data.fps &&
+          asset.audioChannels === (data.audioChannels ?? null) &&
+          asset.sampleRate === (data.sampleRate ?? null),
+        'RENDER_OUTPUT_ASSET_MISMATCH',
+      );
+      return asset;
+    }
+
+    invariant(asset.status === 'UPLOADING', 'RENDER_OUTPUT_ASSET_NOT_UPLOADABLE');
+
+    const updated = await this.tx.asset.update({
+      where: { id: assetId },
+      data: {
+        status: 'READY',
+        checksumSha256: data.checksumSha256,
+        sizeBytes: data.sizeBytes,
+        width: data.width,
+        height: data.height,
+        durationMs: data.durationMs,
+        fps: data.fps,
+        ...(data.audioChannels !== undefined ? { audioChannels: data.audioChannels } : {}),
+        ...(data.sampleRate !== undefined ? { sampleRate: data.sampleRate } : {}),
+      },
+    });
+
+    await changed(this.tx, this.actor, 'Asset.ready', 'Asset', assetId);
+    return updated;
+  }
+
+  async markRenderOutputAssetFailed(assetId: string) {
+    invariant(
+      this.actor.actorType === 'WORKER' && Boolean(this.actor.actorId?.trim()),
+      'WORKER_REQUIRED',
+    );
+
+    const asset = await this.tx.asset.findUniqueOrThrow({ where: { id: assetId } });
+    invariant(
+      asset.sourceType === 'RENDER' &&
+        asset.sourceEntityType === 'RenderAttempt' &&
+        asset.deletedAt === null,
+      'RENDER_OUTPUT_ASSET_MISMATCH',
+    );
+
+    if (asset.status === 'FAILED') return asset;
+    invariant(asset.status === 'UPLOADING', 'RENDER_OUTPUT_ASSET_NOT_UPLOADABLE');
+
+    const updated = await this.tx.asset.update({
+      where: { id: assetId },
+      data: { status: 'FAILED' },
+    });
+    await audit(this.tx, this.actor, 'Asset.failed', 'Asset', assetId);
+    return updated;
+  }
+
+  async succeedRenderAttempt(
+    renderId: string,
+    attemptId: string,
+    outputAssetId: string,
+    technicalQaJson: Prisma.InputJsonValue,
+  ) {
+    invariant(
+      this.actor.actorType === 'WORKER' && Boolean(this.actor.actorId?.trim()),
+      'WORKER_REQUIRED',
+    );
+
+    const qa = TechnicalQaReportSchema.parse(technicalQaJson);
+    invariant(qa.result === 'PASS', 'TECHNICAL_QA_FAILED');
+
+    await lock(this.tx, 'Render', renderId);
+
+    const [render, attempt, asset] = await Promise.all([
+      this.tx.render.findUniqueOrThrow({ where: { id: renderId } }),
+      this.tx.renderAttempt.findUniqueOrThrow({ where: { id: attemptId } }),
+      this.tx.asset.findUniqueOrThrow({ where: { id: outputAssetId } }),
+    ]);
+
+    invariant(attempt.renderId === renderId, 'RENDER_ATTEMPT_LINEAGE_MISMATCH');
+
+    if (attempt.status === 'SUCCEEDED') {
+      invariant(attempt.outputAssetId === outputAssetId, 'RENDER_OUTPUT_MISMATCH');
+      return attempt;
+    }
+
+    invariant(render.status === 'TECHNICAL_QA', 'STALE_STATE');
+    invariant(attempt.status === 'RUNNING', 'RENDER_ATTEMPT_NOT_ACTIVE');
+    invariant(
+      asset.status === 'READY' &&
+        asset.deletedAt === null &&
+        asset.sourceType === 'RENDER' &&
+        asset.sourceEntityType === 'RenderAttempt' &&
+        asset.sourceEntityId === attemptId,
+      'RENDER_OUTPUT_MISMATCH',
+    );
+
+    const now = await databaseTime(this.tx);
+    const updatedAttempt = await this.tx.renderAttempt.update({
+      where: { id: attemptId },
+      data: {
+        status: 'SUCCEEDED',
+        finishedAt: now,
+        outputAssetId,
+        technicalQaJson,
+      },
+    });
+
+    assertTransition('render', render.status, 'CREATIVE_QA');
+    await this.tx.render.update({
+      where: { id: renderId },
+      data: { status: 'CREATIVE_QA' },
+    });
+
+    await changed(this.tx, this.actor, 'RenderAttempt.succeeded', 'RenderAttempt', attemptId);
+    await changed(this.tx, this.actor, 'Render.creative_qa', 'Render', renderId);
+
+    return updatedAttempt;
+  }
+
+  async failRenderAttempt(
+    renderId: string,
+    attemptId: string,
+    data: {
+      failureCode: string;
+      failureMessage?: string;
+      technicalQaJson?: Prisma.InputJsonValue;
+    },
+  ) {
+    invariant(
+      this.actor.actorType === 'WORKER' && Boolean(this.actor.actorId?.trim()),
+      'WORKER_REQUIRED',
+    );
+    invariant(data.failureCode.trim(), 'FAILURE_CODE_REQUIRED');
+
+    await lock(this.tx, 'Render', renderId);
+
+    const [render, attempt] = await Promise.all([
+      this.tx.render.findUniqueOrThrow({ where: { id: renderId } }),
+      this.tx.renderAttempt.findUniqueOrThrow({ where: { id: attemptId } }),
+    ]);
+
+    invariant(attempt.renderId === renderId, 'RENDER_ATTEMPT_LINEAGE_MISMATCH');
+
+    if (attempt.status === 'FAILED') return attempt;
+
+    invariant(
+      attempt.status === 'QUEUED' || attempt.status === 'RUNNING',
+      'RENDER_ATTEMPT_NOT_ACTIVE',
+    );
+    invariant(
+      ['QUEUED', 'RENDERING', 'TECHNICAL_QA', 'CREATIVE_QA'].includes(render.status),
+      'RENDER_NOT_ACTIVE',
+    );
+
+    const now = await databaseTime(this.tx);
+    const updatedAttempt = await this.tx.renderAttempt.update({
+      where: { id: attemptId },
+      data: {
+        status: 'FAILED',
+        finishedAt: now,
+        failureCode: data.failureCode,
+        ...(data.failureMessage !== undefined
+          ? { failureMessage: data.failureMessage.slice(0, 4_000) }
+          : {}),
+        ...(data.technicalQaJson !== undefined ? { technicalQaJson: data.technicalQaJson } : {}),
+      },
+    });
+
+    if (render.status !== 'FAILED') {
+      assertTransition('render', render.status, 'FAILED');
+      await this.tx.render.update({
+        where: { id: renderId },
+        data: { status: 'FAILED' },
+      });
+      await changed(this.tx, this.actor, 'Render.failed', 'Render', renderId);
+    }
+
+    await changed(this.tx, this.actor, 'RenderAttempt.failed', 'RenderAttempt', attemptId);
+
+    return updatedAttempt;
+  }
+
+  /** Low-level transition helper retained for workflow/tests; renderer execution uses the guarded worker methods above. */
   async transitionRender(
     id: string,
     expected: RenderStatus,

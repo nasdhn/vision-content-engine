@@ -4,5 +4,21 @@
   "private": true,
   "type": "module",
   "license": "UNLICENSED",
-  "exports": "./src/index.ts"
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@remotion/bundler": "4.0.526",
+    "@remotion/renderer": "4.0.526",
+    "@vision/application": "workspace:*",
+    "@vision/contracts": "workspace:*",
+    "@vision/database": "workspace:*",
+    "@vision/domain": "workspace:*",
+    "@vision/media": "workspace:*",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "remotion": "4.0.526"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0"
+  }
 }

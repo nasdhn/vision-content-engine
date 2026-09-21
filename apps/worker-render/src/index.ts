@@ -1,2 +1,3 @@
-// Phase 0 scaffold. Business implementation requires a later authorized phase.
-export {};
+export { RemotionVideoRenderer } from './remotion-renderer.js';
+export { RenderWorkerOrchestrator } from './orchestrator.js';
+export { VisionComposition } from './composition.js';

@@ -10,3 +10,5 @@ export * from './video-engine-registry.js';
 export * from './editing-intelligence-service.js';
 export * from './render-payload-compiler.js';
 export * from './render-payload-builder.js';
+export * from './video-renderer.js';
+export * from './technical-qa.js';

@@ -82,3 +82,12 @@ export const VIDEO_ENGINE_TEMPLATE_CONTRACT = Object.freeze({
     ...templateContract.defaultProfiles,
   }),
 });
+
+export const VIDEO_ENGINE_PROFILES = Object.freeze({
+  chroma: Object.freeze(chromaRegistry.profiles),
+  color: Object.freeze(colorRegistry.profiles),
+  codec: Object.freeze(codecRegistry.profiles),
+  audio: Object.freeze(audioRegistry.profiles),
+  motion: Object.freeze(motionRegistry.presets),
+  transition: Object.freeze(transitionRegistry.presets),
+});
