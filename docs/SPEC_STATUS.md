@@ -129,3 +129,20 @@ lease/fencing amendment. Prior freeze and amendment sections remain historical r
 - This tranche is uncommitted: no migration application, tag operation, push or runtime implementation.
 
 After validation, report and stop. Neither Phase 1 nor Phase 2 starts automatically.
+
+## Current baseline amendment — spec-v1.0.3 (2026-09-21)
+
+This update supersedes earlier dated baseline instructions only for lossless EditingPlan
+persistence.
+
+- Current specification after validation: **spec-v1.0.3**.
+- Normative contract: `22_PHASE5_EDITING_PLAN_PERSISTENCE_AMENDMENT.md`, ADR-0026 and D-187.
+- Scope: one nullable `EditingPlanVersion.planSpecJson` field plus the exact READY proof
+  tying the stored plan and projections to the applied successful ModelInvocation.
+- Current manifest: `docs/spec-artifacts/spec-v1.0.3-manifest.json` (156 entries).
+- Historical spec-v1.0, spec-v1.0.1 and spec-v1.0.2 manifests remain immutable.
+- Amendment 20 still governs UTC instants; amendment 21 still governs durable leases/fencing.
+- Phase 5 implementation remains limited to the currently authorized Editing Intelligence /
+  Video Engine tranche. Distribution is not activated by this amendment.
+
+After validation, the historical earlier baseline sections remain dated records.

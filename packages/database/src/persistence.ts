@@ -9,6 +9,7 @@ import { audit, changed, databaseTime, emit, lock } from './transaction.js';
 import type { Actor, OutboxInput, Transaction } from './transaction.js';
 import { Versions } from './versions.js';
 import { approvedConcept, validatePublication, validateRender } from './lineage.js';
+import { EditingPlanSpecSchema } from '@vision/contracts';
 import { contentHash, normalize, textHash } from '@vision/contracts/canonical';
 import {
   conceptSelectionAction,
@@ -20,10 +21,14 @@ import { Recordings } from './recordings.js';
 import { Patterns } from './patterns.js';
 import { Knowledge } from './knowledge.js';
 import { Captures } from './captures.js';
+import { EditingProfiles } from './editing-profiles.js';
+import { Templates } from './templates.js';
 
 export class UnitOfWork {
   readonly recordings: Recordings;
   readonly captures: Captures;
+  readonly editingProfiles: EditingProfiles;
+  readonly templates: Templates;
   readonly knowledge: Knowledge;
   readonly patterns: Patterns;
   readonly versions: Versions;
@@ -33,6 +38,8 @@ export class UnitOfWork {
   ) {
     this.recordings = new Recordings(tx, actor);
     this.captures = new Captures(tx, actor);
+    this.editingProfiles = new EditingProfiles(tx, actor);
+    this.templates = new Templates(tx, actor);
     this.versions = new Versions(tx, actor);
     this.knowledge = new Knowledge(tx, actor);
     this.patterns = new Patterns(tx, actor);
@@ -180,6 +187,137 @@ export class UnitOfWork {
     await changed(this.tx, this.actor, 'CreativePlan.created', 'CreativePlan', row.id);
     return row;
   }
+  async ensureEditingPlan(creativePlanId: string) {
+    await lock(this.tx, 'CreativePlan', creativePlanId);
+
+    const creativePlan = await this.tx.creativePlan.findUniqueOrThrow({
+      where: {
+        id: creativePlanId,
+      },
+    });
+
+    invariant(creativePlan.status === 'READY_FOR_EDITING', 'CREATIVE_PLAN_NOT_READY_FOR_EDITING');
+
+    const existing = await this.tx.editingPlan.findUnique({
+      where: {
+        creativePlanId,
+      },
+    });
+
+    if (existing) return existing;
+
+    const row = await this.tx.editingPlan.create({
+      data: {
+        creativePlanId,
+      },
+    });
+
+    await changed(this.tx, this.actor, 'EditingPlan.created', 'EditingPlan', row.id);
+
+    return row;
+  }
+
+  async markEditingPlanReady(editingPlanVersionId: string) {
+    const version = await this.tx.editingPlanVersion.findUniqueOrThrow({
+      where: {
+        id: editingPlanVersionId,
+      },
+    });
+
+    invariant(
+      version.planSpecJson !== null && version.modelInvocationId !== null,
+      'EDITING_PLAN_VALIDATED_SPEC_REQUIRED',
+    );
+
+    const parsedEditingPlan = EditingPlanSpecSchema.safeParse(version.planSpecJson);
+
+    invariant(parsedEditingPlan.success, 'EDITING_PLAN_VALIDATED_SPEC_REQUIRED');
+
+    const invocation = await this.tx.modelInvocation.findUniqueOrThrow({
+      where: {
+        id: version.modelInvocationId,
+      },
+    });
+
+    invariant(
+      invocation.status === 'SUCCEEDED' &&
+        invocation.outputHash === contentHash(parsedEditingPlan.data),
+      'VALIDATED_INVOCATION_REQUIRED',
+    );
+
+    const appliedInvocation = await this.tx.auditEvent.findFirst({
+      where: {
+        subjectId: invocation.id,
+        subjectType: 'ModelInvocation',
+        action: 'ModelInvocation.applied',
+      },
+    });
+
+    invariant(appliedInvocation, 'VALIDATED_INVOCATION_REQUIRED');
+
+    invariant(
+      contentHash(version.timelineJson) === contentHash(parsedEditingPlan.data.timeline) &&
+        contentHash(version.captionPlanJson) === contentHash(parsedEditingPlan.data.captions) &&
+        contentHash(version.audioPlanJson) === contentHash(parsedEditingPlan.data.audio) &&
+        contentHash(version.visualFocusJson) === contentHash(parsedEditingPlan.data.productFocus) &&
+        contentHash(version.transitionPlanJson) ===
+          contentHash(parsedEditingPlan.data.transitions) &&
+        contentHash(version.greenScreenPlanJson) ===
+          contentHash(parsedEditingPlan.data.presenter) &&
+        contentHash(version.renderSettingsJson) ===
+          contentHash(parsedEditingPlan.data.renderSettings),
+      'EDITING_PLAN_PROJECTION_MISMATCH',
+    );
+
+    await lock(this.tx, 'EditingPlan', version.editingPlanId);
+
+    await validateRender(this.tx, version.id);
+
+    const root = await this.tx.editingPlan.findUniqueOrThrow({
+      where: {
+        id: version.editingPlanId,
+      },
+    });
+
+    const creativePlan = await this.tx.creativePlan.findUniqueOrThrow({
+      where: {
+        id: root.creativePlanId,
+      },
+    });
+
+    invariant(creativePlan.status === 'READY_FOR_EDITING', 'CREATIVE_PLAN_NOT_READY_FOR_EDITING');
+
+    const latest = await this.tx.editingPlanVersion.findFirstOrThrow({
+      where: {
+        editingPlanId: root.id,
+      },
+
+      orderBy: {
+        version: 'desc',
+      },
+    });
+
+    invariant(latest.id === version.id, 'STALE_VERSION');
+
+    invariant(!['SUPERSEDED', 'ARCHIVED'].includes(root.status), 'EDITING_PLAN_NOT_WRITABLE');
+
+    if (root.status !== 'READY') {
+      await this.tx.editingPlan.update({
+        where: {
+          id: root.id,
+        },
+
+        data: {
+          status: 'READY',
+        },
+      });
+
+      await changed(this.tx, this.actor, 'EditingPlan.ready', 'EditingPlan', root.id, version.id);
+    }
+
+    return version;
+  }
+
   async createEditingPlan(creativePlanId: string) {
     const row = await this.tx.editingPlan.create({ data: { creativePlanId } });
     await changed(this.tx, this.actor, 'EditingPlan.created', 'EditingPlan', row.id);

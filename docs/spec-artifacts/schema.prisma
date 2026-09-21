@@ -919,6 +919,7 @@ model EditingPlanVersion {
   creativePlanVersionId   String                @db.Uuid
   editingProfileVersionId String                @db.Uuid
   templateVersionId       String                @db.Uuid
+  planSpecJson            Json?
   timelineJson            Json
   captionPlanJson         Json?
   audioPlanJson           Json?

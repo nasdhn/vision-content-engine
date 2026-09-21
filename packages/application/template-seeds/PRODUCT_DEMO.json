@@ -1,0 +1,57 @@
+{
+  "templateVersionId": "018f2000-0000-7000-8000-000000000001",
+  "templateKey": "PRODUCT_DEMO",
+  "name": "Product Demo",
+  "version": 1,
+  "compositionKey": "product-demo-v1",
+  "rendererApiVersion": "v1",
+  "supportedCanvas": {
+    "width": 1080,
+    "height": 1920,
+    "allowedFps": [30, 60]
+  },
+  "supportedLayers": ["BACKGROUND", "PRODUCT", "PRESENTER", "TEXT", "CAPTION", "OVERLAY"],
+  "requiredSlots": [
+    {
+      "key": "product",
+      "accepts": "PRODUCT",
+      "required": true
+    }
+  ],
+  "optionalSlots": [
+    {
+      "key": "presenter",
+      "accepts": "PRESENTER",
+      "required": false
+    },
+    {
+      "key": "voice",
+      "accepts": "AUDIO",
+      "required": false
+    },
+    {
+      "key": "music",
+      "accepts": "AUDIO",
+      "required": false
+    }
+  ],
+  "supportedMotionPresetKeys": [
+    "CUT",
+    "SUBTLE_SCALE_IN",
+    "FOCUS_ZOOM",
+    "SHORT_SLIDE_UP",
+    "SHORT_SLIDE_LEFT",
+    "MASK_REVEAL",
+    "RESULT_POP",
+    "SUBTLE_FADE",
+    "SHORT_SLIDE",
+    "SUBTLE_SCALE"
+  ],
+  "supportedTransitionPresetKeys": ["CUT", "MATCH_CUT", "SHORT_FADE", "SLIDE", "MASK_REVEAL"],
+  "supportedChromaKeyProfileKeys": ["GREENSCREEN_STANDARD_V1", "GREENSCREEN_LOW_SPILL_V1"],
+  "supportedColorProfileKeys": ["SDR_BT709_SOCIAL_V1"],
+  "supportedCodecProfileKeys": ["SOCIAL_H264_AAC_V1"],
+  "supportedAudioProfileKeys": ["SOCIAL_VOICE_MASTER_V1"],
+  "assetDependencies": [],
+  "sourceRevision": "SPEC_PLACEHOLDER"
+}

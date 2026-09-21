@@ -1,0 +1,100 @@
+{
+  "identity": {
+    "editingProfileVersionId": "018f1000-0000-7000-8000-000000000002",
+    "key": "FOUNDER_STORY",
+    "version": 1,
+    "name": "Founder Story"
+  },
+  "pacing": {
+    "targetEnergy": "CALM",
+    "preferredAverageShotMs": {
+      "min": 1800,
+      "max": 4200
+    },
+    "maxDeadAirMs": 650,
+    "preserveNaturalPauseUpToMs": 900,
+    "maxUnchangedVisualMs": 5000,
+    "patternInterruptGuidance": {
+      "enabled": true,
+      "minimumSpacingMs": 4500,
+      "preferredTypes": ["ARTIFACT_REVEAL", "PRODUCT_INSERT", "TEXT_EMPHASIS"]
+    }
+  },
+  "cuts": {
+    "preferSemanticBoundaries": true,
+    "minimumOrdinaryShotMs": 900,
+    "allowFlashCuts": false,
+    "avoidWordInternalCuts": true
+  },
+  "captions": {
+    "mode": "SEMANTIC_CHUNKS",
+    "maxLines": 2,
+    "maxCharactersPerLine": 36,
+    "minimumCueMs": 900,
+    "maximumCueMs": 3200,
+    "emphasis": {
+      "enabled": true,
+      "maxHighlightedWordsPerCue": 1
+    }
+  },
+  "focus": {
+    "preferProductProofOverDecoration": true,
+    "maxSimultaneousDominantElements": 2,
+    "allowFollowTarget": false
+  },
+  "motion": {
+    "allowedPresetKeys": ["CUT", "SHORT_FADE", "SUBTLE_SCALE"],
+    "maximumConcurrentMotions": 1,
+    "preferSubtleMotion": true,
+    "requirePurposeForMotion": true,
+    "defaultTransitionDurationMs": {
+      "min": 140,
+      "max": 350
+    }
+  },
+  "presenter": {
+    "allowedSides": ["LEFT", "RIGHT"],
+    "preferredWidthPercent": {
+      "min": 26,
+      "max": 40
+    },
+    "avoidCoveringProductRegion": true,
+    "avoidCoveringCaptionRegion": true,
+    "gestureAwarePlacement": true,
+    "maximumContinuousPresenterMs": 12000
+  },
+  "audio": {
+    "voiceTargetLoudness": {
+      "targetLufs": -16,
+      "tolerance": 2
+    },
+    "music": {
+      "enabled": true,
+      "defaultUnderVoiceDb": -20,
+      "allowNoMusic": true
+    },
+    "sfx": {
+      "enabled": true,
+      "maxEventsPer10Sec": 1
+    },
+    "avoidContinuousAttentionSfx": true
+  },
+  "hook": {
+    "maxSetupMs": 1400,
+    "requireMeaningfulFirstFrame": true,
+    "allowLogoIntro": false,
+    "preferredOpeningModes": ["PRESENTER", "TEXT_STATEMENT"],
+    "maximumSimultaneousFocalElements": 1
+  },
+  "ending": {
+    "avoidDeadEnding": true,
+    "preferredCtaLeadInMs": 1800,
+    "allowAbruptCutIfIntentional": true
+  },
+  "constraints": {
+    "suitablePrimaryFormats": ["FOUNDER_STORY", "GREEN_SCREEN_EXPLAINER"],
+    "minDurationMs": 12000,
+    "maxDurationMs": 60000,
+    "requiresHumanPresenter": true
+  }
+}

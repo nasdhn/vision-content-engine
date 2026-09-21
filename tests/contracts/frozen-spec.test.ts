@@ -22,6 +22,11 @@ const historicalManifests = [
     count: 149,
     hash: '82871f4b71028843455715094b52713e9f010773fe61d110bef4d41fb11c1d1f',
   },
+  {
+    version: 'spec-v1.0.2',
+    count: 153,
+    hash: 'c6962f0bd4eddc7351bfc891cc76256c1fd2e209c536b845ebb14a74aea401cc',
+  },
 ] as const;
 const manifestPath = (version: string) => `docs/spec-artifacts/${version}-manifest.json`;
 const leaseDefinitions = {
@@ -62,6 +67,13 @@ function withoutDurableLeases(schema: string): string {
   }
   return schema;
 }
+function withoutPhase5EditingPlanSpec(schema: string): string {
+  return schema
+    .split('\n')
+    .filter((line) => !/^\s*planSpecJson\s+Json\?\s*$/.test(line))
+    .join('\n');
+}
+
 const appendedDocuments = new Set([
   'docs/04_WORKFLOWS.md',
   'docs/10_DASHBOARD_UX.md',
@@ -83,7 +95,8 @@ it.each(historicalManifests)(
     for (const entry of manifest.files) {
       let original = await readFile(entry.path);
       if (entry.path === 'docs/spec-artifacts/schema.prisma') {
-        let schema = withoutDurableLeases(original.toString());
+        let schema = withoutPhase5EditingPlanSpec(original.toString());
+        if (version !== 'spec-v1.0.2') schema = withoutDurableLeases(schema);
         if (version === 'spec-v1.0') schema = schema.replaceAll(' @db.Timestamptz(3)', '');
         original = Buffer.from(schema);
       } else if (appendedDocuments.has(entry.path)) {
@@ -96,31 +109,26 @@ it.each(historicalManifests)(
   },
 );
 
-it('validates the current spec-v1.0.2 manifest and parses its JSON/TypeScript', async () => {
+it('validates the current spec-v1.0.3 manifest and parses its JSON/TypeScript', async () => {
   const historical = manifestSchema.parse(
-    JSON.parse(await readFile(manifestPath('spec-v1.0.1'), 'utf8')),
-  );
-  const manifest = manifestSchema.parse(
     JSON.parse(await readFile(manifestPath('spec-v1.0.2'), 'utf8')),
   );
-  expect(manifest.specVersion).toBe('spec-v1.0.2');
-  expect(manifest.fileCount).toBe(153);
-  expect(manifest.files).toHaveLength(153);
+  const manifest = manifestSchema.parse(
+    JSON.parse(await readFile(manifestPath('spec-v1.0.3'), 'utf8')),
+  );
+  expect(manifest.specVersion).toBe('spec-v1.0.3');
+  expect(manifest.fileCount).toBe(156);
+  expect(manifest.files).toHaveLength(156);
   expect(manifest.files.map((entry) => entry.path)).toEqual(
     [
       ...historical.files.map((entry) => entry.path),
-      manifestPath('spec-v1.0.1'),
-      'docs/21_DURABLE_LEASES_FENCING_AMENDMENT.md',
-      'docs/adr/ADR-0025-durable-leases-and-fencing.md',
-      'docs/spec-artifacts/final-reconciliation/durable-lease-constraints.sql',
+      manifestPath('spec-v1.0.2'),
+      'docs/22_PHASE5_EDITING_PLAN_PERSISTENCE_AMENDMENT.md',
+      'docs/adr/ADR-0026-editing-plan-lossless-snapshot.md',
     ].sort(),
   );
   for (const entry of manifest.files) {
-    let content = await readFile(entry.path);
-    if (
-      ['docs/04_WORKFLOWS.md', 'docs/10_DASHBOARD_UX.md', 'docs/DECISIONS.md'].includes(entry.path)
-    )
-      content = content.subarray(0, entry.sizeBytes);
+    const content = await readFile(entry.path);
     expect(sha256(content), entry.path).toBe(entry.sha256);
     expect(content.length, entry.path).toBe(entry.sizeBytes);
     if (entry.path.endsWith('.json'))

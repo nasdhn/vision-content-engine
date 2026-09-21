@@ -1,0 +1,19 @@
+{
+  "version": "v1",
+  "profiles": {
+    "GREENSCREEN_STANDARD_V1": {
+      "keyColor": "#00FF00",
+      "similarity": 0.28,
+      "blend": 0.08,
+      "spillReduction": "standard",
+      "edgeTreatment": "soft"
+    },
+    "GREENSCREEN_LOW_SPILL_V1": {
+      "keyColor": "#00FF00",
+      "similarity": 0.24,
+      "blend": 0.06,
+      "spillReduction": "high",
+      "edgeTreatment": "conservative"
+    }
+  }
+}

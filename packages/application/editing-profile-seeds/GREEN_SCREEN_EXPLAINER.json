@@ -1,0 +1,100 @@
+{
+  "identity": {
+    "editingProfileVersionId": "018f1000-0000-7000-8000-000000000003",
+    "key": "GREEN_SCREEN_EXPLAINER",
+    "version": 1,
+    "name": "Green-Screen Explainer"
+  },
+  "pacing": {
+    "targetEnergy": "MODERATE",
+    "preferredAverageShotMs": {
+      "min": 1300,
+      "max": 2800
+    },
+    "maxDeadAirMs": 500,
+    "preserveNaturalPauseUpToMs": 700,
+    "maxUnchangedVisualMs": 3600,
+    "patternInterruptGuidance": {
+      "enabled": true,
+      "minimumSpacingMs": 3200,
+      "preferredTypes": ["PRESENTER_TO_PRODUCT", "FOCUS_ZOOM", "TEXT_EMPHASIS"]
+    }
+  },
+  "cuts": {
+    "preferSemanticBoundaries": true,
+    "minimumOrdinaryShotMs": 800,
+    "allowFlashCuts": false,
+    "avoidWordInternalCuts": true
+  },
+  "captions": {
+    "mode": "SEMANTIC_CHUNKS",
+    "maxLines": 2,
+    "maxCharactersPerLine": 34,
+    "minimumCueMs": 750,
+    "maximumCueMs": 2800,
+    "emphasis": {
+      "enabled": true,
+      "maxHighlightedWordsPerCue": 2
+    }
+  },
+  "focus": {
+    "preferProductProofOverDecoration": true,
+    "maxSimultaneousDominantElements": 2,
+    "allowFollowTarget": false
+  },
+  "motion": {
+    "allowedPresetKeys": ["CUT", "FOCUS_ZOOM", "SHORT_SLIDE"],
+    "maximumConcurrentMotions": 2,
+    "preferSubtleMotion": true,
+    "requirePurposeForMotion": true,
+    "defaultTransitionDurationMs": {
+      "min": 100,
+      "max": 300
+    }
+  },
+  "presenter": {
+    "allowedSides": ["LEFT", "RIGHT"],
+    "preferredWidthPercent": {
+      "min": 24,
+      "max": 38
+    },
+    "avoidCoveringProductRegion": true,
+    "avoidCoveringCaptionRegion": true,
+    "gestureAwarePlacement": true,
+    "maximumContinuousPresenterMs": 9000
+  },
+  "audio": {
+    "voiceTargetLoudness": {
+      "targetLufs": -16,
+      "tolerance": 2
+    },
+    "music": {
+      "enabled": true,
+      "defaultUnderVoiceDb": -19,
+      "allowNoMusic": true
+    },
+    "sfx": {
+      "enabled": true,
+      "maxEventsPer10Sec": 2
+    },
+    "avoidContinuousAttentionSfx": true
+  },
+  "hook": {
+    "maxSetupMs": 1100,
+    "requireMeaningfulFirstFrame": true,
+    "allowLogoIntro": false,
+    "preferredOpeningModes": ["PRESENTER", "PROBLEM_VISUAL", "TEXT_STATEMENT"],
+    "maximumSimultaneousFocalElements": 2
+  },
+  "ending": {
+    "avoidDeadEnding": true,
+    "preferredCtaLeadInMs": 1500,
+    "allowAbruptCutIfIntentional": true
+  },
+  "constraints": {
+    "suitablePrimaryFormats": ["GREEN_SCREEN_EXPLAINER", "PROBLEM_SOLUTION"],
+    "minDurationMs": 10000,
+    "maxDurationMs": 55000,
+    "requiresHumanPresenter": true
+  }
+}

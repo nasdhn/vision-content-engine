@@ -1,0 +1,14 @@
+{
+  "version": "v1",
+  "profiles": {
+    "SOCIAL_VOICE_MASTER_V1": {
+      "version": "1",
+      "voiceTargetLufs": -16,
+      "integratedTargetLufs": -14,
+      "truePeakCeilingDb": -1.0,
+      "musicUnderVoiceDb": -20,
+      "sampleRate": 48000,
+      "channels": 2
+    }
+  }
+}

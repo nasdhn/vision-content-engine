@@ -589,3 +589,14 @@ recalcul de disponibilité des inputs sont atomiques, y compris en concurrence. 
 remplacement simultané obligatoire. Les lignées immuables historiques restent intactes.
 Clarification isolée des sections recording de `04_WORKFLOWS.md` et `10_DASHBOARD_UX.md`,
 sans nouvelle version de spec, modification de schéma ou de tag.
+
+## D-187 — EditingPlanVersion preserves the complete validated EditingPlanSpec
+**Date :** 2026-09-21.
+
+**Décision :** l'amendement `spec-v1.0.3` ajoute `EditingPlanVersion.planSpecJson`
+comme snapshot JSONB lossless de l'`EditingPlanSpec` validé. Les colonnes
+timeline/captions/audio/focus/transitions/green-screen/render-settings restent des projections
+déterministes. Le champ est nullable uniquement pour préserver les lignes historiques ; tout
+nouveau EditingPlanVersion produit par Editing Intelligence doit le renseigner et prouver
+l'exact `ModelInvocation` appliqué avant passage à READY. Les manifests spec-v1.0.x
+historiques restent immuables.

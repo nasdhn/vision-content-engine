@@ -58,10 +58,11 @@ export interface StructuredProvider {
 }
 export type InvocationRequest<I> = {
   requestId: string;
-  capability: 'CREATOR' | 'CREATIVE_DIRECTOR';
+  capability: 'CREATOR' | 'CREATIVE_DIRECTOR' | 'EDITING_INTELLIGENCE';
   purpose: string;
   prompt: { key: string; version: string };
   knowledgeSnapshot: { id: string; version: number; contentHash: string };
+  knowledgeContext?: unknown;
   input: I;
 };
 export type ModelPolicy = z.infer<typeof ModelPolicySchema>;
@@ -125,15 +126,30 @@ export class AIProviderGateway {
     );
     const input = contracts.input.parse(request.input);
     assertNoSecrets(input);
-    const knowledge = BrandKnowledgeSnapshotSchema.parse(
-      (input as Record<string, unknown>).brandKnowledge,
-    );
+
+    const embeddedKnowledge = (input as Record<string, unknown>).brandKnowledge;
+
+    const suppliedKnowledge = embeddedKnowledge ?? request.knowledgeContext;
+
+    invariant(suppliedKnowledge !== undefined, 'KNOWLEDGE_CONTEXT_REQUIRED');
+
+    const knowledge = BrandKnowledgeSnapshotSchema.parse(suppliedKnowledge);
+
+    assertNoSecrets(knowledge);
+
+    if (embeddedKnowledge !== undefined && request.knowledgeContext !== undefined)
+      invariant(
+        contentHash(knowledge) === contentHash(request.knowledgeContext),
+        'KNOWLEDGE_CONTEXT_MISMATCH',
+      );
+
     invariant(
       knowledge.id === request.knowledgeSnapshot.id &&
         knowledge.version === request.knowledgeSnapshot.version &&
         knowledge.contentHash === request.knowledgeSnapshot.contentHash,
       'KNOWLEDGE_CONTEXT_MISMATCH',
     );
+
     const choices = this.providers.filter(
       (p) =>
         (!policy.preferredProvider || p.provider === policy.preferredProvider) &&

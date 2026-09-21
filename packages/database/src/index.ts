@@ -11,3 +11,5 @@ export type { Budget } from './invocations.js';
 export { KnowledgePayloadSchema } from './knowledge.js';
 
 export { Captures } from './captures.js';
+export { EditingProfiles } from './editing-profiles.js';
+export { Templates } from './templates.js';

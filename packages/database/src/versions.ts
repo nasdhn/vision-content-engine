@@ -199,6 +199,7 @@ export class Versions {
       | 'creativePlanVersionId'
       | 'editingProfileVersionId'
       | 'templateVersionId'
+      | 'planSpecJson'
       | 'timelineJson'
       | 'captionPlanJson'
       | 'audioPlanJson'
@@ -216,6 +217,7 @@ export class Versions {
           'creativePlanVersionId',
           'editingProfileVersionId',
           'templateVersionId',
+          'planSpecJson',
           'timelineJson',
           'captionPlanJson',
           'audioPlanJson',
@@ -310,6 +312,7 @@ export class Versions {
   async templateVersion(
     data: Pick<
       Prisma.TemplateVersionUncheckedCreateInput,
+      | 'id'
       | 'templateId'
       | 'inputSchemaJson'
       | 'supportedAspectRatiosJson'
@@ -325,6 +328,7 @@ export class Versions {
     invariant(
       Object.keys(data).every((key) =>
         [
+          'id',
           'templateId',
           'inputSchemaJson',
           'supportedAspectRatiosJson',
@@ -360,6 +364,7 @@ export class Versions {
   async editingProfileVersion(
     data: Pick<
       Prisma.EditingProfileVersionUncheckedCreateInput,
+      | 'id'
       | 'editingProfileId'
       | 'pacingRulesJson'
       | 'cutRulesJson'
@@ -375,6 +380,7 @@ export class Versions {
     invariant(
       Object.keys(data).every((key) =>
         [
+          'id',
           'editingProfileId',
           'pacingRulesJson',
           'cutRulesJson',

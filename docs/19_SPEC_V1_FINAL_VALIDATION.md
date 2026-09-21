@@ -231,3 +231,22 @@ CHECKs. Amendment 21 governs this limited subject; amendment 20 continues to gov
 After its validation gates pass, spec-v1.0.2 is the current baseline, covered by a new manifest.
 Both earlier tags and manifests remain immutable. This tranche applies no migration and
 creates no runtime service, commit or Git tag. Phase 1 and Phase 2 remain unauthorized here.
+
+---
+
+# 13. Post-freeze amendment — spec-v1.0.3 (2026-09-21)
+
+The earlier validation and spec-v1.0.1 / spec-v1.0.2 amendment records remain historical.
+`docs/22_PHASE5_EDITING_PLAN_PERSISTENCE_AMENDMENT.md`, ADR-0026 and D-187 close the
+EditingPlan persistence gap discovered during Phase 5 implementation.
+
+The canonical and runtime Prisma schemas now both contain nullable
+`EditingPlanVersion.planSpecJson`. AI-produced plans require the exact complete validated
+EditingPlan snapshot, successful/applied ModelInvocation evidence and deterministic projection
+agreement before READY promotion. Historical rows remain nullable without fabricated backfill.
+
+`docs/spec-artifacts/spec-v1.0.3-manifest.json` is the current specification manifest.
+Historical manifests remain immutable and are reconstructed in fidelity tests by reversing
+only the explicitly declared later schema amendments and document appendices.
+
+This amendment does not authorize Distribution or publication work.

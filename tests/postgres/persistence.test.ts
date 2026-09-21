@@ -146,11 +146,45 @@ async function expireOutbox(id: string) {
 it('deploys the reviewed migration once with exact catalog constraints and UTC types', async () => {
   fixture.migrate();
   const migrations = await db.$queryRaw<
-    { checksum: string }[]
-  >`SELECT checksum FROM _prisma_migrations WHERE finished_at IS NOT NULL`;
-  expect(migrations).toHaveLength(1);
-  const sql = await readFile('prisma/migrations/20260919000000_initial_canonical/migration.sql');
-  expect(migrations[0]!.checksum).toBe(createHash('sha256').update(sql).digest('hex'));
+    {
+      migration_name: string;
+      checksum: string;
+    }[]
+  >`
+    SELECT migration_name, checksum
+    FROM _prisma_migrations
+    WHERE finished_at IS NOT NULL
+    ORDER BY migration_name
+  `;
+
+  expect(migrations.map((migration) => migration.migration_name)).toEqual([
+    '20260919000000_initial_canonical',
+    '20260921120000_phase5_editing_plan_spec',
+  ]);
+
+  for (const migration of migrations) {
+    const sql = await readFile(`prisma/migrations/${migration.migration_name}/migration.sql`);
+
+    expect(migration.checksum).toBe(createHash('sha256').update(sql).digest('hex'));
+  }
+
+  const [planSpecColumn] = await db.$queryRaw<
+    {
+      data_type: string;
+      is_nullable: string;
+    }[]
+  >`
+      SELECT data_type, is_nullable
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'EditingPlanVersion'
+        AND column_name = 'planSpecJson'
+    `;
+
+  expect(planSpecColumn).toEqual({
+    data_type: 'jsonb',
+    is_nullable: 'YES',
+  });
   const [catalog] = await db.$queryRaw<
     {
       tables: number;

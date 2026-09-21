@@ -1,0 +1,100 @@
+{
+  "identity": {
+    "editingProfileVersionId": "018f1000-0000-7000-8000-000000000005",
+    "key": "MANUAL_VS_VISION",
+    "version": 1,
+    "name": "Manual vs Vision"
+  },
+  "pacing": {
+    "targetEnergy": "FAST",
+    "preferredAverageShotMs": {
+      "min": 900,
+      "max": 2000
+    },
+    "maxDeadAirMs": 400,
+    "preserveNaturalPauseUpToMs": 550,
+    "maxUnchangedVisualMs": 2800,
+    "patternInterruptGuidance": {
+      "enabled": true,
+      "minimumSpacingMs": 2400,
+      "preferredTypes": ["COMPARISON_SWITCH", "PRODUCT_REVEAL", "FOCUS_ZOOM"]
+    }
+  },
+  "cuts": {
+    "preferSemanticBoundaries": true,
+    "minimumOrdinaryShotMs": 700,
+    "allowFlashCuts": true,
+    "avoidWordInternalCuts": true
+  },
+  "captions": {
+    "mode": "SHORT_PHRASES",
+    "maxLines": 2,
+    "maxCharactersPerLine": 30,
+    "minimumCueMs": 650,
+    "maximumCueMs": 2200,
+    "emphasis": {
+      "enabled": true,
+      "maxHighlightedWordsPerCue": 2
+    }
+  },
+  "focus": {
+    "preferProductProofOverDecoration": true,
+    "maxSimultaneousDominantElements": 2,
+    "allowFollowTarget": false
+  },
+  "motion": {
+    "allowedPresetKeys": ["CUT", "MATCH_CUT", "FOCUS_ZOOM", "MASK_REVEAL"],
+    "maximumConcurrentMotions": 2,
+    "preferSubtleMotion": true,
+    "requirePurposeForMotion": true,
+    "defaultTransitionDurationMs": {
+      "min": 90,
+      "max": 260
+    }
+  },
+  "presenter": {
+    "allowedSides": ["LEFT", "RIGHT"],
+    "preferredWidthPercent": {
+      "min": 22,
+      "max": 34
+    },
+    "avoidCoveringProductRegion": true,
+    "avoidCoveringCaptionRegion": true,
+    "gestureAwarePlacement": true,
+    "maximumContinuousPresenterMs": 5000
+  },
+  "audio": {
+    "voiceTargetLoudness": {
+      "targetLufs": -16,
+      "tolerance": 2
+    },
+    "music": {
+      "enabled": true,
+      "defaultUnderVoiceDb": -18,
+      "allowNoMusic": true
+    },
+    "sfx": {
+      "enabled": true,
+      "maxEventsPer10Sec": 2
+    },
+    "avoidContinuousAttentionSfx": true
+  },
+  "hook": {
+    "maxSetupMs": 900,
+    "requireMeaningfulFirstFrame": true,
+    "allowLogoIntro": false,
+    "preferredOpeningModes": ["PROBLEM_VISUAL", "PRODUCT_RESULT"],
+    "maximumSimultaneousFocalElements": 2
+  },
+  "ending": {
+    "avoidDeadEnding": true,
+    "preferredCtaLeadInMs": 1200,
+    "allowAbruptCutIfIntentional": true
+  },
+  "constraints": {
+    "suitablePrimaryFormats": ["MANUAL_TO_VISION", "PRODUCT_DEMO"],
+    "minDurationMs": 8000,
+    "maxDurationMs": 45000,
+    "requiresHumanPresenter": false
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "version": "v1",
+  "profiles": {
+    "SOCIAL_H264_AAC_V1": {
+      "version": "1",
+      "container": "mp4",
+      "videoCodec": "h264",
+      "audioCodec": "aac",
+      "pixelFormat": "yuv420p",
+      "videoSettings": {
+        "rateControl": "quality-targeted",
+        "profile": "high",
+        "movflags": "faststart"
+      },
+      "audioSettings": {
+        "sampleRate": 48000,
+        "channels": 2
+      }
+    }
+  }
+}
