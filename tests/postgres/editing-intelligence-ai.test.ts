@@ -5,10 +5,12 @@ import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
 import { AIProviderGateway } from '../../packages/ai/src/index.js';
 import type { ModelPolicy, ProviderRequest } from '../../packages/ai/src/index.js';
 import {
+  CreativeQAOutputSchema,
   EditingIntelligenceOutputV11Schema,
   TechnicalQaReportSchema,
 } from '../../packages/contracts/src/index.js';
 import {
+  CreativeQaService,
   EditingIntelligenceService,
   EditingProfileRegistry,
   RenderPayloadBuilder,
@@ -1004,4 +1006,278 @@ it('persists the deterministic render worker lifecycle through technical QA to c
     status: 'READY',
     checksumSha256: 'a'.repeat(64),
   });
+});
+
+const creativeQaPolicy: ModelPolicy = {
+  capability: 'CREATIVE_QA',
+  maxAttempts: 2,
+  timeoutMs: 1_000,
+  fallbackPolicy: 'NONE',
+  maxInputTokens: 100_000,
+  maxOutputTokens: 4_000,
+  maxEstimatedCost: 0.5,
+};
+
+const creativeQaBudget = {
+  key: 'phase5-creative-qa',
+  from: '2020-01-01T00:00:00Z',
+  to: '2100-01-01T00:00:00Z',
+  limit: '10',
+  currency: 'EUR',
+};
+
+async function renderFixtureToCreativeQa(data: Awaited<ReturnType<typeof setup>>) {
+  await service(new FakeAIProvider(async (request) => reply(validOutput(request)))).generatePlan(
+    {
+      requestId: randomUUID(),
+      knowledgeSnapshotId: data.knowledge.id,
+      creativePlanVersionId: data.creativePlanVersion.id,
+    },
+    policy,
+    budget,
+  );
+  const editingVersion = await db.editingPlanVersion.findFirstOrThrow();
+  const render = await persistence.transaction(human, (unit) =>
+    unit.requestRender(editingVersion.id),
+  );
+  await persistence.transaction(human, (unit) =>
+    unit.transitionRender(render.id, 'REQUESTED', 'QUEUED'),
+  );
+  const attempt = await persistence.transaction(human, (unit) =>
+    unit.createRenderAttempt(render.id, 'render-worker-creative-qa-v1'),
+  );
+  const worker = { actorType: 'WORKER', actorId: 'render-worker-creative-qa' } as const;
+  await persistence.transaction(worker, (unit) => unit.startRenderAttempt(render.id, attempt.id));
+  await persistence.transaction(worker, (unit) =>
+    unit.enterRenderTechnicalQa(render.id, attempt.id),
+  );
+  const output = await persistence.transaction(worker, (unit) =>
+    unit.reserveRenderOutputAsset(attempt.id, {
+      storageProvider: 'fixture',
+      bucket: 'fixture',
+      objectKey: `renders/${render.id}/creative-qa/master.mp4`,
+      mimeType: 'video/mp4',
+    }),
+  );
+  const qa = TechnicalQaReportSchema.parse({
+    result: 'PASS',
+    probe: {
+      assetId: output.id,
+      container: 'mov,mp4,m4a,3gp,3g2,mj2',
+      durationMs: 10_000,
+      video: {
+        codec: 'h264',
+        width: 1080,
+        height: 1920,
+        fps: 30,
+        pixelFormat: 'yuv420p',
+        rotationDeg: 0,
+        color: {
+          primaries: 'bt709',
+          transfer: 'bt709',
+          matrix: 'bt709',
+          range: 'tv',
+          hdrKind: 'SDR',
+        },
+      },
+      probeVersion: 'ffprobe-v1',
+    },
+    checks: [
+      {
+        key: 'CATASTROPHIC_BLACK',
+        status: 'PASS',
+        data: { blackDurationMs: 0, catastrophicLimitMs: 8_500 },
+      },
+    ],
+    rendererVersion: 'v1',
+    colorProfileKey: 'SDR_BT709_SOCIAL_V1',
+    codecProfileKey: 'SOCIAL_H264_AAC_V1',
+    audioProfileKey: 'SOCIAL_VOICE_MASTER_V1',
+  });
+  await persistence.transaction(worker, async (unit) => {
+    await unit.markRenderOutputAssetReady(output.id, {
+      checksumSha256: 'b'.repeat(64),
+      sizeBytes: 1_000_000n,
+      width: 1080,
+      height: 1920,
+      durationMs: 10_000,
+      fps: 30,
+    });
+    await unit.succeedRenderAttempt(
+      render.id,
+      attempt.id,
+      output.id,
+      qa as unknown as Prisma.InputJsonValue,
+    );
+  });
+  return { render, attempt, output };
+}
+
+it('links a successful evidence-bound Creative QA invocation to the exact RenderAttempt and opens human review', async () => {
+  const data = await setup();
+  const rendered = await renderFixtureToCreativeQa(data);
+  const provider = new FakeAIProvider(async () =>
+    reply(
+      CreativeQAOutputSchema.parse({
+        result: 'PASS_WITH_WARNINGS',
+        evaluatedDimensions: ['PRODUCT_VISIBILITY', 'PACING'],
+        notEvaluatedDimensions: ['AUDIO'],
+        issues: [
+          {
+            code: 'CTA_TOO_LONG',
+            severity: 'WARNING',
+            startMs: 8_500,
+            endMs: 9_800,
+            explanation: 'Le CTA occupe une part importante de la fin.',
+            suggestedFix: 'Raccourcir le CTA sans modifier la preuve produit.',
+          },
+        ],
+        summary: 'Rendu exploitable avec un avertissement non critique.',
+      }),
+    ),
+  );
+  const requestId = randomUUID();
+  const gateway = new AIProviderGateway(new InvocationRepository(db), [provider], () => false);
+  const result = await new CreativeQaService(db, gateway).review(
+    {
+      requestId,
+      knowledgeSnapshotId: data.knowledge.id,
+      renderAttemptId: rendered.attempt.id,
+      renderInspection: {
+        durationMs: 10_000,
+        sampledFrames: [
+          { atMs: 500, assetId: rendered.output.id },
+          { atMs: 5_000, assetId: rendered.output.id },
+        ],
+        cutEvents: [{ atMs: 0, type: 'CUT' }],
+        productVisibilitySignals: {
+          firstVisibleAtMs: 0,
+          totalVisibleMs: 10_000,
+          readabilityWarnings: [],
+        },
+      },
+    },
+    creativeQaPolicy,
+    creativeQaBudget,
+  );
+  expect(provider.calls).toHaveLength(1);
+  expect(provider.calls[0]!.envelope.capability).toBe('CREATIVE_QA');
+  expect(provider.calls[0]!.envelope.prompt).toMatchObject({
+    key: 'creative-qa',
+    version: '1.0.0',
+  });
+  expect(result.output.result).toBe('PASS_WITH_WARNINGS');
+  expect(
+    await db.renderAttempt.findUniqueOrThrow({ where: { id: rendered.attempt.id } }),
+  ).toMatchObject({
+    creativeQaResult: 'PASS_WITH_WARNINGS',
+    creativeQaModelInvocationId: requestId,
+    creativeQaJson: result.output,
+  });
+  expect(await db.render.findUniqueOrThrow({ where: { id: rendered.render.id } })).toMatchObject({
+    status: 'READY_FOR_REVIEW',
+  });
+  expect(await db.modelInvocation.findUniqueOrThrow({ where: { id: requestId } })).toMatchObject({
+    status: 'SUCCEEDED',
+    promptKey: 'creative-qa',
+    promptVersion: '1.0.0',
+  });
+});
+
+it('persists Creative QA FAIL with exact lineage and stops before human review', async () => {
+  const data = await setup();
+  const rendered = await renderFixtureToCreativeQa(data);
+  const provider = new FakeAIProvider(async () =>
+    reply(
+      CreativeQAOutputSchema.parse({
+        result: 'FAIL',
+        evaluatedDimensions: ['PRODUCT_VISIBILITY'],
+        notEvaluatedDimensions: ['AUDIO'],
+        issues: [
+          {
+            code: 'PRODUCT_NOT_VISIBLE_ENOUGH',
+            severity: 'ERROR',
+            startMs: 1_000,
+            endMs: 4_000,
+            explanation: 'La preuve produit est insuffisamment visible.',
+          },
+        ],
+        summary: 'Le rendu doit être corrigé avant la review humaine.',
+      }),
+    ),
+  );
+  const requestId = randomUUID();
+  const gateway = new AIProviderGateway(new InvocationRepository(db), [provider], () => false);
+  await new CreativeQaService(db, gateway).review(
+    {
+      requestId,
+      knowledgeSnapshotId: data.knowledge.id,
+      renderAttemptId: rendered.attempt.id,
+      renderInspection: {
+        durationMs: 10_000,
+        sampledFrames: [{ atMs: 2_000, assetId: rendered.output.id }],
+        productVisibilitySignals: {
+          firstVisibleAtMs: 2_500,
+          totalVisibleMs: 2_000,
+          readabilityWarnings: ['proof-small'],
+        },
+      },
+    },
+    creativeQaPolicy,
+    creativeQaBudget,
+  );
+  expect(
+    await db.renderAttempt.findUniqueOrThrow({ where: { id: rendered.attempt.id } }),
+  ).toMatchObject({ creativeQaResult: 'FAIL', creativeQaModelInvocationId: requestId });
+  expect(await db.render.findUniqueOrThrow({ where: { id: rendered.render.id } })).toMatchObject({
+    status: 'CREATIVE_QA',
+  });
+  await expect(
+    persistence.transaction(human, (unit) =>
+      unit.decideRender(rendered.render.id, 'APPROVED', rendered.output.id),
+    ),
+  ).rejects.toThrow();
+});
+
+it('rejects Creative QA visual claims when no visual inspection evidence was supplied', async () => {
+  const data = await setup();
+  const rendered = await renderFixtureToCreativeQa(data);
+  const provider = new FakeAIProvider(async () =>
+    reply(
+      CreativeQAOutputSchema.parse({
+        result: 'FAIL',
+        evaluatedDimensions: ['PRODUCT_VISIBILITY'],
+        notEvaluatedDimensions: [],
+        issues: [
+          {
+            code: 'PRODUCT_NOT_VISIBLE_ENOUGH',
+            severity: 'ERROR',
+            explanation: 'Unsupported visual claim.',
+          },
+        ],
+        summary: 'Unsupported.',
+      }),
+    ),
+  );
+  const requestId = randomUUID();
+  const gateway = new AIProviderGateway(new InvocationRepository(db), [provider], () => false);
+  await expect(
+    new CreativeQaService(db, gateway).review(
+      {
+        requestId,
+        knowledgeSnapshotId: data.knowledge.id,
+        renderAttemptId: rendered.attempt.id,
+        renderInspection: { durationMs: 10_000, sampledFrames: [] },
+      },
+      creativeQaPolicy,
+      creativeQaBudget,
+    ),
+  ).rejects.toThrow('CREATIVE_QA_VISUAL_EVIDENCE_REQUIRED');
+  expect(provider.calls).toHaveLength(1);
+  expect(await db.render.findUniqueOrThrow({ where: { id: rendered.render.id } })).toMatchObject({
+    status: 'CREATIVE_QA',
+  });
+  expect(
+    await db.renderAttempt.findUniqueOrThrow({ where: { id: rendered.attempt.id } }),
+  ).toMatchObject({ creativeQaModelInvocationId: null, creativeQaResult: null });
 });

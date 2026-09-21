@@ -13,6 +13,7 @@ import {
   EditingIntelligenceBlockedResultSchema,
   EditingIntelligencePlanResultSchema,
   EditingPlanSpecSchema,
+  CreativeQAOutputSchema,
   TechnicalQaReportSchema,
   TemplateRuntimeContractSchema,
 } from '@vision/contracts';
@@ -1057,6 +1058,71 @@ export class UnitOfWork {
     await changed(this.tx, this.actor, 'RenderAttempt.succeeded', 'RenderAttempt', attemptId);
     await changed(this.tx, this.actor, 'Render.creative_qa', 'Render', renderId);
 
+    return updatedAttempt;
+  }
+
+  async applyCreativeQa(renderAttemptId: string, modelInvocationId: string, output: unknown) {
+    invariant(this.actor.actorType === 'AI', 'AI_ACTOR_REQUIRED');
+    const creativeQa = CreativeQAOutputSchema.parse(output);
+    const attemptBeforeLock = await this.tx.renderAttempt.findUniqueOrThrow({
+      where: { id: renderAttemptId },
+    });
+    await lock(this.tx, 'Render', attemptBeforeLock.renderId);
+
+    const [attempt, render, invocation] = await Promise.all([
+      this.tx.renderAttempt.findUniqueOrThrow({ where: { id: renderAttemptId } }),
+      this.tx.render.findUniqueOrThrow({ where: { id: attemptBeforeLock.renderId } }),
+      this.tx.modelInvocation.findUniqueOrThrow({ where: { id: modelInvocationId } }),
+    ]);
+    invariant(attempt.renderId === render.id, 'RENDER_ATTEMPT_LINEAGE_MISMATCH');
+    invariant(attempt.status === 'SUCCEEDED', 'CREATIVE_QA_RENDER_ATTEMPT_NOT_READY');
+    invariant(render.status === 'CREATIVE_QA', 'CREATIVE_QA_RENDER_NOT_READY');
+    invariant(attempt.creativeQaModelInvocationId === null, 'CREATIVE_QA_ALREADY_APPLIED');
+
+    const technicalQa = TechnicalQaReportSchema.parse(attempt.technicalQaJson);
+    invariant(technicalQa.result === 'PASS', 'CREATIVE_QA_TECHNICAL_QA_REQUIRED');
+    invariant(
+      invocation.status === 'SUCCEEDED' &&
+        invocation.outputHash === contentHash(creativeQa) &&
+        invocation.promptKey === 'creative-qa' &&
+        invocation.promptVersion === '1.0.0',
+      'VALIDATED_INVOCATION_REQUIRED',
+    );
+    const invocationPolicy = invocation.policyJson as Prisma.JsonObject | null;
+    invariant(invocationPolicy?.capability === 'CREATIVE_QA', 'VALIDATED_INVOCATION_REQUIRED');
+    const appliedInvocation = await this.tx.auditEvent.findFirst({
+      where: {
+        subjectId: modelInvocationId,
+        subjectType: 'ModelInvocation',
+        action: 'ModelInvocation.applied',
+      },
+    });
+    invariant(appliedInvocation, 'VALIDATED_INVOCATION_REQUIRED');
+
+    const updatedAttempt = await this.tx.renderAttempt.update({
+      where: { id: renderAttemptId },
+      data: {
+        creativeQaResult: creativeQa.result,
+        creativeQaJson: creativeQa as unknown as Prisma.InputJsonValue,
+        creativeQaModelInvocationId: modelInvocationId,
+      },
+    });
+    await changed(
+      this.tx,
+      this.actor,
+      'RenderAttempt.creative_qa_evaluated',
+      'RenderAttempt',
+      renderAttemptId,
+    );
+
+    if (creativeQa.result === 'FAIL') {
+      await changed(this.tx, this.actor, 'Render.creative_qa_blocked', 'Render', render.id);
+      return updatedAttempt;
+    }
+
+    assertTransition('render', render.status, 'READY_FOR_REVIEW');
+    await this.tx.render.update({ where: { id: render.id }, data: { status: 'READY_FOR_REVIEW' } });
+    await changed(this.tx, this.actor, 'Render.ready_for_review', 'Render', render.id);
     return updatedAttempt;
   }
 

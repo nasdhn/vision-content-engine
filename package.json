@@ -36,7 +36,8 @@
     "test:browser": "playwright test",
     "test:storage": "vitest run --config vitest.storage.config.ts",
     "check:phase3": "pnpm check && pnpm test:postgres && pnpm test:storage && pnpm build:web && pnpm test:browser",
-    "check:phase4": "pnpm check && pnpm test:postgres && pnpm test:storage && pnpm build:web && pnpm test:browser"
+    "check:phase4": "pnpm check && pnpm test:postgres && pnpm test:storage && pnpm build:web && pnpm test:browser",
+    "check:phase5": "pnpm check && pnpm test:postgres && pnpm test:storage && pnpm exec tsx tests/render/remotion-smoke.ts && pnpm exec tsx tests/render/media-regression.ts && pnpm build:web && pnpm test:browser"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

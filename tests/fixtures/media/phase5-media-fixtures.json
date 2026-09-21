@@ -1,0 +1,23 @@
+{
+  "fixtureVersion": "phase5-media-v1",
+  "durationMs": 1200,
+  "canvas": {
+    "width": 1080,
+    "height": 1920,
+    "fps": 30
+  },
+  "recipes": {
+    "product": "ffmpeg lavfi testsrc2 -> h264/yuv420p/bt709",
+    "presenter": "ffmpeg green surface + red subject -> h264 -> renderer chroma profile",
+    "voice": "ffmpeg sine 440Hz -> pcm_s16le/48kHz/stereo",
+    "blackSilence": "ffmpeg black + anullsrc -> h264/aac"
+  },
+  "assertions": [
+    "product probe is portrait SDR video",
+    "voice probe is 48kHz stereo audio",
+    "black/silence detector detects catastrophic synthetic fixture",
+    "renderer executes chroma preprocessing",
+    "renderer executes captions and voice layers",
+    "final master passes technical QA as H264/yuv420p/BT709 with audio"
+  ]
+}

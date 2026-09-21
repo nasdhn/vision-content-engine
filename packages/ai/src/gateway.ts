@@ -58,7 +58,7 @@ export interface StructuredProvider {
 }
 export type InvocationRequest<I> = {
   requestId: string;
-  capability: 'CREATOR' | 'CREATIVE_DIRECTOR' | 'EDITING_INTELLIGENCE';
+  capability: 'CREATOR' | 'CREATIVE_DIRECTOR' | 'EDITING_INTELLIGENCE' | 'CREATIVE_QA';
   purpose: string;
   prompt: { key: string; version: string };
   knowledgeSnapshot: { id: string; version: number; contentHash: string };
