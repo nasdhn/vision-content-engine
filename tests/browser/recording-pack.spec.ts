@@ -9,9 +9,14 @@ test('authenticated human upload, private preview, selection, last rejection and
   await page.goto('/production');
   await page.getByLabel('Clé d’accès locale').fill(key);
   await page.getByRole('button', { name: 'Se connecter', exact: true }).click();
+  await page.getByRole('link', { name: 'Ouvrir la production', exact: true }).click();
 
   await expect(page.getByRole('heading', { name: 'Une voix naturelle' })).toBeVisible();
-  await expect(page.getByText('Voici comment retrouver votre preuve.')).toBeVisible();
+  await expect(
+    page
+      .getByRole('region', { name: 'Plan créatif version' })
+      .getByText('Voici comment retrouver votre preuve.', { exact: true }),
+  ).toBeVisible();
   await expect(page.getByText('1 s', { exact: true })).toBeVisible();
 
   await page
@@ -61,6 +66,7 @@ test('mobile layout and keyboard login, validation feedback on unreadable drop u
   await page.goto('/production');
   await page.getByLabel('Clé d’accès locale').fill(key);
   await page.getByLabel('Clé d’accès locale').press('Enter');
+  await page.getByRole('link', { name: 'Ouvrir la production', exact: true }).click();
 
   await expect(page.getByRole('heading', { name: 'Une voix naturelle' })).toBeVisible();
 

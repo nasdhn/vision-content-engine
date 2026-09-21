@@ -4,6 +4,7 @@ import { createApi } from '../../apps/api/src/app.js';
 import {
   ConceptReviewService,
   DashboardReadService,
+  ProductionReadService,
   RecordingPackService,
 } from '../../packages/application/src/index.js';
 import { Persistence } from '../../packages/database/src/index.js';
@@ -13,6 +14,7 @@ const fixture = await postgresFixture();
 const recordings = new RecordingPackService(fixture.client, new MemoryStorage());
 const dashboard = new DashboardReadService(fixture.client);
 const concepts = new ConceptReviewService(fixture.client);
+const production = new ProductionReadService(fixture.client);
 
 const app = await createApi(
   {
@@ -28,6 +30,7 @@ const app = await createApi(
     recordings,
     dashboard,
     concepts,
+    production,
   },
 );
 

@@ -105,6 +105,96 @@ type ConceptReviewDetail = ConceptReviewItem & {
   } | null;
 };
 
+type ProductionStage = 'WAITING_FOR_ME' | 'CAPTURING' | 'EDITING' | 'RENDERING' | 'FAILED' | 'DONE';
+
+type ProductionItem = {
+  creativePlanId: string;
+  creativePlanVersionId: string;
+  version: number;
+  status: string;
+  title: string;
+  hook: string | null;
+  campaignName: string;
+  primaryFormat: string;
+  targetDurationMs: number | null;
+  stage: ProductionStage;
+  nextAction: string;
+  recordings: {
+    total: number;
+    pending: number;
+    readyToRecord: number;
+    uploaded: number;
+    accepted: number;
+  };
+  capture: {
+    id: string;
+    status: string;
+    failureCode: string | null;
+    createdAt: string;
+  } | null;
+  blocker: {
+    id: string;
+    reasonCode: string;
+    recoverability: string;
+    createdAt: string;
+  } | null;
+  editing: {
+    editingPlanVersionId: string;
+    status: string;
+    version: number;
+  } | null;
+  render: {
+    id: string;
+    status: string;
+    attemptStatus: string | null;
+    technicalQaResult: string | null;
+    creativeQaResult: string | null;
+  } | null;
+  createdAt: string;
+};
+
+type ProductionDetail = ProductionItem & {
+  script: {
+    scriptVersionId: string;
+    fullText: string;
+    estimatedDurationMs: number | null;
+    voiceMode: string;
+  };
+  template: { key: string; name: string; version: number };
+  editingProfile: { key: string; name: string; version: number };
+  recordingRequests: {
+    id: string;
+    title: string;
+    type: string;
+    status: string;
+    takeCount: number;
+    selectedTakeCount: number;
+  }[];
+  captures: {
+    id: string;
+    status: string;
+    failureCode: string | null;
+    startedAt: string | null;
+    finishedAt: string | null;
+    createdAt: string;
+  }[];
+  blockers: {
+    id: string;
+    reasonCode: string;
+    recoverability: string;
+    createdAt: string;
+  }[];
+  renderDetail: {
+    id: string;
+    status: string;
+    attemptNumber: number | null;
+    attemptStatus: string | null;
+    failureCode: string | null;
+    technicalQaResult: string | null;
+    creativeQaResult: string | null;
+  } | null;
+};
+
 const labels: Record<string, string> = {
   ACCEPTED: 'Prise sélectionnée',
   UPLOADED: 'Sélection requise',
@@ -125,6 +215,12 @@ const labels: Record<string, string> = {
   NATURAL: 'Naturel',
   GREEN_SCREEN: 'Fond vert',
   OTHER: 'Autre',
+  WAITING_FOR_ME: 'En attente de moi',
+  CAPTURING: 'Capture',
+  EDITING: 'Montage',
+  RENDERING: 'Rendu',
+  FAILED: 'Échec',
+  DONE: 'Terminé',
 };
 
 const errors: Record<string, string> = {
@@ -147,6 +243,8 @@ const errors: Record<string, string> = {
   INVALID_TRANSITION: 'Ce concept ne peut plus être validé depuis cet état.',
   EXPLICIT_SELECTION_REQUIRED: 'Une sélection explicite de version est déjà en cours.',
   INVALID_CONCEPT_REASON: 'La raison de rejet n’est pas valide.',
+  PRODUCTION_OPERATION_FAILED: 'La production est momentanément indisponible.',
+  CREATIVE_PLAN_VERSION_NOT_FOUND: 'Cette version de production est introuvable.',
 };
 
 const navigation = [
@@ -632,6 +730,202 @@ function ConceptReviewView({
   );
 }
 
+function ProductionView({
+  pathname,
+  items,
+  detail,
+  packs,
+  busy,
+  csrf,
+  action,
+  refresh,
+  upload,
+  drop,
+  setNotice,
+  onNavigate,
+}: {
+  pathname: string;
+  items: ProductionItem[];
+  detail: ProductionDetail | null;
+  packs: Pack[];
+  busy: boolean;
+  csrf: string;
+  action: (work: () => Promise<void>) => Promise<void>;
+  refresh: () => Promise<void>;
+  upload: (request: RecordingRequest, files: FileList | null) => Promise<void>;
+  drop: (event: DragEvent, request: RecordingRequest) => void;
+  setNotice: (value: string) => void;
+  onNavigate: (path: string) => void;
+}) {
+  if (pathname === '/production') {
+    return (
+      <>
+        <section className="page-heading">
+          <p className="eyebrow">PIPELINE</p>
+          <h1>Production</h1>
+          <p>
+            Suivez l’état canonique de chaque contenu sans piloter le workflow depuis l’interface.
+          </p>
+        </section>
+
+        {!items.length ? (
+          <section className="panel empty-state">
+            <h2>Aucune production active</h2>
+            <p>Les plans créatifs apparaîtront ici dès qu’ils entreront dans le pipeline.</p>
+          </section>
+        ) : (
+          <section className="production-grid" aria-label="Productions actives">
+            {items.map((item) => (
+              <article className="production-card" key={item.creativePlanVersionId}>
+                <div className="production-card-top">
+                  <span className={`stage-badge stage-${item.stage.toLowerCase()}`}>
+                    {labels[item.stage] ?? item.stage}
+                  </span>
+                  <span>v{item.version}</span>
+                </div>
+                <h2>{item.title}</h2>
+                {item.hook && <p className="production-hook">{item.hook}</p>}
+                <p className="muted">
+                  {item.campaignName} · {item.primaryFormat}
+                </p>
+                <dl className="production-mini">
+                  <dt>Enregistrements</dt>
+                  <dd>
+                    {item.recordings.accepted}/{item.recordings.total} acceptés
+                  </dd>
+                  <dt>Capture</dt>
+                  <dd>{item.capture?.status ?? 'Pas encore lancée'}</dd>
+                  <dt>Montage</dt>
+                  <dd>{item.editing?.status ?? 'Pas encore généré'}</dd>
+                  <dt>Rendu</dt>
+                  <dd>{item.render?.status ?? 'Pas encore lancé'}</dd>
+                </dl>
+                <p className="next-action">{item.nextAction}</p>
+                <AppLink
+                  href={`/production/${item.creativePlanVersionId}`}
+                  onNavigate={onNavigate}
+                  className="text-link"
+                >
+                  Ouvrir la production
+                </AppLink>
+              </article>
+            ))}
+          </section>
+        )}
+      </>
+    );
+  }
+
+  if (!detail)
+    return (
+      <section className="panel" aria-busy="true">
+        <p>Chargement de la production…</p>
+      </section>
+    );
+
+  const matchingPacks = packs.filter((pack) => pack.versionId === detail.creativePlanVersionId);
+
+  return (
+    <>
+      <section className="page-heading">
+        <p className="eyebrow">PRODUCTION · VERSION {detail.version}</p>
+        <h1>État de production</h1>
+        <p>{detail.title}</p>
+      </section>
+
+      <div className="production-detail-top">
+        <article className="panel production-summary">
+          <div className="section-head">
+            <div>
+              <p className="eyebrow">ÉTAT CANONIQUE</p>
+              <h2>{labels[detail.stage] ?? detail.stage}</h2>
+            </div>
+            <span className={`stage-badge stage-${detail.stage.toLowerCase()}`}>
+              {labels[detail.stage] ?? detail.stage}
+            </span>
+          </div>
+          <p className="next-action">{detail.nextAction}</p>
+          {detail.hook && <blockquote>{detail.hook}</blockquote>}
+          <dl className="detail-list">
+            <dt>Format</dt>
+            <dd>{detail.primaryFormat}</dd>
+            <dt>Durée cible</dt>
+            <dd>
+              {detail.targetDurationMs
+                ? `${(detail.targetDurationMs / 1000).toFixed(0)} s`
+                : 'Libre'}
+            </dd>
+            <dt>Template</dt>
+            <dd>
+              {detail.template.name} · v{detail.template.version}
+            </dd>
+            <dt>Profil montage</dt>
+            <dd>
+              {detail.editingProfile.name} · v{detail.editingProfile.version}
+            </dd>
+          </dl>
+        </article>
+
+        <article className="panel">
+          <p className="eyebrow">SCRIPT</p>
+          <p className="script-preview">{detail.script.fullText}</p>
+          <p className="muted">
+            {detail.script.voiceMode}
+            {detail.script.estimatedDurationMs
+              ? ` · ${(detail.script.estimatedDurationMs / 1000).toFixed(1)} s estimées`
+              : ''}
+          </p>
+        </article>
+      </div>
+
+      <section className="pipeline-strip" aria-label="État technique de la production">
+        <article>
+          <span>Capture</span>
+          <strong>{detail.capture?.status ?? 'NON LANCÉE'}</strong>
+          {detail.capture?.failureCode && <small>{detail.capture.failureCode}</small>}
+        </article>
+        <article>
+          <span>Montage</span>
+          <strong>{detail.editing?.status ?? 'NON GÉNÉRÉ'}</strong>
+          {detail.blocker && <small>{detail.blocker.reasonCode}</small>}
+        </article>
+        <article>
+          <span>Rendu</span>
+          <strong>{detail.render?.status ?? 'NON LANCÉ'}</strong>
+          {detail.render?.creativeQaResult && <small>QA {detail.render.creativeQaResult}</small>}
+        </article>
+      </section>
+
+      {detail.blockers.length > 0 && (
+        <section className="panel">
+          <p className="eyebrow">BLOCKERS OUVERTS</p>
+          <h2>Le montage nécessite une intervention</h2>
+          <ul className="simple-list">
+            {detail.blockers.map((blocker) => (
+              <li key={blocker.id}>
+                <strong>{blocker.reasonCode}</strong>
+                <span>{blocker.recoverability}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <RecordingPackView
+        packs={matchingPacks}
+        busy={busy}
+        csrf={csrf}
+        action={action}
+        refresh={refresh}
+        upload={upload}
+        drop={drop}
+        setNotice={setNotice}
+        embedded
+      />
+    </>
+  );
+}
+
 function RecordingPackView({
   packs,
   busy,
@@ -641,6 +935,7 @@ function RecordingPackView({
   upload,
   drop,
   setNotice,
+  embedded = false,
 }: {
   packs: Pack[];
   busy: boolean;
@@ -650,18 +945,21 @@ function RecordingPackView({
   upload: (request: RecordingRequest, files: FileList | null) => Promise<void>;
   drop: (event: DragEvent, request: RecordingRequest) => void;
   setNotice: (value: string) => void;
+  embedded?: boolean;
 }) {
   return (
     <>
-      <section className="page-heading">
+      <section className={embedded ? 'section-heading' : 'page-heading'}>
         <p className="eyebrow">PRODUCTION · INPUT HUMAIN</p>
         <h1>Recording Pack</h1>
         <p>Vos enregistrements bruts, prêts pour la prochaine étape.</p>
       </section>
 
-      <button className="secondary-button" disabled={busy} onClick={() => void action(refresh)}>
-        Actualiser
-      </button>
+      {!embedded && (
+        <button className="secondary-button" disabled={busy} onClick={() => void action(refresh)}>
+          Actualiser
+        </button>
+      )}
 
       {!packs.length && (
         <section className="panel empty-state">
@@ -875,6 +1173,8 @@ function App() {
   const [attention, setAttention] = useState<AttentionItem[] | null>(null);
   const [concepts, setConcepts] = useState<ConceptReviewItem[]>([]);
   const [conceptDetail, setConceptDetail] = useState<ConceptReviewDetail | null>(null);
+  const [productions, setProductions] = useState<ProductionItem[]>([]);
+  const [productionDetail, setProductionDetail] = useState<ProductionDetail | null>(null);
   const [packs, setPacks] = useState<Pack[]>([]);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -882,7 +1182,10 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   const section = useMemo(
-    () => navigation.find(([path]) => path === pathname)?.[1] ?? 'Vision',
+    () =>
+      navigation.find(([path]) =>
+        path === '/' ? pathname === '/' : pathname === path || pathname.startsWith(`${path}/`),
+      )?.[1] ?? 'Vision',
     [pathname],
   );
 
@@ -894,17 +1197,25 @@ function App() {
   }
 
   async function refresh() {
-    const [summary, items, conceptQueue, recordingPacks] = await Promise.all([
-      call('dashboard', csrf),
-      call('attention', csrf),
-      call('concepts/review', csrf),
-      call('recording-packs', csrf),
-    ]);
+    const productionVersionId = pathname.match(/^\/production\/([0-9a-f-]+)$/)?.[1];
+    const [summary, items, conceptQueue, productionQueue, recordingPacks, currentProduction] =
+      await Promise.all([
+        call('dashboard', csrf),
+        call('attention', csrf),
+        call('concepts/review', csrf),
+        call('production', csrf),
+        call('recording-packs', csrf),
+        productionVersionId
+          ? call(`production/${productionVersionId}`, csrf)
+          : Promise.resolve(null),
+      ]);
 
     setDashboard(summary as DashboardSummary);
     setAttention(items as AttentionItem[]);
     setConcepts(conceptQueue as ConceptReviewItem[]);
+    setProductions(productionQueue as ProductionItem[]);
     setPacks(recordingPacks as Pack[]);
+    if (productionVersionId) setProductionDetail(currentProduction as ProductionDetail);
   }
 
   useEffect(() => {
@@ -928,6 +1239,19 @@ function App() {
     setConceptDetail(null);
     void call(`concepts/${conceptVersionId}`, csrf)
       .then((value) => setConceptDetail(value as ConceptReviewDetail))
+      .catch((caught) => setError(caught instanceof Error ? caught.message : 'Action impossible.'));
+  }, [csrf, pathname]);
+
+  useEffect(() => {
+    const creativePlanVersionId = pathname.match(/^\/production\/([0-9a-f-]+)$/)?.[1];
+    if (!csrf || !creativePlanVersionId) {
+      setProductionDetail(null);
+      return;
+    }
+
+    setProductionDetail(null);
+    void call(`production/${creativePlanVersionId}`, csrf)
+      .then((value) => setProductionDetail(value as ProductionDetail))
       .catch((caught) => setError(caught instanceof Error ? caught.message : 'Action impossible.'));
   }, [csrf, pathname]);
 
@@ -1068,6 +1392,8 @@ function App() {
                   setAttention(null);
                   setConcepts([]);
                   setConceptDetail(null);
+                  setProductions([]);
+                  setProductionDetail(null);
                   setPacks([]);
                 })
               }
@@ -1119,8 +1445,11 @@ function App() {
                 });
               }}
             />
-          ) : pathname === '/production' ? (
-            <RecordingPackView
+          ) : pathname === '/production' || pathname.startsWith('/production/') ? (
+            <ProductionView
+              pathname={pathname}
+              items={productions}
+              detail={productionDetail}
               packs={packs}
               busy={busy}
               csrf={csrf}
@@ -1129,6 +1458,7 @@ function App() {
               upload={upload}
               drop={drop}
               setNotice={setNotice}
+              onNavigate={navigate}
             />
           ) : (
             <DeferredView pathname={pathname} />

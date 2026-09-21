@@ -3,6 +3,7 @@ import { createDatabaseClient } from '@vision/database';
 import {
   ConceptReviewService,
   DashboardReadService,
+  ProductionReadService,
   RecordingPackService,
 } from '@vision/application';
 import { S3PrivateStorage } from '@vision/media';
@@ -26,6 +27,7 @@ async function main() {
     );
     const dashboard = new DashboardReadService(db);
     const concepts = new ConceptReviewService(db);
+    const production = new ProductionReadService(db);
 
     await recordings.recoverInterrupted();
     await recordings.prepareExisting();
@@ -38,6 +40,7 @@ async function main() {
       recordings,
       dashboard,
       concepts,
+      production,
     });
 
     const close = async () => {
