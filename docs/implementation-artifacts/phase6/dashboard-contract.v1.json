@@ -1,0 +1,78 @@
+{
+  "version": "phase6-dashboard-v1",
+  "baselineHead": "3b3209693fbbf18f5db807639f6877114f8b045c",
+  "mandatoryHumanGates": ["CONCEPT_VERSION", "FINAL_RENDER"],
+  "routes": [
+    "/",
+    "/attention",
+    "/concepts",
+    "/concepts/:conceptVersionId",
+    "/production",
+    "/production/:creativePlanVersionId",
+    "/review",
+    "/review/:renderId",
+    "/calendar",
+    "/published",
+    "/assets",
+    "/assets/:assetId",
+    "/patterns",
+    "/templates",
+    "/settings",
+    "/analytics"
+  ],
+  "writes": {
+    "conceptDecision": {
+      "route": "POST /api/concepts/:conceptVersionId/decision",
+      "decisions": ["APPROVED", "REJECTED"],
+      "stalePolicy": "FAIL_CLOSED",
+      "rejectionReasons": [
+        "HOOK_WEAK",
+        "ANGLE_TOO_GENERIC",
+        "TOO_AD_LIKE",
+        "TOO_REPETITIVE",
+        "NOT_TRUE_TO_VISION",
+        "WRONG_AUDIENCE",
+        "OTHER"
+      ],
+      "reasonRequired": false
+    },
+    "renderDecision": {
+      "route": "POST /api/review/:renderId/decision",
+      "decisions": ["APPROVED", "REJECTED"],
+      "approvalAssetPolicy": "SERVER_RESOLVES_EXACT_SUCCESSFUL_READY_OUTPUT",
+      "rejectionReasons": [
+        "PACING_TOO_SLOW",
+        "PACING_TOO_FAST",
+        "CUTS_TOO_MECHANICAL",
+        "CAPTIONS_TOO_BUSY",
+        "PRODUCT_NOT_VISIBLE_ENOUGH",
+        "HOOK_VISUALLY_WEAK",
+        "SOUND_TOO_BUSY",
+        "CTA_TOO_LONG",
+        "GREEN_SCREEN_BAD_PLACEMENT",
+        "SCRIPT_VISUAL_MISMATCH",
+        "OTHER"
+      ],
+      "reasonRequiredForDashboardReject": true
+    }
+  },
+  "needsAttentionSources": [
+    "EditingBlocker.OPEN",
+    "RecordingRequest.HUMAN_INPUT_REQUIRED",
+    "Render.FAILED",
+    "CaptureRun.FAILED",
+    "WorkflowRun.FAILED",
+    "OutboxEvent.FAILED",
+    "PlatformAccount.REAUTH_REQUIRED",
+    "PlatformAccount.ERROR",
+    "Publication.PUBLISHING_UNKNOWN",
+    "Publication.FAILED"
+  ],
+  "phaseBoundaries": {
+    "distributionWrites": "PHASE_7",
+    "analyticsEvidenceAndUI": "PHASE_8",
+    "securityOpsHardeningBeyondExistingLocalAuth": "PHASE_10"
+  },
+  "expectedPrismaMigration": false,
+  "tranches": ["6A", "6B", "6C", "6D", "6E"]
+}
