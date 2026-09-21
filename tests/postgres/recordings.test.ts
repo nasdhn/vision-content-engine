@@ -96,16 +96,21 @@ it.each(['REJECTED', 'UPLOADED'] as const)(
 it('selection change leaves exact immutable plan, script, render input and original asset unchanged', async () => {
   const g = await uploaded();
   await service.select(human, g.take.id, 'SELECTED');
-  const render = await p.transaction(human, async (u) => {
+  const epv = await p.transaction(human, async (u) => {
     const editing = await u.createEditingPlan(g.plan.id);
-    const epv = await u.versions.editingPlanVersion({
+    return u.versions.editingPlanVersion({
       editingPlanId: editing.id,
       creativePlanVersionId: g.cpv.id,
       templateVersionId: g.tv.id,
       editingProfileVersionId: g.pv.id,
       timelineJson: { assetId: g.take.assetId },
     });
-    return u.requestRender(epv.id);
+  });
+
+  // Historical immutability fixture: this test is intentionally not exercising
+  // the Phase-5 requestRender gate, which requires a READY lossless EditingPlan.
+  const render = await db.render.create({
+    data: { editingPlanVersionId: epv.id },
   });
   await db.renderInputAsset.create({
     data: { renderId: render.id, assetId: g.take.assetId, role: 'VOICE' },

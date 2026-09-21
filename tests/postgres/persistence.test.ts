@@ -65,7 +65,8 @@ async function content() {
   const b = await base();
   const template = await db.template.create({ data: { key: randomUUID(), name: 'fixture' } });
   const profile = await db.editingProfile.create({ data: { key: randomUUID(), name: 'fixture' } });
-  return persistence.transaction(human, async (u) => {
+
+  const lineage = await persistence.transaction(human, async (u) => {
     const tv = await u.versions.templateVersion({
       templateId: template.id,
       rendererVersion: 'fixture-only',
@@ -93,9 +94,20 @@ async function content() {
       editingProfileVersionId: pv.id,
       timelineJson: {},
     });
-    const render = await u.requestRender(epv.id);
-    return { ...b, tv, pv, sv, cpv, epv, render };
+
+    return { ...b, tv, pv, sv, cpv, epv };
   });
+
+  // This historical helper intentionally builds a synthetic pre-Phase-5 render
+  // for unrelated SQL/approval/publication tests. The production requestRender()
+  // path now requires a READY, lossless EditingPlan and is covered separately.
+  const render = await db.render.create({
+    data: {
+      editingPlanVersionId: lineage.epv.id,
+    },
+  });
+
+  return { ...lineage, render };
 }
 async function asset() {
   return db.asset.create({
@@ -768,6 +780,7 @@ it('reclaims outbox after enqueue/mark loss using stable deduplication identity'
       aggregateType: 'fixture',
       aggregateId: 'fixture',
       payloadJson: {},
+      availableAt: new Date('2000-01-01T00:00:00Z'),
     },
   });
   const initial = await leases.claimOutbox('one');

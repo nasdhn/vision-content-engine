@@ -8,6 +8,7 @@ import { EditingIntelligenceOutputSchema } from '../../packages/contracts/src/in
 import {
   EditingIntelligenceService,
   EditingProfileRegistry,
+  RenderPayloadBuilder,
   TemplateRegistry,
 } from '../../packages/application/src/index.js';
 import type { createDatabaseClient } from '../../packages/database/src/index.js';
@@ -498,6 +499,141 @@ it('generates and persists a hard-validated EditingPlan through the production A
       },
     }),
   ).toBe(1);
+});
+
+it('pins exact RenderInputAssets and compiles a deterministic RenderPayload', async () => {
+  const data = await setup();
+
+  const provider = new FakeAIProvider(async (request) => reply(validOutput(request)));
+
+  const result = await service(provider).generatePlan(
+    {
+      requestId: randomUUID(),
+      knowledgeSnapshotId: data.knowledge.id,
+      creativePlanVersionId: data.creativePlanVersion.id,
+    },
+    policy,
+    budget,
+  );
+
+  const editingVersion = await db.editingPlanVersion.findFirstOrThrow();
+
+  const render = await persistence.transaction(human, (unit) =>
+    unit.requestRender(editingVersion.id),
+  );
+
+  expect(
+    await db.renderInputAsset.findMany({
+      where: {
+        renderId: render.id,
+      },
+      orderBy: {
+        sequence: 'asc',
+      },
+    }),
+  ).toEqual([
+    expect.objectContaining({
+      renderId: render.id,
+      assetId: data.productAsset.id,
+      role: 'PRODUCT_CAPTURE',
+      slotKey: null,
+      sequence: 0,
+    }),
+  ]);
+
+  await persistence.transaction(human, (unit) =>
+    unit.transitionRender(render.id, 'REQUESTED', 'QUEUED'),
+  );
+
+  const renderAttempt = await persistence.transaction(human, (unit) =>
+    unit.createRenderAttempt(render.id, 'render-worker-fixture-v1'),
+  );
+
+  await expect(
+    persistence.transaction(human, (unit) =>
+      unit.createRenderAttempt(render.id, 'render-worker-duplicate'),
+    ),
+  ).rejects.toThrow('ACTIVE_RENDER_ATTEMPT_EXISTS');
+
+  const payload = await new RenderPayloadBuilder(db).build({
+    renderId: render.id,
+    renderAttemptId: renderAttempt.id,
+    resolvedAssets: [
+      {
+        assetId: data.productAsset.id,
+        localUri: `/render-work/${renderAttempt.id}/product.mp4`,
+        kind: 'VIDEO',
+        probe: {
+          assetId: data.productAsset.id,
+          container: 'mp4',
+          durationMs: 10_000,
+          video: {
+            codec: 'h264',
+            width: 1080,
+            height: 1920,
+            fps: 30,
+            color: {
+              hdrKind: 'SDR',
+            },
+          },
+          probeVersion: 'fixture-v1',
+        },
+      },
+    ],
+  });
+
+  expect(renderAttempt).toMatchObject({
+    renderId: render.id,
+    attemptNumber: 1,
+    status: 'QUEUED',
+    workerVersion: 'render-worker-fixture-v1',
+    rendererVersion: 'v1',
+  });
+
+  expect(payload.editingPlan).toEqual(result.output);
+
+  expect(payload.provenance).toMatchObject({
+    editingPlanVersionId: editingVersion.id,
+    templateVersionId: data.template.identity.templateVersionId,
+    editingProfileVersionId: data.profile.identity.editingProfileVersionId,
+    colorProfileKey: 'SDR_BT709_SOCIAL_V1',
+    codecProfileKey: 'SOCIAL_H264_AAC_V1',
+    audioProfileKey: 'SOCIAL_VOICE_MASTER_V1',
+  });
+});
+
+it('refuses Render intent when a previously selected input Asset is no longer READY', async () => {
+  const data = await setup();
+
+  const provider = new FakeAIProvider(async (request) => reply(validOutput(request)));
+
+  await service(provider).generatePlan(
+    {
+      requestId: randomUUID(),
+      knowledgeSnapshotId: data.knowledge.id,
+      creativePlanVersionId: data.creativePlanVersion.id,
+    },
+    policy,
+    budget,
+  );
+
+  const editingVersion = await db.editingPlanVersion.findFirstOrThrow();
+
+  await db.asset.update({
+    where: {
+      id: data.productAsset.id,
+    },
+    data: {
+      status: 'ARCHIVED',
+    },
+  });
+
+  await expect(
+    persistence.transaction(human, (unit) => unit.requestRender(editingVersion.id)),
+  ).rejects.toThrow('RENDER_INPUT_NOT_READY');
+
+  expect(await db.render.count()).toBe(0);
+  expect(await db.renderInputAsset.count()).toBe(0);
 });
 
 it('refuses READY promotion without exact validated invocation evidence', async () => {

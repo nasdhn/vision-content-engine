@@ -1,0 +1,14 @@
+{
+  "specVersion": "v1",
+  "canvas": {
+    "width": 1080,
+    "height": 1920,
+    "allowedFps": [30, 60]
+  },
+  "requiredRendererApiVersion": "v1",
+  "defaultProfiles": {
+    "color": "SDR_BT709_SOCIAL_V1",
+    "audio": "SOCIAL_VOICE_MASTER_V1",
+    "codec": "SOCIAL_H264_AAC_V1"
+  }
+}

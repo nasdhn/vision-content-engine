@@ -9,7 +9,7 @@ import { audit, changed, databaseTime, emit, lock } from './transaction.js';
 import type { Actor, OutboxInput, Transaction } from './transaction.js';
 import { Versions } from './versions.js';
 import { approvedConcept, validatePublication, validateRender } from './lineage.js';
-import { EditingPlanSpecSchema } from '@vision/contracts';
+import { EditingPlanSpecSchema, TemplateRuntimeContractSchema } from '@vision/contracts';
 import { contentHash, normalize, textHash } from '@vision/contracts/canonical';
 import {
   conceptSelectionAction,
@@ -461,10 +461,159 @@ export class UnitOfWork {
     return result;
   }
   async requestRender(editingPlanVersionId: string) {
-    await validateRender(this.tx, editingPlanVersionId);
-    const row = await this.tx.render.create({ data: { editingPlanVersionId } });
+    const editing = await validateRender(this.tx, editingPlanVersionId);
+
+    const editingPlan = await this.tx.editingPlan.findUniqueOrThrow({
+      where: {
+        id: editing.editingPlanId,
+      },
+    });
+
+    invariant(editingPlan.status === 'READY', 'EDITING_PLAN_NOT_READY');
+
+    const plan = EditingPlanSpecSchema.parse(editing.planSpecJson);
+
+    const templateVersion = await this.tx.templateVersion.findUniqueOrThrow({
+      where: {
+        id: editing.templateVersionId,
+      },
+    });
+
+    const template = TemplateRuntimeContractSchema.parse(templateVersion.capabilitiesJson);
+
+    invariant(template.templateVersionId === editing.templateVersionId, 'TEMPLATE_CONTRACT_FAILED');
+
+    const selectedAssetIds = plan.selectedAssets.map((asset) => asset.assetId);
+
+    const inputAssetIds = [...new Set([...selectedAssetIds, ...template.assetDependencies])];
+
+    const inputAssets = await this.tx.asset.findMany({
+      where: {
+        id: {
+          in: inputAssetIds,
+        },
+      },
+    });
+
+    invariant(
+      inputAssets.length === inputAssetIds.length &&
+        inputAssets.every((asset) => asset.status === 'READY' && asset.deletedAt === null),
+      'RENDER_INPUT_NOT_READY',
+    );
+
+    const templateLinks = await this.tx.templateVersionAsset.findMany({
+      where: {
+        templateVersionId: editing.templateVersionId,
+        assetId: {
+          in: template.assetDependencies,
+        },
+      },
+      orderBy: [{ assetId: 'asc' }, { role: 'asc' }],
+    });
+
+    const dependencyLinksByAsset = new Map<string, (typeof templateLinks)[number]>();
+
+    for (const link of templateLinks) {
+      invariant(!dependencyLinksByAsset.has(link.assetId), 'TEMPLATE_ASSET_AMBIGUOUS');
+      dependencyLinksByAsset.set(link.assetId, link);
+    }
+
+    invariant(
+      dependencyLinksByAsset.size === template.assetDependencies.length &&
+        template.assetDependencies.every((assetId) => dependencyLinksByAsset.has(assetId)),
+      'TEMPLATE_ASSET_DEPENDENCY_MISSING',
+    );
+
+    const row = await this.tx.render.create({
+      data: {
+        editingPlanVersionId,
+      },
+    });
+
+    const selectedInputs: Prisma.RenderInputAssetCreateManyInput[] = plan.selectedAssets.map(
+      (asset, sequence) => ({
+        renderId: row.id,
+        assetId: asset.assetId,
+        role: asset.role === 'PRESENTER' ? 'GREEN_SCREEN_VIDEO' : asset.role,
+        sequence,
+      }),
+    );
+
+    const templateInputs: Prisma.RenderInputAssetCreateManyInput[] = [...template.assetDependencies]
+      .sort()
+      .map((assetId, sequence) => ({
+        renderId: row.id,
+        assetId,
+        role: 'TEMPLATE_ASSET',
+        sequence,
+        ...(dependencyLinksByAsset.get(assetId)!.slotKey !== null
+          ? {
+              slotKey: dependencyLinksByAsset.get(assetId)!.slotKey!,
+            }
+          : {}),
+      }));
+
+    if (selectedInputs.length + templateInputs.length > 0)
+      await this.tx.renderInputAsset.createMany({
+        data: [...selectedInputs, ...templateInputs],
+      });
+
     await changed(this.tx, this.actor, 'Render.requested', 'Render', row.id);
+
     return row;
+  }
+  async createRenderAttempt(renderId: string, workerVersion: string) {
+    invariant(workerVersion.trim().length > 0, 'WORKER_VERSION_REQUIRED');
+
+    await lock(this.tx, 'Render', renderId);
+
+    const render = await this.tx.render.findUniqueOrThrow({
+      where: {
+        id: renderId,
+      },
+      include: {
+        editingPlanVersion: {
+          include: {
+            templateVersion: true,
+          },
+        },
+      },
+    });
+
+    invariant(render.status === 'QUEUED', 'RENDER_NOT_QUEUEABLE');
+
+    const activeAttempt = await this.tx.renderAttempt.findFirst({
+      where: {
+        renderId,
+        status: {
+          in: ['QUEUED', 'RUNNING'],
+        },
+      },
+    });
+
+    invariant(!activeAttempt, 'ACTIVE_RENDER_ATTEMPT_EXISTS');
+
+    const latest = await this.tx.renderAttempt.aggregate({
+      where: {
+        renderId,
+      },
+      _max: {
+        attemptNumber: true,
+      },
+    });
+
+    const attempt = await this.tx.renderAttempt.create({
+      data: {
+        renderId,
+        attemptNumber: (latest._max.attemptNumber ?? 0) + 1,
+        workerVersion,
+        rendererVersion: render.editingPlanVersion.templateVersion.rendererVersion,
+      },
+    });
+
+    await changed(this.tx, this.actor, 'RenderAttempt.created', 'RenderAttempt', attempt.id);
+
+    return attempt;
   }
   /** Persistence transition only; technical/creative QA execution belongs to later phases. */
   async transitionRender(
