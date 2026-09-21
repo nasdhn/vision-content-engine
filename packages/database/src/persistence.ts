@@ -500,6 +500,7 @@ export class UnitOfWork {
     conceptVersionId: string,
     decision: 'APPROVED' | 'REJECTED',
     comment?: string,
+    reasonCode?: string,
   ) {
     assertHuman(this.actor);
     const version = await this.tx.conceptVersion.findUniqueOrThrow({
@@ -513,7 +514,7 @@ export class UnitOfWork {
     });
     invariant(latest.id === version.id, 'STALE_VERSION');
     invariant(!(await pendingConceptSelection(this.tx, concept.id)), 'EXPLICIT_SELECTION_REQUIRED');
-    return this.recordConceptDecision(concept.id, version.id, decision, comment);
+    return this.recordConceptDecision(concept.id, version.id, decision, comment, reasonCode);
   }
   /** Deliberate USER selection of an exact version, independent of the latest-version flow. */
   async selectConceptVersionForReview(conceptVersionId: string) {
@@ -547,6 +548,7 @@ export class UnitOfWork {
     selectionId: string,
     decision: 'APPROVED' | 'REJECTED',
     comment?: string,
+    reasonCode?: string,
   ) {
     assertHuman(this.actor);
     const selection = await this.tx.auditEvent.findFirst({
@@ -572,6 +574,7 @@ export class UnitOfWork {
       version.id,
       decision,
       comment,
+      reasonCode,
     );
     await this.tx.auditEvent.create({
       data: {
@@ -591,6 +594,7 @@ export class UnitOfWork {
     conceptVersionId: string,
     decision: 'APPROVED' | 'REJECTED',
     comment?: string,
+    reasonCode?: string,
   ) {
     const concept = await this.tx.concept.findUniqueOrThrow({ where: { id: conceptId } });
     assertTransition('concept', concept.status, decision);
@@ -601,6 +605,7 @@ export class UnitOfWork {
         decision,
         actorType: 'USER',
         actorId: this.actor.actorId!,
+        ...(reasonCode !== undefined ? { reasonCode } : {}),
         ...(comment !== undefined ? { comment } : {}),
       },
     });

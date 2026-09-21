@@ -1,6 +1,10 @@
 import 'dotenv/config';
 import { createDatabaseClient } from '@vision/database';
-import { DashboardReadService, RecordingPackService } from '@vision/application';
+import {
+  ConceptReviewService,
+  DashboardReadService,
+  RecordingPackService,
+} from '@vision/application';
 import { S3PrivateStorage } from '@vision/media';
 import { parseConfig } from '@vision/shared';
 
@@ -21,6 +25,7 @@ async function main() {
       new S3PrivateStorage(dependencies.storage, config.S3_BUCKET),
     );
     const dashboard = new DashboardReadService(db);
+    const concepts = new ConceptReviewService(db);
 
     await recordings.recoverInterrupted();
     await recordings.prepareExisting();
@@ -32,6 +37,7 @@ async function main() {
       },
       recordings,
       dashboard,
+      concepts,
     });
 
     const close = async () => {

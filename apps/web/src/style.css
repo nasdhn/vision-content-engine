@@ -658,3 +658,105 @@ blockquote,
     padding: 16px;
   }
 }
+
+select,
+textarea {
+  width: 100%;
+  margin: 8px 0 18px;
+  padding: 11px 12px;
+  border: 1px solid #bfcac4;
+  border-radius: 9px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+}
+
+textarea {
+  resize: vertical;
+}
+
+.concept-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.concept-card {
+  padding: 22px;
+  border: 1px solid #d8dfda;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 12px 36px rgba(26, 42, 35, 0.045);
+}
+
+.concept-card h2 {
+  margin: 14px 0 8px;
+}
+
+.concept-card blockquote {
+  font-size: 1rem;
+}
+
+.concept-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #73807b;
+  font-size: 0.8rem;
+}
+
+.concept-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+  gap: 18px;
+}
+
+.detail-list {
+  grid-template-columns: 140px minmax(0, 1fr);
+}
+
+.decision-panel label {
+  display: block;
+  margin-top: 14px;
+  font-weight: 650;
+}
+
+.decision-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.approve-button {
+  background: #204e3d;
+  border-color: #204e3d;
+}
+
+.reject-button {
+  background: #fff;
+  border-color: #a34136;
+  color: #8c342a;
+}
+
+.stale-panel {
+  border-color: #c9994d;
+  background: #fff9ee;
+}
+
+@media (max-width: 760px) {
+  .concept-grid,
+  .concept-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .concept-meta {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .decision-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+}

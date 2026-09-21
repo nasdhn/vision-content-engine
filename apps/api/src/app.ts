@@ -3,7 +3,11 @@ import { Controller, Get, Inject, Module, ServiceUnavailableException } from '@n
 import { NestFactory } from '@nestjs/core';
 import { checkReadiness } from '@vision/observability';
 import type { ReadinessProbes } from '@vision/observability';
-import type { DashboardReadService, RecordingPackService } from '@vision/application';
+import type {
+  ConceptReviewService,
+  DashboardReadService,
+  RecordingPackService,
+} from '@vision/application';
 
 import {
   LOCAL_SESSION,
@@ -12,6 +16,7 @@ import {
   type LocalSessionOptions,
 } from './auth.js';
 import { DashboardController, DASHBOARD } from './dashboard.js';
+import { ConceptReviewController, CONCEPT_REVIEW } from './concepts.js';
 import { RecordingController, RECORDINGS } from './recordings.js';
 
 const PROBES = Symbol('bootstrap-readiness-probes');
@@ -20,6 +25,7 @@ export type ApiBusinessOptions = {
   auth: LocalSessionOptions;
   recordings?: RecordingPackService;
   dashboard?: DashboardReadService;
+  concepts?: ConceptReviewService;
 };
 
 @Controller()
@@ -46,6 +52,7 @@ export async function createApi(probes: ReadinessProbes, business?: ApiBusinessO
       ...(business ? [LocalSessionController] : []),
       ...(business?.recordings ? [RecordingController] : []),
       ...(business?.dashboard ? [DashboardController] : []),
+      ...(business?.concepts ? [ConceptReviewController] : []),
     ],
     providers: [
       { provide: PROBES, useValue: probes },
@@ -70,6 +77,14 @@ export async function createApi(probes: ReadinessProbes, business?: ApiBusinessO
             {
               provide: DASHBOARD,
               useValue: business.dashboard,
+            },
+          ]
+        : []),
+      ...(business?.concepts
+        ? [
+            {
+              provide: CONCEPT_REVIEW,
+              useValue: business.concepts,
             },
           ]
         : []),

@@ -69,6 +69,42 @@ type AttentionItem = {
   targetRoute: string;
 };
 
+type ConceptReviewItem = {
+  conceptId: string;
+  conceptVersionId: string;
+  version: number;
+  title: string;
+  hook: string | null;
+  angle: string | null;
+  audience: string | null;
+  objective: string | null;
+  hypothesis: string | null;
+  rationale: string | null;
+  createdAt: string;
+  pattern: { id: string; key: string; name: string; version: number } | null;
+  brief: {
+    id: string;
+    title: string;
+    goal: string | null;
+    audience: string | null;
+    campaign: { id: string; name: string; slug: string };
+  };
+};
+
+type ConceptReviewDetail = ConceptReviewItem & {
+  status: string;
+  latestConceptVersionId: string;
+  isLatest: boolean;
+  decisionAllowed: boolean;
+  previousDecision: {
+    id: string;
+    decision: string;
+    reasonCode: string | null;
+    comment: string | null;
+    createdAt: string;
+  } | null;
+};
+
 const labels: Record<string, string> = {
   ACCEPTED: 'Prise sélectionnée',
   UPLOADED: 'Sélection requise',
@@ -105,6 +141,12 @@ const errors: Record<string, string> = {
   PREVIEW_CAPACITY_REACHED: 'Une prévisualisation est en cours. Réessayez dans un instant.',
   ASSET_NOT_AVAILABLE: 'Fichier indisponible. Envoyez une nouvelle prise.',
   DASHBOARD_OPERATION_FAILED: 'Le tableau de bord est momentanément indisponible.',
+  CONCEPT_OPERATION_FAILED: 'La review du concept est momentanément indisponible.',
+  CONCEPT_VERSION_NOT_FOUND: 'Cette version de concept est introuvable.',
+  STALE_VERSION: 'Une version plus récente existe. Rechargez la review avant de décider.',
+  INVALID_TRANSITION: 'Ce concept ne peut plus être validé depuis cet état.',
+  EXPLICIT_SELECTION_REQUIRED: 'Une sélection explicite de version est déjà en cours.',
+  INVALID_CONCEPT_REASON: 'La raison de rejet n’est pas valide.',
 };
 
 const navigation = [
@@ -123,10 +165,6 @@ const navigation = [
 ] as const;
 
 const deferredTitles: Record<string, { title: string; note: string }> = {
-  '/concepts': {
-    title: 'Concepts',
-    note: 'La validation des concepts arrive dans la tranche 6B.',
-  },
   '/review': {
     title: 'Review finale',
     note: 'La review vidéo finale arrive dans la tranche 6D.',
@@ -407,6 +445,193 @@ function AttentionView({
   );
 }
 
+function ConceptReviewView({
+  pathname,
+  concepts,
+  detail,
+  busy,
+  onNavigate,
+  onDecision,
+}: {
+  pathname: string;
+  concepts: ConceptReviewItem[];
+  detail: ConceptReviewDetail | null;
+  busy: boolean;
+  onNavigate: (path: string) => void;
+  onDecision: (
+    decision: 'APPROVED' | 'REJECTED',
+    reasonCode?: string,
+    comment?: string,
+  ) => Promise<void>;
+}) {
+  const [reasonCode, setReasonCode] = useState('');
+  const [comment, setComment] = useState('');
+
+  useEffect(() => {
+    setReasonCode('');
+    setComment('');
+  }, [detail?.conceptVersionId]);
+
+  if (pathname === '/concepts') {
+    return (
+      <>
+        <section className="page-heading">
+          <p className="eyebrow">HUMAN GATE · 1/2</p>
+          <h1>Concepts</h1>
+          <p>Validez l’idée créative exacte avant que la production ne continue.</p>
+        </section>
+
+        {!concepts.length ? (
+          <section className="panel empty-state">
+            <h2>Aucun concept à valider</h2>
+            <p>La file de review est vide.</p>
+          </section>
+        ) : (
+          <section className="concept-grid" aria-label="Concepts à valider">
+            {concepts.map((concept) => (
+              <article className="concept-card" key={concept.conceptVersionId}>
+                <div className="concept-meta">
+                  <span className="badge">Version {concept.version}</span>
+                  <span>{concept.brief.campaign.name}</span>
+                </div>
+                <h2>{concept.title}</h2>
+                {concept.hook && <blockquote>{concept.hook}</blockquote>}
+                <dl>
+                  <dt>Angle</dt>
+                  <dd>{concept.angle ?? 'Non précisé'}</dd>
+                  <dt>Audience</dt>
+                  <dd>{concept.audience ?? concept.brief.audience ?? 'Non précisée'}</dd>
+                  <dt>Pattern</dt>
+                  <dd>{concept.pattern?.name ?? 'Aucun pattern lié'}</dd>
+                </dl>
+                <AppLink
+                  href={`/concepts/${concept.conceptVersionId}`}
+                  onNavigate={onNavigate}
+                  className="text-link"
+                >
+                  Ouvrir {concept.title}
+                </AppLink>
+              </article>
+            ))}
+          </section>
+        )}
+      </>
+    );
+  }
+
+  if (!detail)
+    return (
+      <section className="panel" aria-busy="true">
+        <p>Chargement de la version du concept…</p>
+      </section>
+    );
+
+  return (
+    <>
+      <section className="page-heading">
+        <p className="eyebrow">CONCEPT · VERSION {detail.version}</p>
+        <h1>{detail.title}</h1>
+        <p>
+          {detail.brief.campaign.name} · {detail.brief.title}
+        </p>
+      </section>
+
+      {!detail.decisionAllowed && (
+        <section className="panel stale-panel" role="alert">
+          <h2>Cette version n’est plus décisionnable</h2>
+          <p>
+            {detail.isLatest
+              ? `Le concept est maintenant ${detail.status}.`
+              : 'Une version plus récente existe. La décision est volontairement bloquée.'}
+          </p>
+        </section>
+      )}
+
+      <section className="concept-detail-grid">
+        <article className="panel">
+          <p className="eyebrow">ACCROCHE</p>
+          <blockquote>{detail.hook ?? 'Aucune accroche renseignée.'}</blockquote>
+
+          <dl className="detail-list">
+            <dt>Angle</dt>
+            <dd>{detail.angle ?? 'Non précisé'}</dd>
+            <dt>Audience</dt>
+            <dd>{detail.audience ?? detail.brief.audience ?? 'Non précisée'}</dd>
+            <dt>Objectif</dt>
+            <dd>{detail.objective ?? detail.brief.goal ?? 'Non précisé'}</dd>
+            <dt>Hypothèse</dt>
+            <dd>{detail.hypothesis ?? 'Non précisée'}</dd>
+            <dt>Pattern</dt>
+            <dd>
+              {detail.pattern ? `${detail.pattern.name} · v${detail.pattern.version}` : 'Aucun'}
+            </dd>
+          </dl>
+        </article>
+
+        <article className="panel">
+          <p className="eyebrow">RATIONALE</p>
+          <p>{detail.rationale ?? 'Aucune rationale renseignée.'}</p>
+        </article>
+      </section>
+
+      {detail.decisionAllowed && (
+        <section className="panel decision-panel">
+          <div className="section-head">
+            <div>
+              <p className="eyebrow">DÉCISION HUMAINE</p>
+              <h2>Valider cette version exacte</h2>
+            </div>
+            <span className="badge">v{detail.version}</span>
+          </div>
+
+          <label htmlFor="concept-reason">Raison du rejet</label>
+          <select
+            id="concept-reason"
+            value={reasonCode}
+            onChange={(event) => setReasonCode(event.target.value)}
+          >
+            <option value="">Optionnelle</option>
+            <option value="HOOK_WEAK">Hook faible</option>
+            <option value="ANGLE_TOO_GENERIC">Angle trop générique</option>
+            <option value="TOO_AD_LIKE">Trop publicitaire</option>
+            <option value="TOO_REPETITIVE">Trop répétitif</option>
+            <option value="NOT_TRUE_TO_VISION">Pas fidèle à Vision</option>
+            <option value="WRONG_AUDIENCE">Mauvaise audience</option>
+            <option value="OTHER">Autre</option>
+          </select>
+
+          <label htmlFor="concept-comment">Commentaire de review</label>
+          <textarea
+            id="concept-comment"
+            rows={4}
+            maxLength={1000}
+            value={comment}
+            onChange={(event) => setComment(event.target.value)}
+            placeholder="Optionnel · expliquez ce qui doit changer."
+          />
+
+          <div className="decision-actions">
+            <button
+              className="approve-button"
+              disabled={busy}
+              onClick={() => void onDecision('APPROVED', undefined, comment)}
+            >
+              Approuver le concept
+            </button>
+            <button
+              className="reject-button"
+              disabled={busy}
+              onClick={() => void onDecision('REJECTED', reasonCode || undefined, comment)}
+            >
+              Rejeter le concept
+            </button>
+          </div>
+        </section>
+      )}
+    </>
+  );
+}
+
 function RecordingPackView({
   packs,
   busy,
@@ -648,6 +873,8 @@ function App() {
   const [accessKey, setAccessKey] = useState('');
   const [dashboard, setDashboard] = useState<DashboardSummary | null>(null);
   const [attention, setAttention] = useState<AttentionItem[] | null>(null);
+  const [concepts, setConcepts] = useState<ConceptReviewItem[]>([]);
+  const [conceptDetail, setConceptDetail] = useState<ConceptReviewDetail | null>(null);
   const [packs, setPacks] = useState<Pack[]>([]);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -667,14 +894,16 @@ function App() {
   }
 
   async function refresh() {
-    const [summary, items, recordingPacks] = await Promise.all([
+    const [summary, items, conceptQueue, recordingPacks] = await Promise.all([
       call('dashboard', csrf),
       call('attention', csrf),
+      call('concepts/review', csrf),
       call('recording-packs', csrf),
     ]);
 
     setDashboard(summary as DashboardSummary);
     setAttention(items as AttentionItem[]);
+    setConcepts(conceptQueue as ConceptReviewItem[]);
     setPacks(recordingPacks as Pack[]);
   }
 
@@ -688,6 +917,19 @@ function App() {
   useEffect(() => {
     if (csrf) void refresh().catch((caught) => setError(String(caught.message)));
   }, [csrf]);
+
+  useEffect(() => {
+    const conceptVersionId = pathname.match(/^\/concepts\/([0-9a-f-]+)$/)?.[1];
+    if (!csrf || !conceptVersionId) {
+      setConceptDetail(null);
+      return;
+    }
+
+    setConceptDetail(null);
+    void call(`concepts/${conceptVersionId}`, csrf)
+      .then((value) => setConceptDetail(value as ConceptReviewDetail))
+      .catch((caught) => setError(caught instanceof Error ? caught.message : 'Action impossible.'));
+  }, [csrf, pathname]);
 
   async function action(work: () => Promise<void>) {
     setBusy(true);
@@ -824,6 +1066,8 @@ function App() {
                   setCsrf('');
                   setDashboard(null);
                   setAttention(null);
+                  setConcepts([]);
+                  setConceptDetail(null);
                   setPacks([]);
                 })
               }
@@ -847,6 +1091,34 @@ function App() {
             <DashboardView summary={dashboard} onNavigate={navigate} />
           ) : pathname === '/attention' ? (
             <AttentionView items={attention} onNavigate={navigate} />
+          ) : pathname === '/concepts' || pathname.startsWith('/concepts/') ? (
+            <ConceptReviewView
+              pathname={pathname}
+              concepts={concepts}
+              detail={conceptDetail}
+              busy={busy}
+              onNavigate={navigate}
+              onDecision={async (decision, reasonCode, comment) => {
+                const conceptVersionId = pathname.match(/^\/concepts\/([0-9a-f-]+)$/)?.[1];
+                if (!conceptVersionId) return;
+
+                await action(async () => {
+                  await call(`concepts/${conceptVersionId}/decision`, csrf, {
+                    decision,
+                    ...(reasonCode ? { reasonCode } : {}),
+                    ...(comment?.trim() ? { comment: comment.trim() } : {}),
+                  });
+                  await refresh();
+                  setConceptDetail(null);
+                  navigate('/concepts');
+                  setNotice(
+                    decision === 'APPROVED'
+                      ? 'Concept approuvé.'
+                      : 'Concept rejeté et feedback enregistré.',
+                  );
+                });
+              }}
+            />
           ) : pathname === '/production' ? (
             <RecordingPackView
               packs={packs}
