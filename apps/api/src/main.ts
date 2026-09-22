@@ -5,6 +5,7 @@ import {
   DashboardReadService,
   ProductionReadService,
   RecordingPackService,
+  RenderReviewService,
 } from '@vision/application';
 import { S3PrivateStorage } from '@vision/media';
 import { parseConfig } from '@vision/shared';
@@ -21,13 +22,12 @@ async function main() {
     if (!config.VCE_LOCAL_ACCESS_KEY || config.VCE_LOCAL_ACCESS_KEY.length < 32)
       throw new Error('LOCAL_AUTH_NOT_CONFIGURED');
 
-    const recordings = new RecordingPackService(
-      db,
-      new S3PrivateStorage(dependencies.storage, config.S3_BUCKET),
-    );
+    const storage = new S3PrivateStorage(dependencies.storage, config.S3_BUCKET);
+    const recordings = new RecordingPackService(db, storage);
     const dashboard = new DashboardReadService(db);
     const concepts = new ConceptReviewService(db);
     const production = new ProductionReadService(db);
+    const review = new RenderReviewService(db, storage);
 
     await recordings.recoverInterrupted();
     await recordings.prepareExisting();
@@ -41,6 +41,7 @@ async function main() {
       dashboard,
       concepts,
       production,
+      review,
     });
 
     const close = async () => {

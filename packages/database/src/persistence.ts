@@ -1211,7 +1211,13 @@ export class UnitOfWork {
     await this.tx.render.update({ where: { id }, data: { status: next } });
     await changed(this.tx, this.actor, `Render.${next.toLowerCase()}`, 'Render', id);
   }
-  async decideRender(id: string, decision: 'APPROVED' | 'REJECTED', outputAssetId?: string) {
+  async decideRender(
+    id: string,
+    decision: 'APPROVED' | 'REJECTED',
+    outputAssetId?: string,
+    comment?: string,
+    reasonCode?: string,
+  ) {
     assertHuman(this.actor);
     await lock(this.tx, 'Render', id);
     const render = await this.tx.render.findUniqueOrThrow({ where: { id } });
@@ -1220,11 +1226,19 @@ export class UnitOfWork {
     if (decision === 'APPROVED') {
       invariant(outputAssetId, 'EXACT_RENDER_ASSET_REQUIRED');
       const attempt = await this.tx.renderAttempt.findFirst({
-        where: { renderId: id, outputAssetId, status: 'SUCCEEDED' },
+        where: {
+          renderId: id,
+          status: 'SUCCEEDED',
+          creativeQaResult: { in: ['PASS', 'PASS_WITH_WARNINGS'] },
+          outputAssetId: { not: null },
+        },
+        orderBy: [{ attemptNumber: 'desc' }, { id: 'desc' }],
       });
       const asset = await this.tx.asset.findUnique({ where: { id: outputAssetId } });
       invariant(
-        attempt && asset?.status === 'READY' && asset.deletedAt === null,
+        attempt?.outputAssetId === outputAssetId &&
+          asset?.status === 'READY' &&
+          asset.deletedAt === null,
         'RENDER_OUTPUT_MISMATCH',
       );
     }
@@ -1233,6 +1247,8 @@ export class UnitOfWork {
         subjectType: 'RENDER',
         renderId: id,
         decision,
+        ...(reasonCode !== undefined ? { reasonCode } : {}),
+        ...(comment !== undefined ? { comment } : {}),
         actorType: 'USER',
         actorId: this.actor.actorId!,
       },

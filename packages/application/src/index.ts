@@ -16,3 +16,4 @@ export * from './technical-qa.js';
 export * from './dashboard-read.js';
 export * from './concept-review.js';
 export * from './production-read.js';
+export * from './render-review.js';

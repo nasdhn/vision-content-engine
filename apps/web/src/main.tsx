@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useMemo, useState } from 'react';
+import { StrictMode, useEffect, useMemo, useRef, useState } from 'react';
 import type { DragEvent, FormEvent, MouseEvent, ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './style.css';
@@ -195,6 +195,80 @@ type ProductionDetail = ProductionItem & {
   } | null;
 };
 
+type RenderReviewItem = {
+  renderId: string;
+  status: string;
+  title: string;
+  hook: string | null;
+  creativePlanVersionId: string;
+  creativePlanVersion: number;
+  primaryFormat: string;
+  targetDurationMs: number | null;
+  creativeQaResult: 'PASS' | 'PASS_WITH_WARNINGS';
+  creativeQaSummary: string;
+  issueCount: number;
+  createdAt: string;
+};
+
+type RenderReviewDetail = RenderReviewItem & {
+  decisionAllowed: boolean;
+  concept: {
+    angle: string | null;
+    audience: string | null;
+    objective: string | null;
+    hypothesis: string | null;
+    rationale: string | null;
+  };
+  script: {
+    fullText: string;
+    estimatedDurationMs: number | null;
+    voiceMode: string;
+  };
+  cta: unknown;
+  platformIntent: unknown;
+  creativeQa: {
+    result: 'PASS' | 'PASS_WITH_WARNINGS';
+    summary: string;
+    evaluatedDimensions: string[];
+    notEvaluatedDimensions: string[];
+    issues: {
+      code: string;
+      severity: 'WARNING' | 'ERROR';
+      startMs: number | null;
+      endMs: number | null;
+      explanation: string;
+      suggestedFix: string | null;
+    }[];
+  };
+  technicalQa: {
+    result: 'PASS';
+    durationMs: number;
+    width: number | null;
+    height: number | null;
+    fps: number | null;
+    rendererVersion: string;
+    colorProfileKey: string;
+    codecProfileKey: string;
+    audioProfileKey: string;
+    checks: { key: string; status: string; message: string | null }[];
+  };
+  lineage: {
+    editingPlanVersionId: string;
+    creativePlanVersionId: string;
+    renderAttemptId: string;
+    attemptNumber: number;
+    outputAssetId: string;
+    approvedAssetId: string | null;
+  };
+  previousDecision: {
+    id: string;
+    decision: string;
+    reasonCode: string | null;
+    comment: string | null;
+    createdAt: string;
+  } | null;
+};
+
 const labels: Record<string, string> = {
   ACCEPTED: 'Prise sélectionnée',
   UPLOADED: 'Sélection requise',
@@ -221,6 +295,12 @@ const labels: Record<string, string> = {
   RENDERING: 'Rendu',
   FAILED: 'Échec',
   DONE: 'Terminé',
+  PASS: 'Validé',
+  PASS_WITH_WARNINGS: 'Validé avec avertissements',
+  WARNING: 'Avertissement',
+  ERROR: 'Erreur',
+  READY_FOR_REVIEW: 'Prêt pour review',
+  APPROVED: 'Approuvé',
 };
 
 const errors: Record<string, string> = {
@@ -235,16 +315,23 @@ const errors: Record<string, string> = {
     'Le fichier est illisible ou le transfert a échoué. Réessayez avec une nouvelle prise.',
   INVALID_RECORDING_ASSET: 'Ce fichier ne peut pas être sélectionné.',
   PREVIEW_CAPACITY_REACHED: 'Une prévisualisation est en cours. Réessayez dans un instant.',
-  ASSET_NOT_AVAILABLE: 'Fichier indisponible. Envoyez une nouvelle prise.',
+  ASSET_NOT_AVAILABLE: 'Fichier privé indisponible. Rechargez l’état avant de réessayer.',
   DASHBOARD_OPERATION_FAILED: 'Le tableau de bord est momentanément indisponible.',
   CONCEPT_OPERATION_FAILED: 'La review du concept est momentanément indisponible.',
   CONCEPT_VERSION_NOT_FOUND: 'Cette version de concept est introuvable.',
   STALE_VERSION: 'Une version plus récente existe. Rechargez la review avant de décider.',
-  INVALID_TRANSITION: 'Ce concept ne peut plus être validé depuis cet état.',
+  INVALID_TRANSITION: 'Cet élément ne peut plus être validé depuis son état actuel.',
   EXPLICIT_SELECTION_REQUIRED: 'Une sélection explicite de version est déjà en cours.',
   INVALID_CONCEPT_REASON: 'La raison de rejet n’est pas valide.',
   PRODUCTION_OPERATION_FAILED: 'La production est momentanément indisponible.',
   CREATIVE_PLAN_VERSION_NOT_FOUND: 'Cette version de production est introuvable.',
+  REVIEW_OPERATION_FAILED: 'La review finale est momentanément indisponible.',
+  RENDER_NOT_FOUND: 'Ce rendu est introuvable.',
+  RENDER_NOT_REVIEWABLE: 'Ce rendu n’est pas disponible pour cette review.',
+  RENDER_OUTPUT_MISMATCH: 'La sortie du rendu ne correspond plus à la lineage attendue.',
+  RENDER_REVIEW_EVIDENCE_INVALID: 'Les preuves QA du rendu sont incomplètes.',
+  RENDER_REJECTION_REASON_REQUIRED: 'Choisissez une raison avant de rejeter le rendu.',
+  INVALID_RENDER_REASON: 'La raison de rejet du rendu n’est pas valide.',
 };
 
 const navigation = [
@@ -263,10 +350,6 @@ const navigation = [
 ] as const;
 
 const deferredTitles: Record<string, { title: string; note: string }> = {
-  '/review': {
-    title: 'Review finale',
-    note: 'La review vidéo finale arrive dans la tranche 6D.',
-  },
   '/calendar': {
     title: 'Calendrier',
     note: 'Lecture uniquement en Phase 6. Le scheduling appartient à la Phase 7.',
@@ -1149,6 +1232,333 @@ function RecordingPackView({
   );
 }
 
+function readableEvidence(value: unknown): string {
+  if (value === null || value === undefined) return 'Non précisé';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return 'Valeur indisponible';
+  }
+}
+
+function RenderReviewView({
+  pathname,
+  items,
+  detail,
+  busy,
+  onNavigate,
+  onDecision,
+}: {
+  pathname: string;
+  items: RenderReviewItem[];
+  detail: RenderReviewDetail | null;
+  busy: boolean;
+  onNavigate: (path: string) => void;
+  onDecision: (
+    decision: 'APPROVED' | 'REJECTED',
+    reasonCode?: string,
+    comment?: string,
+  ) => Promise<void>;
+}) {
+  const [reasonCode, setReasonCode] = useState('');
+  const [comment, setComment] = useState('');
+  const player = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    setReasonCode('');
+    setComment('');
+  }, [detail?.renderId]);
+
+  if (pathname === '/review') {
+    return (
+      <>
+        <section className="page-heading">
+          <p className="eyebrow">HUMAN GATE · 2/2</p>
+          <h1>Review finale</h1>
+          <p>Inspectez le master exact rendu et validé par les contrôles QA avant publication.</p>
+        </section>
+
+        {!items.length ? (
+          <section className="panel empty-state">
+            <h2>Aucun rendu à valider</h2>
+            <p>La file contient uniquement les Render au statut READY_FOR_REVIEW.</p>
+          </section>
+        ) : (
+          <section className="review-grid" aria-label="Rendus prêts pour review">
+            {items.map((item) => (
+              <article className="review-card" key={item.renderId}>
+                <div className="review-card-top">
+                  <span className="badge">{labels[item.creativeQaResult]}</span>
+                  <time dateTime={item.createdAt}>
+                    {new Date(item.createdAt).toLocaleString('fr-FR')}
+                  </time>
+                </div>
+                <h2>{item.title}</h2>
+                {item.hook && <blockquote>{item.hook}</blockquote>}
+                <p className="muted">
+                  Plan créatif v{item.creativePlanVersion} · {item.primaryFormat}
+                </p>
+                <p>{item.creativeQaSummary}</p>
+                <p className="muted">
+                  {item.issueCount
+                    ? `${item.issueCount} point${item.issueCount > 1 ? 's' : ''} QA à inspecter`
+                    : 'Aucun avertissement Creative QA'}
+                </p>
+                <AppLink
+                  href={`/review/${item.renderId}`}
+                  onNavigate={onNavigate}
+                  className="text-link"
+                >
+                  Ouvrir la review finale
+                </AppLink>
+              </article>
+            ))}
+          </section>
+        )}
+      </>
+    );
+  }
+
+  if (!detail)
+    return (
+      <section className="panel" aria-busy="true">
+        <p>Chargement du rendu final…</p>
+      </section>
+    );
+
+  const seek = (startMs: number | null) => {
+    if (startMs === null || !player.current) return;
+    player.current.currentTime = startMs / 1000;
+    void player.current.play().catch(() => {});
+  };
+
+  return (
+    <>
+      <section className="page-heading review-heading">
+        <div>
+          <p className="eyebrow">FINAL RENDER · PLAN V{detail.creativePlanVersion}</p>
+          <h1>{detail.title}</h1>
+          <p>{detail.hook ?? 'Aucune accroche renseignée.'}</p>
+        </div>
+        <span className="badge">{labels[detail.status] ?? detail.status}</span>
+      </section>
+
+      {!detail.decisionAllowed && (
+        <section className="panel stale-panel" role="status">
+          <h2>Décision déjà enregistrée</h2>
+          <p>
+            Ce rendu est maintenant {labels[detail.status]?.toLowerCase() ?? detail.status}. La
+            preview reste accessible pour audit.
+          </p>
+        </section>
+      )}
+
+      <section className="review-layout">
+        <article className="panel review-player-panel">
+          <div className="section-head">
+            <div>
+              <p className="eyebrow">MASTER PRIVÉ</p>
+              <h2>Rendu exact à valider</h2>
+            </div>
+            <span className="badge">{Math.round(detail.technicalQa.durationMs / 1000)} s</span>
+          </div>
+          <div className="vertical-player-frame">
+            <video
+              ref={player}
+              controls
+              playsInline
+              preload="metadata"
+              src={`/api/review/${detail.renderId}/media`}
+              aria-label="Rendu final à valider"
+            />
+          </div>
+          <p className="muted">
+            {detail.technicalQa.width ?? '—'}×{detail.technicalQa.height ?? '—'} ·{' '}
+            {detail.technicalQa.fps ?? '—'} fps · {detail.technicalQa.codecProfileKey}
+          </p>
+        </article>
+
+        <div className="review-side">
+          <article className="panel">
+            <p className="eyebrow">CREATIVE QA</p>
+            <div className="section-head compact">
+              <h2>{labels[detail.creativeQa.result]}</h2>
+              <span className={`qa-result qa-${detail.creativeQa.result.toLowerCase()}`}>
+                {detail.creativeQa.result}
+              </span>
+            </div>
+            <p>{detail.creativeQa.summary}</p>
+
+            {detail.creativeQa.issues.length ? (
+              <ul className="qa-issues">
+                {detail.creativeQa.issues.map((issue, index) => (
+                  <li key={`${issue.code}-${index}`}>
+                    <div>
+                      <strong>{issue.code.replaceAll('_', ' ')}</strong>
+                      <span className={`issue-severity severity-${issue.severity.toLowerCase()}`}>
+                        {labels[issue.severity]}
+                      </span>
+                    </div>
+                    <p>{issue.explanation}</p>
+                    {issue.suggestedFix && <p className="muted">{issue.suggestedFix}</p>}
+                    {issue.startMs !== null && (
+                      <button
+                        className="timestamp-button"
+                        type="button"
+                        onClick={() => seek(issue.startMs)}
+                      >
+                        Aller à {(issue.startMs / 1000).toFixed(1)} s
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="muted">Aucune issue Creative QA signalée.</p>
+            )}
+          </article>
+
+          <article className="panel">
+            <p className="eyebrow">CONTENU</p>
+            <h2>Script & intention</h2>
+            <blockquote>{detail.script.fullText}</blockquote>
+            <dl className="detail-list">
+              <dt>Angle</dt>
+              <dd>{detail.concept.angle ?? 'Non précisé'}</dd>
+              <dt>Audience</dt>
+              <dd>{detail.concept.audience ?? 'Non précisée'}</dd>
+              <dt>Objectif</dt>
+              <dd>{detail.concept.objective ?? 'Non précisé'}</dd>
+              <dt>Hypothèse</dt>
+              <dd>{detail.concept.hypothesis ?? 'Non précisée'}</dd>
+              <dt>Rationale</dt>
+              <dd>{detail.concept.rationale ?? 'Non précisée'}</dd>
+              <dt>CTA</dt>
+              <dd>
+                <pre className="evidence-value">{readableEvidence(detail.cta)}</pre>
+              </dd>
+              <dt>Intent plateforme</dt>
+              <dd>
+                <pre className="evidence-value">{readableEvidence(detail.platformIntent)}</pre>
+              </dd>
+            </dl>
+          </article>
+        </div>
+      </section>
+
+      <section className="review-evidence-grid">
+        <article className="panel">
+          <p className="eyebrow">TECHNICAL QA</p>
+          <h2>{labels[detail.technicalQa.result]}</h2>
+          <dl className="detail-list">
+            <dt>Renderer</dt>
+            <dd>{detail.technicalQa.rendererVersion}</dd>
+            <dt>Couleur</dt>
+            <dd>{detail.technicalQa.colorProfileKey}</dd>
+            <dt>Audio</dt>
+            <dd>{detail.technicalQa.audioProfileKey}</dd>
+          </dl>
+          {detail.technicalQa.checks.length > 0 && (
+            <ul className="simple-list">
+              {detail.technicalQa.checks.map((check) => (
+                <li key={check.key}>
+                  <strong>{check.key}</strong>
+                  <span>{check.status}</span>
+                  {check.message && <small>{check.message}</small>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </article>
+
+        <article className="panel">
+          <p className="eyebrow">LINEAGE</p>
+          <h2>Version exacte</h2>
+          <dl className="detail-list lineage-list">
+            <dt>Render</dt>
+            <dd>{detail.renderId}</dd>
+            <dt>RenderAttempt</dt>
+            <dd>
+              #{detail.lineage.attemptNumber} · {detail.lineage.renderAttemptId}
+            </dd>
+            <dt>EditingPlanVersion</dt>
+            <dd>{detail.lineage.editingPlanVersionId}</dd>
+            <dt>CreativePlanVersion</dt>
+            <dd>{detail.lineage.creativePlanVersionId}</dd>
+            <dt>Output Asset</dt>
+            <dd>{detail.lineage.outputAssetId}</dd>
+          </dl>
+        </article>
+      </section>
+
+      {detail.decisionAllowed && (
+        <section className="panel decision-panel render-decision-panel">
+          <div className="section-head">
+            <div>
+              <p className="eyebrow">DÉCISION HUMAINE FINALE</p>
+              <h2>Approuver ou rejeter ce master exact</h2>
+            </div>
+            <span className="badge">Gate 2/2</span>
+          </div>
+
+          <label htmlFor="render-reason">Raison du rejet</label>
+          <select
+            id="render-reason"
+            value={reasonCode}
+            onChange={(event) => setReasonCode(event.target.value)}
+          >
+            <option value="">Requise uniquement pour rejeter</option>
+            <option value="PACING_TOO_SLOW">Pacing trop lent</option>
+            <option value="PACING_TOO_FAST">Pacing trop rapide</option>
+            <option value="CUTS_TOO_MECHANICAL">Cuts trop mécaniques</option>
+            <option value="CAPTIONS_TOO_BUSY">Sous-titres trop chargés</option>
+            <option value="PRODUCT_NOT_VISIBLE_ENOUGH">Produit pas assez visible</option>
+            <option value="HOOK_VISUALLY_WEAK">Hook visuel faible</option>
+            <option value="SOUND_TOO_BUSY">Sound design trop chargé</option>
+            <option value="CTA_TOO_LONG">CTA trop long</option>
+            <option value="GREEN_SCREEN_BAD_PLACEMENT">Placement fond vert incorrect</option>
+            <option value="SCRIPT_VISUAL_MISMATCH">Décalage script / visuel</option>
+            <option value="OTHER">Autre</option>
+          </select>
+
+          <label htmlFor="render-comment">Commentaire de review</label>
+          <textarea
+            id="render-comment"
+            rows={4}
+            maxLength={1000}
+            value={comment}
+            onChange={(event) => setComment(event.target.value)}
+            placeholder="Optionnel · précisez ce qui doit changer."
+          />
+
+          <div className="decision-actions">
+            <button
+              className="approve-button"
+              disabled={busy}
+              onClick={() => void onDecision('APPROVED', undefined, comment)}
+            >
+              Approuver le rendu final
+            </button>
+            <button
+              className="reject-button"
+              disabled={busy || !reasonCode}
+              onClick={() => void onDecision('REJECTED', reasonCode || undefined, comment)}
+            >
+              Rejeter le rendu
+            </button>
+          </div>
+        </section>
+      )}
+
+      <AppLink href="/review" onNavigate={onNavigate} className="text-link">
+        Retour à la file de review
+      </AppLink>
+    </>
+  );
+}
+
 function DeferredView({ pathname }: { pathname: string }) {
   const base = `/${pathname.split('/').filter(Boolean)[0] ?? ''}`;
   const content = deferredTitles[base] ?? {
@@ -1175,6 +1585,8 @@ function App() {
   const [conceptDetail, setConceptDetail] = useState<ConceptReviewDetail | null>(null);
   const [productions, setProductions] = useState<ProductionItem[]>([]);
   const [productionDetail, setProductionDetail] = useState<ProductionDetail | null>(null);
+  const [reviews, setReviews] = useState<RenderReviewItem[]>([]);
+  const [reviewDetail, setReviewDetail] = useState<RenderReviewDetail | null>(null);
   const [packs, setPacks] = useState<Pack[]>([]);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -1198,24 +1610,35 @@ function App() {
 
   async function refresh() {
     const productionVersionId = pathname.match(/^\/production\/([0-9a-f-]+)$/)?.[1];
-    const [summary, items, conceptQueue, productionQueue, recordingPacks, currentProduction] =
-      await Promise.all([
-        call('dashboard', csrf),
-        call('attention', csrf),
-        call('concepts/review', csrf),
-        call('production', csrf),
-        call('recording-packs', csrf),
-        productionVersionId
-          ? call(`production/${productionVersionId}`, csrf)
-          : Promise.resolve(null),
-      ]);
+    const reviewRenderId = pathname.match(/^\/review\/([0-9a-f-]+)$/)?.[1];
+    const [
+      summary,
+      items,
+      conceptQueue,
+      productionQueue,
+      reviewQueue,
+      recordingPacks,
+      currentProduction,
+      currentReview,
+    ] = await Promise.all([
+      call('dashboard', csrf),
+      call('attention', csrf),
+      call('concepts/review', csrf),
+      call('production', csrf),
+      call('review', csrf),
+      call('recording-packs', csrf),
+      productionVersionId ? call(`production/${productionVersionId}`, csrf) : Promise.resolve(null),
+      reviewRenderId ? call(`review/${reviewRenderId}`, csrf) : Promise.resolve(null),
+    ]);
 
     setDashboard(summary as DashboardSummary);
     setAttention(items as AttentionItem[]);
     setConcepts(conceptQueue as ConceptReviewItem[]);
     setProductions(productionQueue as ProductionItem[]);
+    setReviews(reviewQueue as RenderReviewItem[]);
     setPacks(recordingPacks as Pack[]);
     if (productionVersionId) setProductionDetail(currentProduction as ProductionDetail);
+    if (reviewRenderId) setReviewDetail(currentReview as RenderReviewDetail);
   }
 
   useEffect(() => {
@@ -1252,6 +1675,19 @@ function App() {
     setProductionDetail(null);
     void call(`production/${creativePlanVersionId}`, csrf)
       .then((value) => setProductionDetail(value as ProductionDetail))
+      .catch((caught) => setError(caught instanceof Error ? caught.message : 'Action impossible.'));
+  }, [csrf, pathname]);
+
+  useEffect(() => {
+    const renderId = pathname.match(/^\/review\/([0-9a-f-]+)$/)?.[1];
+    if (!csrf || !renderId) {
+      setReviewDetail(null);
+      return;
+    }
+
+    setReviewDetail(null);
+    void call(`review/${renderId}`, csrf)
+      .then((value) => setReviewDetail(value as RenderReviewDetail))
       .catch((caught) => setError(caught instanceof Error ? caught.message : 'Action impossible.'));
   }, [csrf, pathname]);
 
@@ -1394,6 +1830,8 @@ function App() {
                   setConceptDetail(null);
                   setProductions([]);
                   setProductionDetail(null);
+                  setReviews([]);
+                  setReviewDetail(null);
                   setPacks([]);
                 })
               }
@@ -1459,6 +1897,34 @@ function App() {
               drop={drop}
               setNotice={setNotice}
               onNavigate={navigate}
+            />
+          ) : pathname === '/review' || pathname.startsWith('/review/') ? (
+            <RenderReviewView
+              pathname={pathname}
+              items={reviews}
+              detail={reviewDetail}
+              busy={busy}
+              onNavigate={navigate}
+              onDecision={async (decision, reasonCode, comment) => {
+                const renderId = pathname.match(/^\/review\/([0-9a-f-]+)$/)?.[1];
+                if (!renderId) return;
+
+                await action(async () => {
+                  await call(`review/${renderId}/decision`, csrf, {
+                    decision,
+                    ...(reasonCode ? { reasonCode } : {}),
+                    ...(comment?.trim() ? { comment: comment.trim() } : {}),
+                  });
+                  await refresh();
+                  setReviewDetail(null);
+                  navigate('/review');
+                  setNotice(
+                    decision === 'APPROVED'
+                      ? 'Rendu final approuvé.'
+                      : 'Rendu rejeté et feedback enregistré.',
+                  );
+                });
+              }}
             />
           ) : (
             <DeferredView pathname={pathname} />

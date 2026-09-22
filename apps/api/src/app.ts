@@ -8,6 +8,7 @@ import type {
   DashboardReadService,
   ProductionReadService,
   RecordingPackService,
+  RenderReviewService,
 } from '@vision/application';
 
 import {
@@ -20,6 +21,7 @@ import { DashboardController, DASHBOARD } from './dashboard.js';
 import { ConceptReviewController, CONCEPT_REVIEW } from './concepts.js';
 import { ProductionController, PRODUCTION_READ } from './production.js';
 import { RecordingController, RECORDINGS } from './recordings.js';
+import { RenderReviewController, RENDER_REVIEW } from './review.js';
 
 const PROBES = Symbol('bootstrap-readiness-probes');
 
@@ -29,6 +31,7 @@ export type ApiBusinessOptions = {
   dashboard?: DashboardReadService;
   concepts?: ConceptReviewService;
   production?: ProductionReadService;
+  review?: RenderReviewService;
 };
 
 @Controller()
@@ -57,6 +60,7 @@ export async function createApi(probes: ReadinessProbes, business?: ApiBusinessO
       ...(business?.dashboard ? [DashboardController] : []),
       ...(business?.concepts ? [ConceptReviewController] : []),
       ...(business?.production ? [ProductionController] : []),
+      ...(business?.review ? [RenderReviewController] : []),
     ],
     providers: [
       { provide: PROBES, useValue: probes },
@@ -97,6 +101,14 @@ export async function createApi(probes: ReadinessProbes, business?: ApiBusinessO
             {
               provide: PRODUCTION_READ,
               useValue: business.production,
+            },
+          ]
+        : []),
+      ...(business?.review
+        ? [
+            {
+              provide: RENDER_REVIEW,
+              useValue: business.review,
             },
           ]
         : []),
