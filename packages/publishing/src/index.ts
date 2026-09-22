@@ -196,6 +196,23 @@ export type ReconcileResult =
   | Readonly<{ kind: 'UNKNOWN' }>
   | Readonly<{ kind: 'ABSENT_RETRY_ELIGIBLE' }>;
 
+export type PlatformAccountSnapshot = Readonly<{
+  id: string;
+  platform: z.infer<typeof PlatformSchema>;
+  remoteAccountId: string;
+  capabilities: PlatformCapabilities | null;
+}>;
+
+export type PlatformAccountHealthResult =
+  | Readonly<{
+      kind: 'ACTIVE';
+      remoteAccountId: string;
+      capabilities: PlatformCapabilities;
+    }>
+  | Readonly<{ kind: 'REAUTH_REQUIRED'; failureCode: string }>
+  | Readonly<{ kind: 'ERROR'; failureCode: string }>
+  | Readonly<{ kind: 'UNAVAILABLE'; failureCode: string }>;
+
 export interface PlatformPublisher {
   readonly platform: z.infer<typeof PlatformSchema>;
   readonly isRealProvider: boolean;
@@ -205,6 +222,7 @@ export interface PlatformPublisher {
     preparation: PublishPreparation,
   ): Promise<PublishResult>;
   reconcile(publication: PublicationSnapshot): Promise<ReconcileResult>;
+  checkAccount?(account: PlatformAccountSnapshot): Promise<PlatformAccountHealthResult>;
 }
 
 export type PublisherRegistry = Readonly<{
@@ -284,21 +302,27 @@ export function retryDelayMs(
 export class FakePublisher implements PlatformPublisher {
   readonly isRealProvider = false;
   readonly calls: Array<
-    Readonly<{ kind: 'PREPARE' | 'PUBLISH' | 'RECONCILE'; operationId: string }>
+    Readonly<{
+      kind: 'PREPARE' | 'PUBLISH' | 'RECONCILE' | 'CHECK_ACCOUNT';
+      operationId: string;
+    }>
   > = [];
 
   private readonly publishResults: PublishResult[];
   private readonly reconcileResults: ReconcileResult[];
+  private readonly accountHealthResults: PlatformAccountHealthResult[];
 
   constructor(
     readonly platform: z.infer<typeof PlatformSchema>,
     options: Readonly<{
       publishResults?: readonly PublishResult[];
       reconcileResults?: readonly ReconcileResult[];
+      accountHealthResults?: readonly PlatformAccountHealthResult[];
     }> = {},
   ) {
     this.publishResults = [...(options.publishResults ?? [])];
     this.reconcileResults = [...(options.reconcileResults ?? [])];
+    this.accountHealthResults = [...(options.accountHealthResults ?? [])];
   }
 
   async prepare(publication: PublicationSnapshot): Promise<PublishPreparation> {
@@ -324,6 +348,27 @@ export class FakePublisher implements PlatformPublisher {
   async reconcile(publication: PublicationSnapshot): Promise<ReconcileResult> {
     this.calls.push({ kind: 'RECONCILE', operationId: publication.operationId });
     return this.reconcileResults.shift() ?? { kind: 'UNKNOWN' };
+  }
+
+  async checkAccount(account: PlatformAccountSnapshot): Promise<PlatformAccountHealthResult> {
+    this.calls.push({ kind: 'CHECK_ACCOUNT', operationId: account.id });
+    return (
+      this.accountHealthResults.shift() ?? {
+        kind: 'ACTIVE',
+        remoteAccountId: account.remoteAccountId,
+        capabilities:
+          account.capabilities ??
+          PlatformCapabilitiesSchema.parse({
+            schemaVersion: 'v1',
+            canPublishVideo: true,
+            canPublishPublic: false,
+            supportsNativeScheduling: false,
+            deliveryMode: this.platform === 'TIKTOK' ? 'MANUAL_HANDOFF' : 'API_AUTOMATED',
+            limitations: [],
+            checkedAt: new Date(0).toISOString(),
+          }),
+      }
+    );
   }
 }
 

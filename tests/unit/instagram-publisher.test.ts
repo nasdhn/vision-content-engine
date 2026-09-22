@@ -304,3 +304,43 @@ it('rejects incompatible Reel media before credentials or provider calls', async
   ).rejects.toBeInstanceOf(ProviderPublishError);
   expect(credentialCalls).toBe(0);
 });
+
+it('refreshes Instagram account health and classifies lost authorization without publishing', async () => {
+  const healthy = new InstagramGraphPublisher(credentials(), leaseProvider(), {
+    apiVersion: 'v25.0',
+    graphBaseUrl: 'https://graph.example.test',
+    fetchImpl: async () =>
+      response({ data: [{ quota_usage: 2, config: { quota_total: 50, quota_duration: 86400 } }] }),
+    now: () => now,
+  });
+  await expect(
+    healthy.checkAccount!({
+      id: snapshot().account.id,
+      platform: 'INSTAGRAM',
+      remoteAccountId: snapshot().account.remoteAccountId,
+      capabilities: snapshot().account.capabilities,
+    }),
+  ).resolves.toMatchObject({
+    kind: 'ACTIVE',
+    remoteAccountId: snapshot().account.remoteAccountId,
+    capabilities: { canPublishVideo: true, checkedAt: now.toISOString() },
+  });
+
+  const expired = new InstagramGraphPublisher(
+    {
+      async resolve() {
+        return { accessToken: token, expiresAt: '2026-09-21T12:00:00.000Z' };
+      },
+    },
+    leaseProvider(),
+    { apiVersion: 'v25.0', graphBaseUrl: 'https://graph.example.test', now: () => now },
+  );
+  await expect(
+    expired.checkAccount!({
+      id: snapshot().account.id,
+      platform: 'INSTAGRAM',
+      remoteAccountId: snapshot().account.remoteAccountId,
+      capabilities: snapshot().account.capabilities,
+    }),
+  ).resolves.toEqual({ kind: 'REAUTH_REQUIRED', failureCode: 'INSTAGRAM_AUTH_REQUIRED' });
+});

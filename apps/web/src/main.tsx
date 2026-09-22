@@ -419,6 +419,46 @@ type TemplateReadItem = {
   updatedAt: string;
 };
 
+type DistributionOverview = {
+  generatedAt: string;
+  safety: { realProvidersEnabled: boolean };
+  accounts: {
+    id: string;
+    platform: string;
+    displayName: string;
+    status: string;
+    credentialsConfigured: boolean;
+    capabilities: null | {
+      canPublishVideo: boolean;
+      canPublishPublic: boolean;
+      supportsNativeScheduling: boolean;
+      checkedAt: string;
+      limitations: string[];
+    };
+    refreshAllowed: boolean;
+    updatedAt: string;
+  }[];
+  publications: {
+    publicationId: string;
+    platform: string;
+    accountName: string;
+    accountStatus: string;
+    deliveryMode: string;
+    status: string;
+    scheduledAt: string | null;
+    updatedAt: string;
+    latestAttempt: null | {
+      id: string;
+      attemptNumber: number;
+      status: string;
+      responseClass: string | null;
+      failureCode: string | null;
+      createdAt: string;
+    };
+    actions: { reconcile: boolean; reschedule: boolean; cancel: boolean };
+  }[];
+};
+
 type SettingsSummary = {
   environment: string;
   webOrigin: string;
@@ -519,6 +559,14 @@ const errors: Record<string, string> = {
   INVALID_PUBLICATION_TRANSITION: 'Cette publication a déjà changé d’état. Rechargez la page.',
   PLATFORM_ACCOUNT_NOT_ACTIVE: 'Le compte TikTok n’est plus actif.',
   PUBLICATION_LINEAGE_INVALID: 'La lineage de cette publication n’est plus valide.',
+  DISTRIBUTION_OPERATION_FAILED: 'Les contrôles de distribution sont momentanément indisponibles.',
+  RECONCILIATION_REQUIRED: 'Cette publication ne nécessite plus de réconciliation.',
+  PUBLICATION_RESCHEDULE_NOT_SAFE: 'Cette publication ne peut plus être replanifiée.',
+  REAL_PROVIDERS_DISABLED: 'Les providers réels restent désactivés pour cette phase.',
+  ACCOUNT_HEALTH_REFRESH_UNAVAILABLE:
+    'Le contrôle distant de ce compte n’est pas encore disponible.',
+  PLATFORM_ACCOUNT_DISABLED: 'Ce compte plateforme est désactivé.',
+  PLATFORM_ACCOUNT_IDENTITY_MISMATCH: 'L’identité distante ne correspond plus au compte configuré.',
 };
 
 const navigation = [
@@ -528,6 +576,7 @@ const navigation = [
   ['/production', 'Production'],
   ['/review', 'Review finale'],
   ['/manual-publish', 'TikTok manuel'],
+  ['/distribution', 'Distribution'],
   ['/calendar', 'Calendrier'],
   ['/published', 'Publiées'],
   ['/assets', 'Assets'],
@@ -2425,6 +2474,206 @@ function SettingsView({ summary }: { summary: SettingsSummary | null }) {
   );
 }
 
+function DistributionView({
+  model,
+  busy,
+  onReconcile,
+  onCancel,
+  onReschedule,
+  onRefreshAccount,
+}: {
+  model: DistributionOverview | null;
+  busy: boolean;
+  onReconcile: (publicationId: string) => Promise<void>;
+  onCancel: (publicationId: string) => Promise<void>;
+  onReschedule: (publicationId: string, scheduledAt: string) => Promise<void>;
+  onRefreshAccount: (accountId: string) => Promise<void>;
+}) {
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+
+  return (
+    <>
+      <section className="page-heading">
+        <p className="eyebrow">PHASE 7E</p>
+        <h1>Distribution</h1>
+        <p>
+          Réconciliation des états ambigus, planification sûre et santé des comptes. Aucun bouton ne
+          contourne PUBLISHING_UNKNOWN.
+        </p>
+      </section>
+
+      <section className="panel">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">COMPTES</p>
+            <h2>Santé des plateformes</h2>
+          </div>
+          <span className="status-chip">
+            Providers réels {model?.safety.realProvidersEnabled ? 'activés' : 'désactivés'}
+          </span>
+        </div>
+        {!model ? (
+          <p>Chargement…</p>
+        ) : model.accounts.length === 0 ? (
+          <p>Aucun compte plateforme configuré.</p>
+        ) : (
+          <div className="support-grid">
+            {model.accounts.map((account) => (
+              <article className="support-card" key={account.id}>
+                <p className="eyebrow">{account.platform}</p>
+                <h3>{account.displayName}</h3>
+                <dl className="detail-list compact-list">
+                  <div>
+                    <dt>État</dt>
+                    <dd>{account.status}</dd>
+                  </div>
+                  <div>
+                    <dt>Credentials</dt>
+                    <dd>{account.credentialsConfigured ? 'Configurés' : 'Absents'}</dd>
+                  </div>
+                  <div>
+                    <dt>Capabilities</dt>
+                    <dd>
+                      {account.capabilities
+                        ? `Vérifiées ${new Date(account.capabilities.checkedAt).toLocaleString('fr-FR')}`
+                        : 'Non vérifiées'}
+                    </dd>
+                  </div>
+                </dl>
+                {account.capabilities?.limitations.length ? (
+                  <p className="support-note">{account.capabilities.limitations.join(' · ')}</p>
+                ) : null}
+                <button
+                  className="secondary-button"
+                  disabled={busy || !account.refreshAllowed}
+                  onClick={() => void onRefreshAccount(account.id)}
+                >
+                  Vérifier le compte
+                </button>
+                {!account.refreshAllowed && (
+                  <p className="support-note">
+                    Refresh distant verrouillé tant que le provider live n’est pas activé.
+                  </p>
+                )}
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="panel">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">OPÉRATIONS</p>
+            <h2>Publications à piloter</h2>
+          </div>
+        </div>
+        {!model ? (
+          <p>Chargement…</p>
+        ) : model.publications.length === 0 ? (
+          <p>Aucune publication ne nécessite de contrôle opérateur.</p>
+        ) : (
+          <div className="support-grid">
+            {model.publications.map((publication) => (
+              <article className="support-card" key={publication.publicationId}>
+                <p className="eyebrow">{publication.platform}</p>
+                <h3>{publication.accountName}</h3>
+                <dl className="detail-list compact-list">
+                  <div>
+                    <dt>Publication</dt>
+                    <dd>{publication.status}</dd>
+                  </div>
+                  <div>
+                    <dt>Compte</dt>
+                    <dd>{publication.accountStatus}</dd>
+                  </div>
+                  <div>
+                    <dt>Mode</dt>
+                    <dd>{publication.deliveryMode}</dd>
+                  </div>
+                  <div>
+                    <dt>Prévue</dt>
+                    <dd>
+                      {publication.scheduledAt
+                        ? new Date(publication.scheduledAt).toLocaleString('fr-FR')
+                        : '—'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Dernier attempt</dt>
+                    <dd>
+                      {publication.latestAttempt
+                        ? `${publication.latestAttempt.status}${publication.latestAttempt.failureCode ? ` · ${publication.latestAttempt.failureCode}` : ''}`
+                        : 'Aucun'}
+                    </dd>
+                  </div>
+                </dl>
+                <div className="distribution-actions">
+                  {publication.actions.reconcile && (
+                    <button
+                      className="primary-button"
+                      disabled={busy}
+                      onClick={() => void onReconcile(publication.publicationId)}
+                    >
+                      Demander la réconciliation
+                    </button>
+                  )}
+                  {publication.actions.reschedule && (
+                    <div className="reschedule-control">
+                      <label htmlFor={`reschedule-${publication.publicationId}`}>
+                        Nouvelle heure
+                      </label>
+                      <input
+                        id={`reschedule-${publication.publicationId}`}
+                        type="datetime-local"
+                        value={drafts[publication.publicationId] ?? ''}
+                        onChange={(event) =>
+                          setDrafts((current) => ({
+                            ...current,
+                            [publication.publicationId]: event.target.value,
+                          }))
+                        }
+                      />
+                      <button
+                        className="secondary-button"
+                        disabled={busy || !drafts[publication.publicationId]}
+                        onClick={() => {
+                          const value = drafts[publication.publicationId];
+                          if (!value) return;
+                          void onReschedule(
+                            publication.publicationId,
+                            new Date(value).toISOString(),
+                          );
+                        }}
+                      >
+                        Replanifier
+                      </button>
+                    </div>
+                  )}
+                  {publication.actions.cancel && (
+                    <button
+                      className="ghost-button"
+                      disabled={busy}
+                      onClick={() => void onCancel(publication.publicationId)}
+                    >
+                      Annuler
+                    </button>
+                  )}
+                </div>
+                {publication.status === 'PUBLISHING_UNKNOWN' && (
+                  <p className="support-note">
+                    Aucun retry direct n’est autorisé avant preuve de réconciliation.
+                  </p>
+                )}
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+    </>
+  );
+}
+
 function AnalyticsDeferredView() {
   return (
     <>
@@ -2483,6 +2732,7 @@ function App() {
   const [patterns, setPatterns] = useState<PatternReadItem[]>([]);
   const [templates, setTemplates] = useState<TemplateReadItem[]>([]);
   const [settings, setSettings] = useState<SettingsSummary | null>(null);
+  const [distribution, setDistribution] = useState<DistributionOverview | null>(null);
   const [packs, setPacks] = useState<Pack[]>([]);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -2522,6 +2772,7 @@ function App() {
       patternList,
       templateList,
       settingsRead,
+      distributionRead,
       recordingPacks,
       currentProduction,
       currentReview,
@@ -2540,6 +2791,7 @@ function App() {
       call('patterns', csrf),
       call('templates', csrf),
       call('settings/summary', csrf),
+      call('distribution', csrf),
       call('recording-packs', csrf),
       productionVersionId ? call(`production/${productionVersionId}`, csrf) : Promise.resolve(null),
       reviewRenderId ? call(`review/${reviewRenderId}`, csrf) : Promise.resolve(null),
@@ -2561,6 +2813,7 @@ function App() {
     setPatterns(patternList as PatternReadItem[]);
     setTemplates(templateList as TemplateReadItem[]);
     setSettings(settingsRead as SettingsSummary);
+    setDistribution(distributionRead as DistributionOverview);
     setPacks(recordingPacks as Pack[]);
     if (productionVersionId) setProductionDetail(currentProduction as ProductionDetail);
     if (reviewRenderId) setReviewDetail(currentReview as RenderReviewDetail);
@@ -2794,6 +3047,7 @@ function App() {
                   setPatterns([]);
                   setTemplates([]);
                   setSettings(null);
+                  setDistribution(null);
                   setPacks([]);
                 })
               }
@@ -2906,6 +3160,39 @@ function App() {
                   setManualHandoffDetail(null);
                   navigate('/published');
                   setNotice('Publication TikTok confirmée dans l’état canonique.');
+                });
+              }}
+            />
+          ) : pathname === '/distribution' ? (
+            <DistributionView
+              model={distribution}
+              busy={busy}
+              onReconcile={async (publicationId) => {
+                await action(async () => {
+                  await call(`distribution/${publicationId}/reconcile`, csrf, {});
+                  await refresh();
+                  setNotice('Réconciliation demandée sans retry aveugle.');
+                });
+              }}
+              onCancel={async (publicationId) => {
+                await action(async () => {
+                  await call(`distribution/${publicationId}/cancel`, csrf, {});
+                  await refresh();
+                  setNotice('Publication annulée dans l’état canonique.');
+                });
+              }}
+              onReschedule={async (publicationId, scheduledAt) => {
+                await action(async () => {
+                  await call(`distribution/${publicationId}/reschedule`, csrf, { scheduledAt });
+                  await refresh();
+                  setNotice('Publication replanifiée.');
+                });
+              }}
+              onRefreshAccount={async (accountId) => {
+                await action(async () => {
+                  await call(`distribution/accounts/${accountId}/refresh`, csrf, {});
+                  await refresh();
+                  setNotice('Santé du compte vérifiée.');
                 });
               }}
             />

@@ -3,8 +3,13 @@ import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
 import { postgresFixture } from '../../packages/database/test/support.js';
 import { Persistence } from '../../packages/database/src/index.js';
 import type { createDatabaseClient } from '../../packages/database/src/index.js';
-import { DistributionControl, DistributionOutboxDispatcher } from '../../apps/control/src/index.js';
+import {
+  DistributionControl,
+  DistributionOutboxDispatcher,
+  PlatformAccountHealthControl,
+} from '../../apps/control/src/index.js';
 import { PublishWorkerOrchestrator } from '../../apps/worker-publish/src/index.js';
+import { DistributionOperationsService } from '../../packages/application/src/distribution-operations.js';
 import {
   FakePublisher,
   StaticPublisherRegistry,
@@ -465,4 +470,114 @@ it('refuses scheduling when the automated account is no longer active', async ()
       unit.distribution.schedule(publication.id, new Date('2000-01-01T00:00:00Z')),
     ),
   ).rejects.toThrow('PLATFORM_ACCOUNT_NOT_ACTIVE');
+});
+
+it('keeps operator reconciliation idempotent and allows reschedule only while SCHEDULED', async () => {
+  const created = await automatedPublication(new Date('2999-01-01T00:00:00Z'));
+  const first = new Date('2999-02-01T00:00:00Z');
+  await persistence.transaction(human, (unit) =>
+    unit.distribution.reschedule(created.publication.id, first),
+  );
+  expect(
+    await db.publication.findUniqueOrThrow({ where: { id: created.publication.id } }),
+  ).toMatchObject({
+    status: 'SCHEDULED',
+    scheduledAt: first,
+  });
+
+  await new DistributionControl(db).dispatchDueOne(false);
+  await db.publication.update({
+    where: { id: created.publication.id },
+    data: { status: 'PUBLISHING_UNKNOWN' },
+  });
+
+  const firstEvent = await persistence.transaction(human, (unit) =>
+    unit.distribution.requestReconciliation(created.publication.id),
+  );
+  const secondEvent = await persistence.transaction(human, (unit) =>
+    unit.distribution.requestReconciliation(created.publication.id),
+  );
+  expect(secondEvent.id).toBe(firstEvent.id);
+  expect(
+    await db.outboxEvent.count({
+      where: {
+        aggregateId: created.publication.id,
+        eventType: 'Publication.reconcile.requested',
+        status: { in: ['PENDING', 'DISPATCHING', 'DISPATCHED'] },
+      },
+    }),
+  ).toBe(1);
+  await expect(
+    persistence.transaction(human, (unit) =>
+      unit.distribution.reschedule(created.publication.id, new Date('2999-03-01T00:00:00Z')),
+    ),
+  ).rejects.toThrow('PUBLICATION_RESCHEDULE_NOT_SAFE');
+});
+
+it('marks platform accounts REAUTH_REQUIRED on explicit provider auth failure', async () => {
+  const created = await automatedPublication();
+  await new DistributionControl(db).dispatchDueOne(false);
+  const job = await publishJobFor(created.publication.id);
+  const fake = new FakePublisher('INSTAGRAM', {
+    publishResults: [
+      { responseClass: 'PERMANENT_FAILURE', failureCode: 'INSTAGRAM_AUTH_REQUIRED' },
+    ],
+  });
+  const worker = new PublishWorkerOrchestrator(db, new StaticPublisherRegistry([fake]), {
+    pauseAllPublishing: false,
+    realProvidersEnabled: false,
+  });
+  await expect(worker.process(job)).resolves.toMatchObject({ kind: 'FAILED' });
+  expect(
+    await db.platformAccount.findUniqueOrThrow({ where: { id: created.account.id } }),
+  ).toHaveProperty('status', 'REAUTH_REQUIRED');
+});
+
+it('refreshes account health through the provider boundary without exposing credentials', async () => {
+  const created = await automatedPublication(new Date('2999-01-01T00:00:00Z'));
+  await db.platformAccount.update({
+    where: { id: created.account.id },
+    data: { status: 'ERROR' },
+  });
+  const checkedAt = '2026-09-22T12:00:00.000Z';
+  const fake = new FakePublisher('INSTAGRAM', {
+    accountHealthResults: [
+      {
+        kind: 'ACTIVE',
+        remoteAccountId: created.account.remoteAccountId,
+        capabilities: { ...instagramCapabilities(), checkedAt, limitations: [] },
+      },
+    ],
+  });
+  const control = new PlatformAccountHealthControl(db, new StaticPublisherRegistry([fake]), {
+    realProvidersEnabled: false,
+  });
+  await expect(control.refreshOne(created.account.id)).resolves.toMatchObject({ kind: 'CHECKED' });
+  expect(
+    await db.platformAccount.findUniqueOrThrow({ where: { id: created.account.id } }),
+  ).toMatchObject({
+    status: 'ACTIVE',
+    capabilitiesJson: expect.objectContaining({ checkedAt }),
+  });
+  expect(fake.calls.filter((call) => call.kind === 'CHECK_ACCOUNT')).toHaveLength(1);
+});
+
+it('projects operator controls without leaking credential references or inventing unsafe retry actions', async () => {
+  const created = await automatedPublication(new Date('2999-01-01T00:00:00Z'));
+  await db.publication.update({
+    where: { id: created.publication.id },
+    data: { status: 'PUBLISHING_UNKNOWN' },
+  });
+  const service = new DistributionOperationsService(db, { realProvidersEnabled: false });
+  const overview = await service.overview();
+  const serialized = JSON.stringify(overview);
+  expect(serialized).not.toContain('secret-ref://instagram-fixture');
+  expect(overview.publications).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        publicationId: created.publication.id,
+        actions: { reconcile: true, reschedule: false, cancel: false },
+      }),
+    ]),
+  );
 });

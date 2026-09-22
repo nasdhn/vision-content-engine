@@ -4,7 +4,12 @@ import {
   assertPublicationTransition,
   invariant,
 } from '@vision/domain';
-import { assertSchedulingCapabilities, parsePublicationMetadata } from '@vision/publishing';
+import {
+  PlatformCapabilitiesSchema,
+  assertSchedulingCapabilities,
+  parsePublicationMetadata,
+} from '@vision/publishing';
+import type { PlatformAccountHealthResult } from '@vision/publishing';
 import { Prisma } from './generated/prisma/client.js';
 import type {
   Platform,
@@ -75,6 +80,10 @@ function boundedMessage(value: string) {
 
 function jsonRecord(value: Readonly<Record<string, unknown>>) {
   return structuredClone(value) as Prisma.InputJsonValue;
+}
+
+function requiresReauthentication(failureCode: string | undefined) {
+  return failureCode === 'INSTAGRAM_AUTH_REQUIRED' || failureCode === 'YOUTUBE_AUTH_REQUIRED';
 }
 
 export class Distribution {
@@ -167,6 +176,22 @@ export class Distribution {
       data: { status: 'SCHEDULED', scheduledAt },
     });
     await changed(this.tx, this.actor, 'Publication.scheduled', 'Publication', publicationId);
+    return row;
+  }
+
+  async reschedule(publicationId: string, scheduledAt: Date) {
+    assertInstant(scheduledAt);
+    await lock(this.tx, 'Publication', publicationId);
+    const publication = await this.tx.publication.findUniqueOrThrow({
+      where: { id: publicationId },
+    });
+    invariant(publication.status === 'SCHEDULED', 'PUBLICATION_RESCHEDULE_NOT_SAFE');
+    await this.snapshot(publicationId);
+    const row = await this.tx.publication.update({
+      where: { id: publicationId },
+      data: { scheduledAt },
+    });
+    await changed(this.tx, this.actor, 'Publication.rescheduled', 'Publication', publicationId);
     return row;
   }
 
@@ -496,6 +521,19 @@ export class Distribution {
       where: { id: attempt.id },
       data: attemptData,
     });
+    if (requiresReauthentication(failureCode)) {
+      await this.tx.platformAccount.update({
+        where: { id: publication.platformAccountId },
+        data: { status: 'REAUTH_REQUIRED' },
+      });
+      await changed(
+        this.tx,
+        this.actor,
+        'PlatformAccount.reauthRequired',
+        'PlatformAccount',
+        publication.platformAccountId,
+      );
+    }
     if (result.responseClass === 'UNKNOWN_SIDE_EFFECT') {
       assertPublicationTransition(
         publication.deliveryMode,
@@ -552,12 +590,95 @@ export class Distribution {
     return { kind: 'FAILED', publicationId: publication.id } as const;
   }
 
+  async platformAccountForHealth(accountId: string) {
+    const account = await this.tx.platformAccount.findUniqueOrThrow({ where: { id: accountId } });
+    return Object.freeze({
+      id: account.id,
+      platform: account.platform,
+      remoteAccountId: account.remoteAccountId,
+      capabilities: PlatformCapabilitiesSchema.safeParse(account.capabilitiesJson).success
+        ? PlatformCapabilitiesSchema.parse(account.capabilitiesJson)
+        : null,
+    });
+  }
+
+  async applyPlatformAccountHealth(accountId: string, result: PlatformAccountHealthResult) {
+    await lock(this.tx, 'PlatformAccount', accountId, 'PLATFORM_ACCOUNT_NOT_FOUND');
+    const account = await this.tx.platformAccount.findUniqueOrThrow({ where: { id: accountId } });
+    invariant(account.status !== 'DISABLED', 'PLATFORM_ACCOUNT_DISABLED');
+
+    if (result.kind === 'UNAVAILABLE') {
+      await audit(
+        this.tx,
+        this.actor,
+        `PlatformAccount.healthUnavailable.${result.failureCode}`,
+        'PlatformAccount',
+        accountId,
+      );
+      return { kind: 'UNCHANGED', status: account.status } as const;
+    }
+
+    if (result.kind === 'ACTIVE') {
+      invariant(
+        result.remoteAccountId === account.remoteAccountId,
+        'PLATFORM_ACCOUNT_IDENTITY_MISMATCH',
+      );
+      const capabilities = PlatformCapabilitiesSchema.parse(result.capabilities);
+      const row = await this.tx.platformAccount.update({
+        where: { id: accountId },
+        data: {
+          status: 'ACTIVE',
+          capabilitiesJson: structuredClone(capabilities) as Prisma.InputJsonValue,
+        },
+      });
+      await changed(
+        this.tx,
+        this.actor,
+        'PlatformAccount.healthActive',
+        'PlatformAccount',
+        accountId,
+      );
+      return { kind: 'UPDATED', status: row.status } as const;
+    }
+
+    const status = result.kind === 'REAUTH_REQUIRED' ? 'REAUTH_REQUIRED' : 'ERROR';
+    const row = await this.tx.platformAccount.update({
+      where: { id: accountId },
+      data: { status },
+    });
+    await changed(
+      this.tx,
+      this.actor,
+      `PlatformAccount.${result.kind === 'REAUTH_REQUIRED' ? 'reauthRequired' : 'healthError'}`,
+      'PlatformAccount',
+      accountId,
+    );
+    await audit(
+      this.tx,
+      this.actor,
+      `PlatformAccount.healthFailure.${result.failureCode}`,
+      'PlatformAccount',
+      accountId,
+    );
+    return { kind: 'UPDATED', status: row.status } as const;
+  }
+
   async requestReconciliation(publicationId: string) {
     await lock(this.tx, 'Publication', publicationId);
     const publication = await this.tx.publication.findUniqueOrThrow({
       where: { id: publicationId },
     });
     invariant(publication.status === 'PUBLISHING_UNKNOWN', 'RECONCILIATION_REQUIRED');
+    const existing = await this.tx.outboxEvent.findFirst({
+      where: {
+        aggregateType: 'Publication',
+        aggregateId: publication.id,
+        eventType: 'Publication.reconcile.requested',
+        status: { in: ['PENDING', 'DISPATCHING', 'DISPATCHED'] },
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    });
+    if (existing) return existing;
     return this.emitReconciliation(publication.id, publication.operationId);
   }
 
@@ -619,6 +740,19 @@ export class Distribution {
         where: { id: publicationId },
         data: { status: 'FAILED' },
       });
+      if (requiresReauthentication(result.failureCode)) {
+        await this.tx.platformAccount.update({
+          where: { id: publication.platformAccountId },
+          data: { status: 'REAUTH_REQUIRED' },
+        });
+        await changed(
+          this.tx,
+          this.actor,
+          'PlatformAccount.reauthRequired',
+          'PlatformAccount',
+          publication.platformAccountId,
+        );
+      }
       await audit(
         this.tx,
         this.actor,

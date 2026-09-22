@@ -8,6 +8,7 @@ import {
   RenderReviewService,
   SupportingReadService,
   ManualHandoffService,
+  DistributionOperationsService,
 } from '@vision/application';
 import { S3PrivateStorage } from '@vision/media';
 import { parseConfig } from '@vision/shared';
@@ -31,6 +32,9 @@ async function main() {
     const production = new ProductionReadService(db);
     const review = new RenderReviewService(db, storage);
     const manualHandoff = new ManualHandoffService(db, storage);
+    const distribution = new DistributionOperationsService(db, {
+      realProvidersEnabled: false,
+    });
     const supporting = new SupportingReadService(db, {
       environment: config.VCE_ENV,
       webOrigin: config.VCE_WEB_ORIGIN,
@@ -59,6 +63,7 @@ async function main() {
       review,
       supporting,
       manualHandoff,
+      distribution,
     });
 
     const close = async () => {

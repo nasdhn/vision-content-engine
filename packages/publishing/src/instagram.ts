@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import type {
+  PlatformAccountHealthResult,
+  PlatformAccountSnapshot,
   PlatformPublisher,
   PublicationSnapshot,
   PublishPreparation,
@@ -560,6 +562,68 @@ export class InstagramGraphPublisher implements PlatformPublisher {
       remoteRequestId: containerId.data,
       responseMetadata: { provider: 'INSTAGRAM' },
     };
+  }
+
+  async checkAccount(account: PlatformAccountSnapshot): Promise<PlatformAccountHealthResult> {
+    if (account.platform !== 'INSTAGRAM') throw new Error('INSTAGRAM_ACCOUNT_REQUIRED');
+    let accessToken: string;
+    try {
+      accessToken = await this.accessToken(account.id);
+    } catch (error) {
+      const failure = error instanceof ProviderPublishError ? error.result : null;
+      return {
+        kind: 'REAUTH_REQUIRED',
+        failureCode: failure?.failureCode ?? 'INSTAGRAM_AUTH_REQUIRED',
+      };
+    }
+
+    const url = new URL(
+      this.endpoint(`${encodeURIComponent(account.remoteAccountId)}/content_publishing_limit`),
+    );
+    url.searchParams.set('fields', 'quota_usage,config');
+    try {
+      const body = await this.request(url.toString(), accessToken, { method: 'GET' }, 'READ');
+      const parsed = CapabilityResponseSchema.safeParse(body);
+      if (!parsed.success) {
+        return { kind: 'ERROR', failureCode: 'INSTAGRAM_CAPABILITY_RESPONSE_INVALID' };
+      }
+      const row = parsed.data.data[0]!;
+      const limitations: string[] = [];
+      if (row.config?.quota_total !== undefined && row.quota_usage >= row.config.quota_total) {
+        limitations.push('PUBLISHING_QUOTA_EXHAUSTED');
+      }
+      return {
+        kind: 'ACTIVE',
+        remoteAccountId: account.remoteAccountId,
+        capabilities: {
+          schemaVersion: 'v1',
+          canPublishVideo: true,
+          canPublishPublic: true,
+          supportsNativeScheduling: false,
+          deliveryMode: 'API_AUTOMATED',
+          limitations,
+          checkedAt: this.now().toISOString(),
+        },
+      };
+    } catch (error) {
+      const failure = error instanceof ProviderPublishError ? error.result : null;
+      if (failure?.failureCode === 'INSTAGRAM_AUTH_REQUIRED') {
+        return { kind: 'REAUTH_REQUIRED', failureCode: failure.failureCode };
+      }
+      if (
+        failure?.responseClass === 'TRANSIENT_FAILURE' ||
+        failure?.responseClass === 'RATE_LIMITED'
+      ) {
+        return {
+          kind: 'UNAVAILABLE',
+          failureCode: failure.failureCode,
+        };
+      }
+      return {
+        kind: 'ERROR',
+        failureCode: failure?.failureCode ?? 'INSTAGRAM_ACCOUNT_HEALTH_FAILED',
+      };
+    }
   }
 
   async reconcile(publication: PublicationSnapshot): Promise<ReconcileResult> {

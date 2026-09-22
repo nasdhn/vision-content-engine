@@ -1307,3 +1307,31 @@ textarea {
     grid-template-columns: 1fr;
   }
 }
+
+.distribution-actions {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.reschedule-control {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.reschedule-control label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.reschedule-control input {
+  min-width: 0;
+  border: 1px solid #d9dfda;
+  border-radius: 0.7rem;
+  background: #fff;
+  color: inherit;
+  padding: 0.7rem 0.8rem;
+  font: inherit;
+}

@@ -9,8 +9,10 @@ import {
   RenderReviewService,
   SupportingReadService,
   ManualHandoffService,
+  DistributionOperationsService,
 } from '../../packages/application/src/index.js';
 import { Persistence } from '../../packages/database/src/index.js';
+import { FakePublisher, StaticPublisherRegistry } from '../../packages/publishing/src/index.js';
 import { MemoryStorage, recordingGraph } from '../fixtures/recordings/support.js';
 
 const fixture = await postgresFixture();
@@ -21,6 +23,11 @@ const concepts = new ConceptReviewService(fixture.client);
 const production = new ProductionReadService(fixture.client);
 const review = new RenderReviewService(fixture.client, storage);
 const manualHandoff = new ManualHandoffService(fixture.client, storage);
+const browserHealthPublisher = new FakePublisher('INSTAGRAM');
+const distribution = new DistributionOperationsService(fixture.client, {
+  realProvidersEnabled: false,
+  publishers: new StaticPublisherRegistry([browserHealthPublisher]),
+});
 const supporting = new SupportingReadService(fixture.client, {
   environment: 'LOCAL',
   webOrigin: 'http://localhost:5174',
@@ -52,6 +59,7 @@ const app = await createApi(
     review,
     supporting,
     manualHandoff,
+    distribution,
   },
 );
 
@@ -251,7 +259,15 @@ try {
       remoteAccountId: `browser-${randomUUID()}`,
       status: 'ACTIVE',
       credentialsRef: 'secret://browser-fixture',
-      capabilitiesJson: { publish: true },
+      capabilitiesJson: {
+        schemaVersion: 'v1',
+        canPublishVideo: true,
+        canPublishPublic: true,
+        supportsNativeScheduling: false,
+        deliveryMode: 'API_AUTOMATED',
+        limitations: [],
+        checkedAt: '2026-09-22T08:00:00.000Z',
+      },
     },
   });
   await fixture.client.publication.create({
@@ -262,9 +278,31 @@ try {
       status: 'SCHEDULED',
       scheduledAt: new Date('2026-09-23T08:00:00.000Z'),
       mediaAssetId: publicationAsset.id,
-      metadataJson: {},
+      metadataJson: {
+        schemaVersion: 'instagram-reel-v1',
+        platform: 'INSTAGRAM',
+        caption: 'Vision browser scheduled publication',
+        shareToFeed: true,
+      },
     },
   });
+  await fixture.client.publication.create({
+    data: {
+      renderId: publicationRender.id,
+      platformAccountId: platformAccount.id,
+      deliveryMode: 'API_AUTOMATED',
+      status: 'PUBLISHING_UNKNOWN',
+      scheduledAt: new Date('2026-09-22T09:00:00.000Z'),
+      mediaAssetId: publicationAsset.id,
+      metadataJson: {
+        schemaVersion: 'instagram-reel-v1',
+        platform: 'INSTAGRAM',
+        caption: 'Vision ambiguous remote publication',
+        shareToFeed: true,
+      },
+    },
+  });
+
   await fixture.client.publication.create({
     data: {
       renderId: publicationRender.id,

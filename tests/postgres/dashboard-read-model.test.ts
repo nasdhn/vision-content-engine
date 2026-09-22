@@ -92,7 +92,7 @@ it('surfaces operational failures without leaking raw stored error strings', asy
       }),
       expect.objectContaining({
         kind: 'PLATFORM_ACCOUNT',
-        targetRoute: '/settings',
+        targetRoute: '/distribution',
       }),
     ]),
   );

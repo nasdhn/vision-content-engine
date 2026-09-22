@@ -341,3 +341,40 @@ it('requires private visibility for native publishAt scheduling', async () => {
     },
   });
 });
+
+it('refreshes YouTube account identity and preserves audit-derived public capability', async () => {
+  const publication = snapshot();
+  const publisher = new YouTubeDataPublisher(credentials(), chunks(), {
+    apiBaseUrl: 'https://youtube.example.test/youtube/v3',
+    uploadBaseUrl: 'https://youtube.example.test/upload/youtube/v3',
+    fetchImpl: async () => jsonResponse({ items: [{ id: publication.account.remoteAccountId }] }),
+    now: () => now,
+  });
+  await expect(
+    publisher.checkAccount!({
+      id: publication.account.id,
+      platform: 'YOUTUBE',
+      remoteAccountId: publication.account.remoteAccountId,
+      capabilities: { ...publication.account.capabilities!, canPublishPublic: true },
+    }),
+  ).resolves.toMatchObject({
+    kind: 'ACTIVE',
+    remoteAccountId: publication.account.remoteAccountId,
+    capabilities: { canPublishVideo: true, canPublishPublic: true, checkedAt: now.toISOString() },
+  });
+
+  const mismatch = new YouTubeDataPublisher(credentials(), chunks(), {
+    apiBaseUrl: 'https://youtube.example.test/youtube/v3',
+    uploadBaseUrl: 'https://youtube.example.test/upload/youtube/v3',
+    fetchImpl: async () => jsonResponse({ items: [{ id: 'different-channel' }] }),
+    now: () => now,
+  });
+  await expect(
+    mismatch.checkAccount!({
+      id: publication.account.id,
+      platform: 'YOUTUBE',
+      remoteAccountId: publication.account.remoteAccountId,
+      capabilities: publication.account.capabilities,
+    }),
+  ).resolves.toEqual({ kind: 'ERROR', failureCode: 'YOUTUBE_REMOTE_ACCOUNT_MISMATCH' });
+});

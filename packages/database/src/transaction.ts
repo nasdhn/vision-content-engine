@@ -22,6 +22,7 @@ export const tables = [
   'CaptureRun',
   'Render',
   'Publication',
+  'PlatformAccount',
   'WorkflowRun',
   'JobAttempt',
   'OutboxEvent',

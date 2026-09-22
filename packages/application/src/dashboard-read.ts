@@ -306,7 +306,7 @@ export class DashboardReadService {
         affectedEntity: { type: 'PlatformAccount', id: row.id },
         createdAt: iso(row.updatedAt),
         recommendedAction: 'Vérifier le compte dans les réglages.',
-        targetRoute: '/settings',
+        targetRoute: '/distribution',
       });
     }
 
@@ -322,8 +322,11 @@ export class DashboardReadService {
             : 'La publication est en échec.',
         affectedEntity: { type: 'Publication', id: row.id },
         createdAt: iso(row.updatedAt),
-        recommendedAction: 'Conserver l’état tel quel jusqu’à la réconciliation Phase 7.',
-        targetRoute: '/published',
+        recommendedAction:
+          row.status === 'PUBLISHING_UNKNOWN'
+            ? 'Ouvrir Distribution et demander une réconciliation.'
+            : 'Ouvrir Distribution pour inspecter l’échec confirmé.',
+        targetRoute: '/distribution',
       });
     }
 

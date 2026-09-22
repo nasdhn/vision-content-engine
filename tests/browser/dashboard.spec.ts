@@ -10,7 +10,7 @@ test('dashboard shell shows canonical counts and navigates to Needs Attention', 
   await page.getByRole('button', { name: 'Se connecter', exact: true }).click();
 
   await expect(page.getByRole('heading', { name: 'Tableau de bord' })).toBeVisible();
-  await expect(page.getByTestId('count-attention')).toHaveText('1');
+  await expect(page.getByTestId('count-attention')).toHaveText('2');
   await expect(page.getByTestId('count-production')).toHaveText('1');
 
   await page.getByRole('link', { name: 'À traiter' }).first().click();

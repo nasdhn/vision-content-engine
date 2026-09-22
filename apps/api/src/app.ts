@@ -11,6 +11,7 @@ import type {
   RenderReviewService,
   SupportingReadService,
   ManualHandoffService,
+  DistributionOperationsService,
 } from '@vision/application';
 
 import {
@@ -26,6 +27,7 @@ import { RecordingController, RECORDINGS } from './recordings.js';
 import { RenderReviewController, RENDER_REVIEW } from './review.js';
 import { SupportingReadController, SUPPORTING_READ } from './supporting.js';
 import { ManualPublishController, MANUAL_HANDOFF } from './manual-publish.js';
+import { DistributionOperationsController, DISTRIBUTION_OPERATIONS } from './distribution.js';
 
 const PROBES = Symbol('bootstrap-readiness-probes');
 
@@ -38,6 +40,7 @@ export type ApiBusinessOptions = {
   review?: RenderReviewService;
   supporting?: SupportingReadService;
   manualHandoff?: ManualHandoffService;
+  distribution?: DistributionOperationsService;
 };
 
 @Controller()
@@ -69,6 +72,7 @@ export async function createApi(probes: ReadinessProbes, business?: ApiBusinessO
       ...(business?.review ? [RenderReviewController] : []),
       ...(business?.supporting ? [SupportingReadController] : []),
       ...(business?.manualHandoff ? [ManualPublishController] : []),
+      ...(business?.distribution ? [DistributionOperationsController] : []),
     ],
     providers: [
       { provide: PROBES, useValue: probes },
@@ -133,6 +137,14 @@ export async function createApi(probes: ReadinessProbes, business?: ApiBusinessO
             {
               provide: MANUAL_HANDOFF,
               useValue: business.manualHandoff,
+            },
+          ]
+        : []),
+      ...(business?.distribution
+        ? [
+            {
+              provide: DISTRIBUTION_OPERATIONS,
+              useValue: business.distribution,
             },
           ]
         : []),

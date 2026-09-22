@@ -5,7 +5,7 @@ import type { PrismaClient } from '@vision/database';
 import type { LeaseConfig } from '@vision/domain';
 import type { RuntimeConfig } from '@vision/shared';
 import { DISTRIBUTION_OUTBOX_EVENT_TYPES, parseDistributionOutboxEvent } from '@vision/publishing';
-import type { PublishQueueJob } from '@vision/publishing';
+import type { PlatformPublisher, PublishQueueJob, PublisherRegistry } from '@vision/publishing';
 
 export const PUBLISH_QUEUE_NAME = 'vce-publication';
 
@@ -129,6 +129,60 @@ export class DistributionControl {
       if (result.kind === 'NONE' || result.kind === 'PAUSED') break;
       if (result.kind === 'BLOCKED') excluded.push(result.publicationId);
     }
+    return results;
+  }
+}
+
+export type AccountHealthControlOptions = Readonly<{
+  realProvidersEnabled: boolean;
+}>;
+
+export class PlatformAccountHealthControl {
+  private readonly persistence: Persistence;
+
+  constructor(
+    private readonly client: PrismaClient,
+    private readonly publishers: PublisherRegistry,
+    private readonly options: AccountHealthControlOptions,
+  ) {
+    this.persistence = new Persistence(client);
+  }
+
+  async refreshOne(accountId: string) {
+    const snapshot = await this.persistence.transaction(
+      { actorType: 'SYSTEM', actorId: 'control-account-health' },
+      (unit) => unit.distribution.platformAccountForHealth(accountId),
+    );
+    let publisher: PlatformPublisher;
+    try {
+      publisher = this.publishers.resolve(snapshot.platform);
+    } catch {
+      return { kind: 'UNSUPPORTED', accountId } as const;
+    }
+    if (!publisher.checkAccount) return { kind: 'UNSUPPORTED', accountId } as const;
+    if (publisher.isRealProvider && !this.options.realProvidersEnabled) {
+      return { kind: 'PAUSED', accountId } as const;
+    }
+    const result = await publisher.checkAccount(snapshot);
+    const applied = await this.persistence.transaction(
+      { actorType: 'SYSTEM', actorId: 'control-account-health' },
+      (unit) => unit.distribution.applyPlatformAccountHealth(accountId, result),
+    );
+    return { kind: 'CHECKED', accountId, result, applied } as const;
+  }
+
+  async refreshBatch(limit = 25) {
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+      throw new Error('INVALID_ACCOUNT_HEALTH_BATCH_SIZE');
+    }
+    const accounts = await this.client.platformAccount.findMany({
+      where: { status: { in: ['ACTIVE', 'ERROR'] } },
+      orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
+      take: limit,
+      select: { id: true },
+    });
+    const results = [];
+    for (const account of accounts) results.push(await this.refreshOne(account.id));
     return results;
   }
 }

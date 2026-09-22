@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import type {
+  PlatformAccountHealthResult,
+  PlatformAccountSnapshot,
   PlatformPublisher,
   PublicationSnapshot,
   PublishPreparation,
@@ -13,6 +15,9 @@ const VideoIdSchema = z.string().min(1).max(256);
 const VideoResponseSchema = z.object({ id: VideoIdSchema }).passthrough();
 const VideoListResponseSchema = z
   .object({ items: z.array(z.object({ id: VideoIdSchema }).passthrough()) })
+  .passthrough();
+const ChannelListResponseSchema = z
+  .object({ items: z.array(z.object({ id: z.string().min(1).max(256) }).passthrough()) })
   .passthrough();
 const GoogleErrorSchema = z
   .object({
@@ -567,6 +572,69 @@ export class YouTubeDataPublisher implements PlatformPublisher {
       responseClass: 'UNKNOWN_SIDE_EFFECT',
       failureCode: 'YOUTUBE_UPLOAD_COMPLETION_UNKNOWN',
       remoteRequestId: sessionUrl.toString(),
+    };
+  }
+
+  async checkAccount(account: PlatformAccountSnapshot): Promise<PlatformAccountHealthResult> {
+    if (account.platform !== 'YOUTUBE') throw new Error('YOUTUBE_ACCOUNT_REQUIRED');
+    let accessToken: string;
+    try {
+      accessToken = await this.accessToken(account.id);
+    } catch (error) {
+      const failure = error instanceof ProviderPublishError ? error.result : null;
+      return {
+        kind: 'REAUTH_REQUIRED',
+        failureCode: failure?.failureCode ?? 'YOUTUBE_AUTH_REQUIRED',
+      };
+    }
+
+    const url = new URL(`${this.apiBaseUrl}/channels`);
+    url.searchParams.set('part', 'id');
+    url.searchParams.set('mine', 'true');
+    let response: Response;
+    try {
+      response = await this.fetchImpl(url.toString(), {
+        method: 'GET',
+        headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}` },
+        signal: AbortSignal.timeout(30_000),
+      });
+    } catch {
+      return { kind: 'UNAVAILABLE', failureCode: 'YOUTUBE_ACCOUNT_HEALTH_UNAVAILABLE' };
+    }
+    const body = await safeJson(response);
+    if (!response.ok) {
+      const failure = failureForHttp(response.status, body, 'READ');
+      if (failure.failureCode === 'YOUTUBE_AUTH_REQUIRED') {
+        return { kind: 'REAUTH_REQUIRED', failureCode: failure.failureCode };
+      }
+      if (
+        failure.responseClass === 'TRANSIENT_FAILURE' ||
+        failure.responseClass === 'RATE_LIMITED'
+      ) {
+        return { kind: 'UNAVAILABLE', failureCode: failure.failureCode };
+      }
+      return { kind: 'ERROR', failureCode: failure.failureCode };
+    }
+    const parsed = ChannelListResponseSchema.safeParse(body);
+    if (!parsed.success || parsed.data.items.length !== 1) {
+      return { kind: 'ERROR', failureCode: 'YOUTUBE_REMOTE_ACCOUNT_NOT_FOUND' };
+    }
+    if (parsed.data.items[0]!.id !== account.remoteAccountId) {
+      return { kind: 'ERROR', failureCode: 'YOUTUBE_REMOTE_ACCOUNT_MISMATCH' };
+    }
+    const current = account.capabilities;
+    return {
+      kind: 'ACTIVE',
+      remoteAccountId: account.remoteAccountId,
+      capabilities: {
+        schemaVersion: 'v1',
+        canPublishVideo: true,
+        canPublishPublic: current?.canPublishPublic ?? false,
+        supportsNativeScheduling: current?.supportsNativeScheduling ?? true,
+        deliveryMode: 'API_AUTOMATED',
+        limitations: current?.limitations ?? ['PUBLIC_UPLOAD_READINESS_UNVERIFIED'],
+        checkedAt: this.now().toISOString(),
+      },
     };
   }
 
