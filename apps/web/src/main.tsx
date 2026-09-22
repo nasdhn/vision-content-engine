@@ -459,6 +459,24 @@ type DistributionOverview = {
   }[];
 };
 
+type TikTokManualAnalyticsOverview = {
+  generatedAt: string;
+  collectionMethod: 'MANUAL_ENTRY';
+  summary: { due: number; overdue: number; upcoming: number; completed: number };
+  prompts: {
+    jobAttemptId: string;
+    publicationId: string;
+    accountName: string;
+    remoteUrl: string | null;
+    windowKey: string;
+    dueAt: string;
+    overdueAt: string;
+    state: 'DUE' | 'OVERDUE' | 'UPCOMING' | 'COMPLETED';
+    materiallyOverdue: boolean;
+    completedAt: string | null;
+  }[];
+};
+
 type SettingsSummary = {
   environment: string;
   webOrigin: string;
@@ -567,6 +585,10 @@ const errors: Record<string, string> = {
     'Le contrôle distant de ce compte n’est pas encore disponible.',
   PLATFORM_ACCOUNT_DISABLED: 'Ce compte plateforme est désactivé.',
   PLATFORM_ACCOUNT_IDENTITY_MISMATCH: 'L’identité distante ne correspond plus au compte configuré.',
+  MANUAL_METRICS_REQUIRED: 'Renseignez au moins une métrique TikTok observée.',
+  MANUAL_SNAPSHOT_NOT_DUE: 'Cette fenêtre de mesure TikTok n’est pas encore due.',
+  MANUAL_ANALYTICS_JOB_NOT_PENDING: 'Cette mesure TikTok a déjà été traitée.',
+  MANUAL_ANALYTICS_OPERATION_FAILED: 'La saisie Analytics n’a pas pu être enregistrée.',
 };
 
 const navigation = [
@@ -2674,22 +2696,135 @@ function DistributionView({
   );
 }
 
-function AnalyticsDeferredView() {
+function TikTokManualAnalyticsView({
+  model,
+  busy,
+  onSubmit,
+}: {
+  model: TikTokManualAnalyticsOverview | null;
+  busy: boolean;
+  onSubmit: (jobAttemptId: string, values: Record<string, number>) => Promise<void>;
+}) {
+  const [drafts, setDrafts] = useState<Record<string, Record<string, string>>>({});
+  const duePrompts =
+    model?.prompts.filter((prompt) => ['DUE', 'OVERDUE'].includes(prompt.state)) ?? [];
+
+  function update(jobAttemptId: string, key: string, value: string) {
+    setDrafts((current) => ({
+      ...current,
+      [jobAttemptId]: { ...current[jobAttemptId], [key]: value },
+    }));
+  }
+
+  const metricFields = [
+    ['views', 'Vues'],
+    ['likes', 'Likes'],
+    ['comments', 'Commentaires'],
+    ['shares', 'Partages'],
+    ['saves', 'Favoris'],
+    ['avgWatchDurationMs', 'Durée moyenne (ms)'],
+    ['completionRate', 'Taux complétion (0–1)'],
+    ['profileVisits', 'Visites profil'],
+    ['follows', 'Abonnements'],
+  ] as const;
+
   return (
     <>
       <section className="page-heading">
-        <p className="eyebrow">PHASE 8</p>
+        <p className="eyebrow">PHASE 8 · TIKTOK MANUEL</p>
         <h1>Analytics</h1>
         <p>
-          Cette destination est stable, mais aucune donnée de performance n’est inventée en Phase 6.
+          TikTok reste en saisie manuelle. Les champs laissés vides restent indisponibles et ne
+          deviennent jamais zéro.
         </p>
       </section>
-      <section className="panel deferred-boundary">
-        <h2>Analytics non activées</h2>
-        <p>
-          La Phase 8 possédera l’ingestion brute, la normalisation, l’attribution et les
-          comparaisons fondées sur des preuves réelles.
-        </p>
+      <section className="metric-grid analytics-summary">
+        <article className="metric-card">
+          <span>À saisir</span>
+          <strong data-testid="analytics-due-count">{model?.summary.due ?? 0}</strong>
+        </article>
+        <article className="metric-card">
+          <span>En retard</span>
+          <strong data-testid="analytics-overdue-count">{model?.summary.overdue ?? 0}</strong>
+        </article>
+        <article className="metric-card">
+          <span>À venir</span>
+          <strong data-testid="analytics-upcoming-count">{model?.summary.upcoming ?? 0}</strong>
+        </article>
+        <article className="metric-card">
+          <span>Terminées</span>
+          <strong data-testid="analytics-completed-count">{model?.summary.completed ?? 0}</strong>
+        </article>
+      </section>
+      <section className="panel">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">PROMPTS DUS</p>
+            <h2>Mesures TikTok</h2>
+          </div>
+          <p className="support-note">Objectif : moins d’une minute par saisie.</p>
+        </div>
+        {duePrompts.length === 0 ? (
+          <p className="empty-state">Aucune mesure TikTok n’est due pour le moment.</p>
+        ) : (
+          <div className="analytics-manual-list">
+            {duePrompts.map((prompt) => {
+              const draft = drafts[prompt.jobAttemptId] ?? {};
+              return (
+                <article className="analytics-manual-card" key={prompt.jobAttemptId}>
+                  <div className="analytics-manual-card__header">
+                    <div>
+                      <p className="eyebrow">{prompt.windowKey.replace('T_PLUS_', 'T+')}</p>
+                      <h3>{prompt.accountName}</h3>
+                    </div>
+                    <span className={`status-pill ${prompt.materiallyOverdue ? 'danger' : ''}`}>
+                      {prompt.materiallyOverdue ? 'En retard' : 'À saisir'}
+                    </span>
+                  </div>
+                  <p className="support-note">
+                    Due : {new Date(prompt.dueAt).toLocaleString('fr-FR')}
+                  </p>
+                  {prompt.remoteUrl && (
+                    <a href={prompt.remoteUrl} target="_blank" rel="noreferrer">
+                      Ouvrir la publication TikTok
+                    </a>
+                  )}
+                  <div className="analytics-manual-fields">
+                    {metricFields.map(([key, label]) => (
+                      <label key={key}>
+                        {label}
+                        <input
+                          data-testid={`analytics-${prompt.jobAttemptId}-${key}`}
+                          inputMode="decimal"
+                          type="number"
+                          min="0"
+                          step={key === 'completionRate' ? '0.01' : '1'}
+                          value={draft[key] ?? ''}
+                          onChange={(event) => update(prompt.jobAttemptId, key, event.target.value)}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                  <button
+                    className="primary-button"
+                    data-testid={`analytics-submit-${prompt.jobAttemptId}`}
+                    disabled={busy || !Object.values(draft).some((value) => value !== '')}
+                    onClick={() => {
+                      const values = Object.fromEntries(
+                        Object.entries(draft)
+                          .filter(([, value]) => value !== '')
+                          .map(([key, value]) => [key, Number(value)]),
+                      );
+                      void onSubmit(prompt.jobAttemptId, values);
+                    }}
+                  >
+                    Enregistrer la mesure
+                  </button>
+                </article>
+              );
+            })}
+          </div>
+        )}
       </section>
     </>
   );
@@ -2733,6 +2868,9 @@ function App() {
   const [templates, setTemplates] = useState<TemplateReadItem[]>([]);
   const [settings, setSettings] = useState<SettingsSummary | null>(null);
   const [distribution, setDistribution] = useState<DistributionOverview | null>(null);
+  const [analyticsManual, setAnalyticsManual] = useState<TikTokManualAnalyticsOverview | null>(
+    null,
+  );
   const [packs, setPacks] = useState<Pack[]>([]);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -2773,6 +2911,7 @@ function App() {
       templateList,
       settingsRead,
       distributionRead,
+      analyticsManualRead,
       recordingPacks,
       currentProduction,
       currentReview,
@@ -2792,6 +2931,7 @@ function App() {
       call('templates', csrf),
       call('settings/summary', csrf),
       call('distribution', csrf),
+      call('analytics/manual', csrf),
       call('recording-packs', csrf),
       productionVersionId ? call(`production/${productionVersionId}`, csrf) : Promise.resolve(null),
       reviewRenderId ? call(`review/${reviewRenderId}`, csrf) : Promise.resolve(null),
@@ -2814,6 +2954,7 @@ function App() {
     setTemplates(templateList as TemplateReadItem[]);
     setSettings(settingsRead as SettingsSummary);
     setDistribution(distributionRead as DistributionOverview);
+    setAnalyticsManual(analyticsManualRead as TikTokManualAnalyticsOverview);
     setPacks(recordingPacks as Pack[]);
     if (productionVersionId) setProductionDetail(currentProduction as ProductionDetail);
     if (reviewRenderId) setReviewDetail(currentReview as RenderReviewDetail);
@@ -3214,7 +3355,23 @@ function App() {
           ) : pathname === '/settings' ? (
             <SettingsView summary={settings} />
           ) : pathname === '/analytics' ? (
-            <AnalyticsDeferredView />
+            <TikTokManualAnalyticsView
+              model={analyticsManual}
+              busy={busy}
+              onSubmit={async (jobAttemptId, values) => {
+                setBusy(true);
+                setError('');
+                try {
+                  await call(`analytics/manual/${jobAttemptId}/submit`, csrf, values);
+                  setNotice('Mesure TikTok enregistrée.');
+                  await refresh();
+                } catch (caught) {
+                  setError(caught instanceof Error ? caught.message : 'Action impossible.');
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            />
           ) : (
             <DeferredView pathname={pathname} />
           )}

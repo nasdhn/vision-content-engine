@@ -5,9 +5,13 @@ import {
   AnalyticsObservationSchema,
   AUTOMATED_PLATFORM_WINDOWS,
   EMPTY_CANONICAL_METRICS,
+  MANUAL_TIKTOK_OVERDUE_GRACE_SECONDS,
+  MANUAL_TIKTOK_WINDOWS,
   collectionDueAt,
   collectionOperationIdFor,
   collectionWindowsFor,
+  normalizeTikTokManualMetrics,
+  TikTokManualMetricsInputSchema,
   parseAnalyticsOutboxEvent,
 } from '../../packages/analytics/src/index.js';
 
@@ -22,6 +26,12 @@ describe('Phase 8A analytics runtime contracts', () => {
       ['T_PLUS_30D', 2_592_000],
     ]);
     expect(collectionWindowsFor('TIKTOK', 'PLATFORM_API')).toHaveLength(0);
+    expect(MANUAL_TIKTOK_WINDOWS.map((window) => window.key)).toEqual([
+      'T_PLUS_24H',
+      'T_PLUS_72H',
+      'T_PLUS_7D',
+    ]);
+    expect(MANUAL_TIKTOK_OVERDUE_GRACE_SECONDS).toBe(86_400);
     expect(
       collectionDueAt(new Date('2026-01-01T00:00:00Z'), AUTOMATED_PLATFORM_WINDOWS[0]!),
     ).toEqual(new Date('2026-01-01T01:00:00Z'));
@@ -86,4 +96,23 @@ describe('Phase 8A analytics runtime contracts', () => {
       }),
     ).toThrow();
   });
+});
+
+it('accepts sparse TikTok manual fields and preserves explicit zero', () => {
+  expect(TikTokManualMetricsInputSchema.parse({ views: 0, likes: 12 })).toEqual({
+    views: 0,
+    likes: 12,
+  });
+  const observation = normalizeTikTokManualMetrics(
+    { views: 0, likes: 12 },
+    new Date('2026-09-22T12:00:00Z'),
+  );
+  expect(observation.metrics.views).toBe(0n);
+  expect(observation.metrics.likes).toBe(12n);
+  expect(observation.metrics.comments).toBeNull();
+  expect(observation.rawPayload).toEqual({ views: 0, likes: 12 });
+});
+
+it('rejects an empty TikTok manual submission', () => {
+  expect(() => TikTokManualMetricsInputSchema.parse({})).toThrow();
 });

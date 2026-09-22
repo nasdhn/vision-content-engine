@@ -36,7 +36,9 @@ test('executes the TikTok manual handoff without any fake remote publishing', as
 
   await expect(page).toHaveURL(/\/published$/);
   await expect(page.getByRole('heading', { name: 'Publiées', exact: true })).toBeVisible();
-  const published = page.getByRole('article').filter({ hasText: 'Vision TikTok' });
+  const published = page.getByRole('article').filter({
+    has: page.locator('a[href="https://www.tiktok.com/@vision/video/123456789"]'),
+  });
   await expect(published).toBeVisible();
   await expect(
     published.getByRole('link', { name: 'Ouvrir la publication distante' }),

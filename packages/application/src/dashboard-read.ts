@@ -1,3 +1,9 @@
+import {
+  MANUAL_TIKTOK_OVERDUE_GRACE_SECONDS,
+  MANUAL_TIKTOK_WINDOWS,
+  collectionDueAt,
+  parseManualTikTokJobType,
+} from '@vision/analytics';
 import type { PrismaClient } from '@vision/database';
 
 export type DashboardAttentionSeverity = 'ACTION' | 'ERROR';
@@ -12,7 +18,8 @@ export type DashboardAttentionItem = {
     | 'WORKFLOW_FAILED'
     | 'OUTBOX_FAILED'
     | 'PLATFORM_ACCOUNT'
-    | 'PUBLICATION';
+    | 'PUBLICATION'
+    | 'ANALYTICS_MANUAL';
   severity: DashboardAttentionSeverity;
   title: string;
   reason: string;
@@ -111,6 +118,7 @@ export class DashboardReadService {
       failedOutbox,
       accountIssues,
       publicationIssues,
+      manualAnalyticsJobs,
     ] = await Promise.all([
       this.db.editingBlocker.findMany({
         where: { status: 'OPEN' },
@@ -196,6 +204,19 @@ export class DashboardReadService {
           status: true,
           updatedAt: true,
         },
+      }),
+      this.db.jobAttempt.findMany({
+        where: {
+          status: 'QUEUED',
+          queueName: 'vce-analytics-manual',
+          jobType: { startsWith: 'ANALYTICS_MANUAL:TIKTOK:' },
+          workflowRun: {
+            is: { workflowType: 'ANALYTICS', rootEntityType: 'PublicationAnalytics' },
+          },
+        },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        take: 50,
+        include: { workflowRun: true },
       }),
     ]);
 
@@ -328,6 +349,46 @@ export class DashboardReadService {
             : 'Ouvrir Distribution pour inspecter l’échec confirmé.',
         targetRoute: '/distribution',
       });
+    }
+
+    if (manualAnalyticsJobs.length > 0) {
+      const publicationIds = [
+        ...new Set(manualAnalyticsJobs.map((job) => job.workflowRun!.rootEntityId)),
+      ];
+      const publications = await this.db.publication.findMany({
+        where: { id: { in: publicationIds } },
+        select: {
+          id: true,
+          publishedAt: true,
+          platformAccount: { select: { platform: true, displayName: true } },
+        },
+      });
+      const byPublication = new Map(
+        publications.map((publication) => [publication.id, publication]),
+      );
+      const now = new Date();
+      for (const job of manualAnalyticsJobs) {
+        const publication = byPublication.get(job.workflowRun!.rootEntityId);
+        if (!publication?.publishedAt || publication.platformAccount.platform !== 'TIKTOK')
+          continue;
+        const windowKey = parseManualTikTokJobType(job.jobType);
+        const window = MANUAL_TIKTOK_WINDOWS.find((candidate) => candidate.key === windowKey);
+        if (!window) continue;
+        const dueAt = collectionDueAt(publication.publishedAt, window);
+        const overdueAt = new Date(dueAt.getTime() + MANUAL_TIKTOK_OVERDUE_GRACE_SECONDS * 1_000);
+        if (now.getTime() < overdueAt.getTime()) continue;
+        items.push({
+          id: `analytics-manual:${job.id}`,
+          kind: 'ANALYTICS_MANUAL',
+          severity: 'ACTION',
+          title: `Mesure TikTok ${windowKey.replace('T_PLUS_', 'T+')}`,
+          reason: `La saisie manuelle pour ${publication.platformAccount.displayName} est matériellement en retard.`,
+          affectedEntity: { type: 'JobAttempt', id: job.id },
+          createdAt: overdueAt.toISOString(),
+          recommendedAction: 'Saisir les métriques visibles dans TikTok Analytics.',
+          targetRoute: '/analytics',
+        });
+      }
     }
 
     return items

@@ -20,3 +20,4 @@ export * from './render-review.js';
 export * from './supporting-read.js';
 export * from './manual-handoff.js';
 export * from './distribution-operations.js';
+export * from './tiktok-manual-analytics.js';

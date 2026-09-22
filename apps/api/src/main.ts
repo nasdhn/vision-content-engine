@@ -9,6 +9,7 @@ import {
   SupportingReadService,
   ManualHandoffService,
   DistributionOperationsService,
+  TikTokManualAnalyticsService,
 } from '@vision/application';
 import { S3PrivateStorage } from '@vision/media';
 import { parseConfig } from '@vision/shared';
@@ -35,6 +36,7 @@ async function main() {
     const distribution = new DistributionOperationsService(db, {
       realProvidersEnabled: false,
     });
+    const analyticsManual = new TikTokManualAnalyticsService(db);
     const supporting = new SupportingReadService(db, {
       environment: config.VCE_ENV,
       webOrigin: config.VCE_WEB_ORIGIN,
@@ -64,6 +66,7 @@ async function main() {
       supporting,
       manualHandoff,
       distribution,
+      analyticsManual,
     });
 
     const close = async () => {

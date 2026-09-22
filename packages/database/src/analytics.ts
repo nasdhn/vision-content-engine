@@ -1,10 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import {
   AnalyticsObservationSchema,
+  MANUAL_TIKTOK_WINDOWS,
   adapterKeyFor,
   collectionDueAt,
   collectionOperationIdFor,
   collectionWindowsFor,
+  normalizeTikTokManualMetrics,
+  parseManualTikTokJobType,
   rawPayloadHash,
 } from '@vision/analytics';
 import type { AnalyticsCollectionSnapshot, AnalyticsWindowKey } from '@vision/analytics';
@@ -43,9 +46,6 @@ export class AnalyticsRuntime {
     invariant(publication.remotePostId, 'REMOTE_POST_ID_REQUIRED');
 
     const platform = publication.platformAccount.platform;
-    if (platform === 'TIKTOK') {
-      return { kind: 'MANUAL_DEFERRED', publicationId } as const;
-    }
 
     const existing = await this.tx.workflowRun.findFirst({
       where: {
@@ -62,6 +62,53 @@ export class AnalyticsRuntime {
         publicationId,
         workflowRunId: existing.id,
         jobAttemptIds: existing.jobAttempts.map((row) => row.id),
+      } as const;
+    }
+
+    if (platform === 'TIKTOK') {
+      const now = await databaseTime(this.tx);
+      const workflow = await this.tx.workflowRun.create({
+        data: {
+          workflowType: 'ANALYTICS',
+          rootEntityType: 'PublicationAnalytics',
+          rootEntityId: publication.id,
+          status: 'WAITING',
+          currentStep: 'manual_measurement_windows',
+          startedAt: now,
+        },
+      });
+      const jobAttemptIds: string[] = [];
+      for (const window of MANUAL_TIKTOK_WINDOWS) {
+        const operationId = collectionOperationIdFor({
+          publicationId: publication.id,
+          adapterKey: 'TIKTOK_MANUAL_V1',
+          windowKey: window.key,
+          collectionMethod: 'MANUAL_ENTRY',
+        });
+        const job = await this.tx.jobAttempt.create({
+          data: {
+            workflowRunId: workflow.id,
+            queueName: 'vce-analytics-manual',
+            jobType: `ANALYTICS_MANUAL:TIKTOK:${window.key}`,
+            operationId,
+            attemptNumber: 1,
+            status: 'QUEUED',
+          },
+        });
+        jobAttemptIds.push(job.id);
+      }
+      await audit(
+        this.tx,
+        this.actor,
+        'Analytics.manualPromptsPlanned',
+        'Publication',
+        publication.id,
+      );
+      return {
+        kind: 'MANUAL_PLANNED',
+        publicationId,
+        workflowRunId: workflow.id,
+        jobAttemptIds,
       } as const;
     }
 
@@ -276,6 +323,99 @@ export class AnalyticsRuntime {
       kind: 'COLLECTED',
       rawSnapshotId: raw.id,
       normalizedSnapshotId: normalized.id,
+      payloadHash: raw.payloadHash,
+    } as const;
+  }
+  async completeManualTikTok(jobAttemptId: string, input: unknown) {
+    await lock(this.tx, 'JobAttempt', jobAttemptId);
+    const job = await this.tx.jobAttempt.findUniqueOrThrow({
+      where: { id: jobAttemptId },
+      include: { workflowRun: true },
+    });
+    invariant(
+      job.workflowRun && job.workflowRun.workflowType === 'ANALYTICS',
+      'ANALYTICS_WORKFLOW_REQUIRED',
+    );
+    invariant(job.queueName === 'vce-analytics-manual', 'MANUAL_ANALYTICS_JOB_REQUIRED');
+    const windowKey = parseManualTikTokJobType(job.jobType);
+    const publication = await this.tx.publication.findUniqueOrThrow({
+      where: { id: job.workflowRun.rootEntityId },
+      include: { platformAccount: true },
+    });
+    invariant(
+      publication.status === 'PUBLISHED' && publication.publishedAt,
+      'PUBLICATION_NOT_PUBLISHED',
+    );
+    invariant(publication.platformAccount.platform === 'TIKTOK', 'TIKTOK_PUBLICATION_REQUIRED');
+    const existingRaw = await this.tx.metricSnapshotRaw.findUnique({
+      where: { collectionOperationId: job.operationId },
+      include: { normalizedSnapshots: true },
+    });
+    if (existingRaw) {
+      return {
+        kind: 'EXISTING',
+        rawSnapshotId: existingRaw.id,
+        normalizedSnapshotId: existingRaw.normalizedSnapshots[0]?.id ?? null,
+      } as const;
+    }
+    invariant(job.status === 'QUEUED', 'MANUAL_ANALYTICS_JOB_NOT_PENDING');
+    const now = await databaseTime(this.tx);
+    const dueAt = collectionDueAt(
+      publication.publishedAt,
+      MANUAL_TIKTOK_WINDOWS.find((window) => window.key === windowKey)!,
+    );
+    invariant(now.getTime() >= dueAt.getTime(), 'MANUAL_SNAPSHOT_NOT_DUE');
+    const observation = normalizeTikTokManualMetrics(input, now);
+    const raw = await this.tx.metricSnapshotRaw.create({
+      data: {
+        publicationId: publication.id,
+        platform: 'TIKTOK',
+        collectedAt: now,
+        providerSchemaVersion: observation.providerSchemaVersion,
+        collectionMethod: 'MANUAL_ENTRY',
+        collectionOperationId: job.operationId,
+        payloadJson: json(observation.rawPayload),
+        payloadHash: rawPayloadHash(observation.rawPayload),
+      },
+    });
+    const normalized = await this.tx.metricSnapshotNormalized.create({
+      data: {
+        publicationId: publication.id,
+        rawSnapshotId: raw.id,
+        collectedAt: now,
+        ...observation.metrics,
+        availabilityJson: json(observation.availability),
+        comparabilityJson: json(observation.comparability),
+        normalizerVersion: observation.normalizerVersion,
+        metricSemanticsVersion: observation.metricSemanticsVersion,
+      },
+    });
+    await this.tx.jobAttempt.update({
+      where: { id: job.id },
+      data: { status: 'SUCCEEDED', startedAt: now, finishedAt: now },
+    });
+    const remaining = await this.tx.jobAttempt.count({
+      where: { workflowRunId: job.workflowRun.id, status: { not: 'SUCCEEDED' } },
+    });
+    await this.tx.workflowRun.update({
+      where: { id: job.workflowRun.id },
+      data:
+        remaining === 0
+          ? { status: 'SUCCEEDED', currentStep: 'complete', finishedAt: now }
+          : { status: 'WAITING', currentStep: 'manual_measurement_windows' },
+    });
+    await audit(
+      this.tx,
+      this.actor,
+      'Analytics.manualSnapshotEntered',
+      'MetricSnapshotRaw',
+      raw.id,
+    );
+    return {
+      kind: 'COLLECTED',
+      rawSnapshotId: raw.id,
+      normalizedSnapshotId: normalized.id,
+      windowKey,
       payloadHash: raw.payloadHash,
     } as const;
   }

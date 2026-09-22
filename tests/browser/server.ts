@@ -10,6 +10,7 @@ import {
   SupportingReadService,
   ManualHandoffService,
   DistributionOperationsService,
+  TikTokManualAnalyticsService,
 } from '../../packages/application/src/index.js';
 import { Persistence } from '../../packages/database/src/index.js';
 import { FakePublisher, StaticPublisherRegistry } from '../../packages/publishing/src/index.js';
@@ -28,6 +29,7 @@ const distribution = new DistributionOperationsService(fixture.client, {
   realProvidersEnabled: false,
   publishers: new StaticPublisherRegistry([browserHealthPublisher]),
 });
+const analyticsManual = new TikTokManualAnalyticsService(fixture.client);
 const supporting = new SupportingReadService(fixture.client, {
   environment: 'LOCAL',
   webOrigin: 'http://localhost:5174',
@@ -60,6 +62,7 @@ const app = await createApi(
     supporting,
     manualHandoff,
     distribution,
+    analyticsManual,
   },
 );
 
@@ -345,6 +348,25 @@ try {
       },
     },
   });
+
+  const analyticsPublishedAt = new Date(Date.now() - 25 * 60 * 60 * 1_000);
+  const tiktokPublished = await fixture.client.publication.create({
+    data: {
+      renderId: publicationRender.id,
+      platformAccountId: tiktokAccount.id,
+      deliveryMode: 'MANUAL_HANDOFF',
+      status: 'PUBLISHED',
+      publishedAt: analyticsPublishedAt,
+      remotePostId: `browser-tiktok-published-${randomUUID()}`,
+      remoteUrl: 'https://example.test/tiktok-browser-published',
+      mediaAssetId: publicationAsset.id,
+      metadataJson: {},
+    },
+  });
+  await new Persistence(fixture.client).transaction(
+    { actorType: 'SYSTEM', actorId: 'browser-analytics-fixture' },
+    (unit) => unit.analytics.planPublication(tiktokPublished.id),
+  );
 
   const browserPattern = await fixture.client.pattern.create({
     data: { key: 'RESULT_FIRST_BROWSER', name: 'Résultat d’abord', status: 'ACTIVE' },

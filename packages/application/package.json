@@ -6,6 +6,7 @@
   "license": "UNLICENSED",
   "exports": "./src/index.ts",
   "dependencies": {
+    "@vision/analytics": "workspace:*",
     "@vision/contracts": "workspace:*",
     "@vision/database": "workspace:*",
     "@vision/domain": "workspace:*",

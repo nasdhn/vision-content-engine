@@ -5,7 +5,7 @@ const key = 'fixture-local-recording-access-key';
 test.describe.configure({ mode: 'serial' });
 let assetHref = '';
 
-test('shows honest Phase 6E read-only supporting surfaces without Phase 7/8 fabrication', async ({
+test('shows honest supporting surfaces and the Phase 8B TikTok manual analytics boundary', async ({
   page,
 }) => {
   await page.goto('/calendar');
@@ -46,8 +46,8 @@ test('shows honest Phase 6E read-only supporting surfaces without Phase 7/8 fabr
 
   await page.getByRole('link', { name: 'Analytics' }).click();
   await expect(page.getByRole('heading', { name: 'Analytics', exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Analytics non activées' })).toBeVisible();
-  await expect(page.getByText(/aucune donnée de performance n’est inventée/i)).toBeVisible();
+  await expect(page.getByText(/TikTok reste en saisie manuelle/i)).toBeVisible();
+  await expect(page.getByTestId('analytics-due-count')).toBeVisible();
 });
 
 test('preserves an asset deep link through mobile login and refresh without horizontal overflow', async ({

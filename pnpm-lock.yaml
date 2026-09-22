@@ -265,6 +265,9 @@ importers:
       '@vision/ai':
         specifier: workspace:*
         version: link:../ai
+      '@vision/analytics':
+        specifier: workspace:*
+        version: link:../analytics
       '@vision/contracts':
         specifier: workspace:*
         version: link:../contracts

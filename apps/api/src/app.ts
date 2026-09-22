@@ -12,6 +12,7 @@ import type {
   SupportingReadService,
   ManualHandoffService,
   DistributionOperationsService,
+  TikTokManualAnalyticsService,
 } from '@vision/application';
 
 import {
@@ -28,6 +29,7 @@ import { RenderReviewController, RENDER_REVIEW } from './review.js';
 import { SupportingReadController, SUPPORTING_READ } from './supporting.js';
 import { ManualPublishController, MANUAL_HANDOFF } from './manual-publish.js';
 import { DistributionOperationsController, DISTRIBUTION_OPERATIONS } from './distribution.js';
+import { TikTokManualAnalyticsController, TIKTOK_MANUAL_ANALYTICS } from './analytics.js';
 
 const PROBES = Symbol('bootstrap-readiness-probes');
 
@@ -41,6 +43,7 @@ export type ApiBusinessOptions = {
   supporting?: SupportingReadService;
   manualHandoff?: ManualHandoffService;
   distribution?: DistributionOperationsService;
+  analyticsManual?: TikTokManualAnalyticsService;
 };
 
 @Controller()
@@ -73,6 +76,7 @@ export async function createApi(probes: ReadinessProbes, business?: ApiBusinessO
       ...(business?.supporting ? [SupportingReadController] : []),
       ...(business?.manualHandoff ? [ManualPublishController] : []),
       ...(business?.distribution ? [DistributionOperationsController] : []),
+      ...(business?.analyticsManual ? [TikTokManualAnalyticsController] : []),
     ],
     providers: [
       { provide: PROBES, useValue: probes },
@@ -145,6 +149,14 @@ export async function createApi(probes: ReadinessProbes, business?: ApiBusinessO
             {
               provide: DISTRIBUTION_OPERATIONS,
               useValue: business.distribution,
+            },
+          ]
+        : []),
+      ...(business?.analyticsManual
+        ? [
+            {
+              provide: TIKTOK_MANUAL_ANALYTICS,
+              useValue: business.analyticsManual,
             },
           ]
         : []),

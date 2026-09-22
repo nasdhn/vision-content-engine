@@ -38,6 +38,25 @@ export const MANUAL_TIKTOK_WINDOWS: readonly CollectionWindow[] = Object.freeze(
   Object.freeze({ key: 'T_PLUS_7D', offsetSeconds: 604_800 }),
 ]);
 
+export const OPTIONAL_MANUAL_TIKTOK_WINDOWS: readonly CollectionWindow[] = Object.freeze([
+  Object.freeze({ key: 'T_PLUS_30D', offsetSeconds: 2_592_000 }),
+]);
+
+export const MANUAL_TIKTOK_OVERDUE_GRACE_SECONDS = 86_400;
+
+export function manualTikTokWindow(windowKey: AnalyticsWindowKey) {
+  const window = [...MANUAL_TIKTOK_WINDOWS, ...OPTIONAL_MANUAL_TIKTOK_WINDOWS].find(
+    (candidate) => candidate.key === windowKey,
+  );
+  if (!window) throw new Error('INVALID_TIKTOK_MANUAL_WINDOW');
+  return window;
+}
+
+export function manualTikTokOverdueAt(publishedAt: Date, windowKey: AnalyticsWindowKey) {
+  const dueAt = collectionDueAt(publishedAt, manualTikTokWindow(windowKey));
+  return new Date(dueAt.getTime() + MANUAL_TIKTOK_OVERDUE_GRACE_SECONDS * 1_000);
+}
+
 export function collectionWindowsFor(
   platform: z.infer<typeof AnalyticsPlatformSchema>,
   method: z.infer<typeof MetricCollectionMethodSchema>,
@@ -131,6 +150,102 @@ export const EMPTY_CANONICAL_METRICS: CanonicalMetrics = Object.freeze({
   websiteClicks: null,
   follows: null,
 });
+
+const ManualCountInputSchema = z
+  .number()
+  .int()
+  .nonnegative()
+  .max(Number.MAX_SAFE_INTEGER)
+  .optional();
+const ManualDurationInputSchema = z
+  .number()
+  .int()
+  .nonnegative()
+  .max(Number.MAX_SAFE_INTEGER)
+  .optional();
+const ManualRateInputSchema = z.number().finite().min(0).max(1).optional();
+
+export const TikTokManualMetricsInputSchema = z
+  .object({
+    views: ManualCountInputSchema,
+    likes: ManualCountInputSchema,
+    comments: ManualCountInputSchema,
+    shares: ManualCountInputSchema,
+    saves: ManualCountInputSchema,
+    watchTimeMs: ManualCountInputSchema,
+    avgWatchDurationMs: ManualDurationInputSchema,
+    completionRate: ManualRateInputSchema,
+    profileVisits: ManualCountInputSchema,
+    follows: ManualCountInputSchema,
+  })
+  .strict()
+  .refine((value) => Object.values(value).some((entry) => entry !== undefined), {
+    message: 'MANUAL_METRICS_REQUIRED',
+  });
+
+export type TikTokManualMetricsInput = z.infer<typeof TikTokManualMetricsInputSchema>;
+
+const MANUAL_TIKTOK_CANONICAL_KEYS = [
+  'views',
+  'likes',
+  'comments',
+  'shares',
+  'saves',
+  'watchTimeMs',
+  'avgWatchDurationMs',
+  'completionRate',
+  'profileVisits',
+  'follows',
+] as const;
+
+export function normalizeTikTokManualMetrics(
+  input: unknown,
+  collectedAt: Date,
+): AnalyticsObservation {
+  const parsed = TikTokManualMetricsInputSchema.parse(input);
+  const metrics: CanonicalMetrics = {
+    ...EMPTY_CANONICAL_METRICS,
+    ...(parsed.views === undefined ? {} : { views: BigInt(parsed.views) }),
+    ...(parsed.likes === undefined ? {} : { likes: BigInt(parsed.likes) }),
+    ...(parsed.comments === undefined ? {} : { comments: BigInt(parsed.comments) }),
+    ...(parsed.shares === undefined ? {} : { shares: BigInt(parsed.shares) }),
+    ...(parsed.saves === undefined ? {} : { saves: BigInt(parsed.saves) }),
+    ...(parsed.watchTimeMs === undefined ? {} : { watchTimeMs: BigInt(parsed.watchTimeMs) }),
+    ...(parsed.avgWatchDurationMs === undefined
+      ? {}
+      : { avgWatchDurationMs: parsed.avgWatchDurationMs }),
+    ...(parsed.completionRate === undefined ? {} : { completionRate: parsed.completionRate }),
+    ...(parsed.profileVisits === undefined ? {} : { profileVisits: BigInt(parsed.profileVisits) }),
+    ...(parsed.follows === undefined ? {} : { follows: BigInt(parsed.follows) }),
+  };
+  const unavailableMetrics = MANUAL_TIKTOK_CANONICAL_KEYS.filter(
+    (key) => parsed[key] === undefined,
+  );
+  return AnalyticsObservationSchema.parse({
+    collectedAt: collectedAt.toISOString(),
+    providerSchemaVersion: 'tiktok-manual-entry-v1',
+    rawPayload: parsed,
+    metrics,
+    otherMetrics: null,
+    availability: {
+      status: 'AVAILABLE',
+      unavailableMetrics,
+      notes: ['Valeurs absentes = non observées, jamais converties en zéro.'],
+    },
+    comparability: {
+      crossPlatformViewsComparable: false,
+      notes: ['Saisie manuelle TikTok; sémantique provider conservée séparément.'],
+    },
+    normalizerVersion: 'tiktok-manual-normalizer-v1',
+    metricSemanticsVersion: METRIC_SEMANTICS_VERSION,
+  });
+}
+
+export function parseManualTikTokJobType(jobType: string) {
+  const match = /^ANALYTICS_MANUAL:TIKTOK:(T_PLUS_(?:24H|72H|7D))$/.exec(jobType);
+  if (!match) throw new Error('INVALID_TIKTOK_MANUAL_JOB_TYPE');
+  return AnalyticsWindowKeySchema.parse(match[1]);
+}
 
 export const AnalyticsFailureCodeSchema = z.enum([
   'NOT_YET_AVAILABLE',
