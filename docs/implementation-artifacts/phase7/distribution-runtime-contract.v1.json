@@ -1,0 +1,52 @@
+{
+  "version": "phase7-distribution-runtime-v1",
+  "baselineHead": "aa906bab2ae969244e6e9100244dbcc8d2a37554",
+  "branch": "phase/7-distribution",
+  "expectedPrismaMigration": false,
+  "canonicalSchedule": "Publication.scheduledAt",
+  "transport": {
+    "kind": "BullMQ",
+    "authoritative": false,
+    "deduplicationKey": "OutboxEvent.id"
+  },
+  "safety": {
+    "pauseAllPublishingDefault": true,
+    "realProvidersEnabledDefault": false,
+    "realProviderCallsIn7A": false
+  },
+  "deliveryModes": {
+    "API_AUTOMATED": {
+      "platforms": ["INSTAGRAM", "YOUTUBE"],
+      "dueTransition": "SCHEDULED->PUBLISHING",
+      "createsPublicationAttempt": true
+    },
+    "MANUAL_HANDOFF": {
+      "platforms": ["TIKTOK"],
+      "dueTransition": "SCHEDULED->READY_FOR_MANUAL_PUBLISH",
+      "createsPublicationAttempt": false
+    }
+  },
+  "unknownSideEffect": {
+    "state": "PUBLISHING_UNKNOWN",
+    "ordinaryRetryAllowed": false,
+    "requiresReconciliation": true
+  },
+  "jobPayloadPolicy": {
+    "allowedIdentifiers": ["publicationId", "publicationAttemptId", "operationId", "outboxEventId"],
+    "forbidden": [
+      "accessToken",
+      "refreshToken",
+      "oauthToken",
+      "credentialsValue",
+      "signedDeliveryUrl"
+    ]
+  },
+  "tranches": [
+    "7A_RUNTIME_FOUNDATION",
+    "7B_TIKTOK_MANUAL_HANDOFF",
+    "7C_INSTAGRAM_ADAPTER",
+    "7D_YOUTUBE_ADAPTER",
+    "7E_HEALTH_RECONCILIATION_CONTROLS",
+    "7F_PHASE_CLOSURE"
+  ]
+}
