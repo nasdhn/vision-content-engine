@@ -1,7 +1,7 @@
 # ADR-0031 — Phase 9 learning runtime boundary
 
-**Status:** Accepted  
-**Date:** 2026-09-22  
+**Status:** Accepted
+**Date:** 2026-09-22
 **Decision scope:** Phase 9 implementation
 
 ## Context

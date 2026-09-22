@@ -1,10 +1,10 @@
 # 27 — Phase 9 Learning Implementation Freeze
 
-**Status:** ACCEPTED FOR IMPLEMENTATION  
-**Phase:** 9 — Learning loop  
-**Base checkpoint:** `e3c5494ceb0316c86119346b2228e5da10dd987d`  
-**Branch:** `phase/9-learning`  
-**Depends on:** Phase 8 closed and `pnpm check:phase8` green  
+**Status:** ACCEPTED FOR IMPLEMENTATION
+**Phase:** 9 — Learning loop
+**Base checkpoint:** `e3c5494ceb0316c86119346b2228e5da10dd987d`
+**Branch:** `phase/9-learning`
+**Depends on:** Phase 8 closed and `pnpm check:phase8` green
 **Prisma migration:** none expected
 
 ---
