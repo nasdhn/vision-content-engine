@@ -368,3 +368,4 @@ export function parseDistributionOutboxEvent(event: {
 
 export * from './provider-error.js';
 export * from './instagram.js';
+export * from './youtube.js';

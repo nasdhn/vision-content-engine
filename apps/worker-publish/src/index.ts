@@ -152,3 +152,4 @@ export function createBullMqPublishWorker(input: {
 }
 
 export * from './instagram-asset-lease.js';
+export * from './youtube-asset-source.js';
