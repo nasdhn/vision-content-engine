@@ -1,4 +1,10 @@
 import { Queue } from 'bullmq';
+import {
+  ANALYTICS_OUTBOX_EVENT_TYPES,
+  ANALYTICS_QUEUE_NAME,
+  parseAnalyticsOutboxEvent,
+} from '@vision/analytics';
+import type { AnalyticsCollectionJob } from '@vision/analytics';
 import type { JobsOptions, QueueOptions } from 'bullmq';
 import { Leases, Persistence } from '@vision/database';
 import type { PrismaClient } from '@vision/database';
@@ -183,6 +189,111 @@ export class PlatformAccountHealthControl {
     });
     const results = [];
     for (const account of accounts) results.push(await this.refreshOne(account.id));
+    return results;
+  }
+}
+
+export interface AnalyticsJobTransport {
+  enqueue(job: AnalyticsCollectionJob): Promise<void>;
+}
+
+export class BullMqAnalyticsTransport implements AnalyticsJobTransport {
+  constructor(private readonly queue: Queue<AnalyticsCollectionJob>) {}
+
+  async enqueue(job: AnalyticsCollectionJob) {
+    const options: JobsOptions = {
+      jobId: `outbox-${job.outboxEventId}`,
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 1_000 },
+      removeOnComplete: false,
+      removeOnFail: false,
+    };
+    await this.queue.add(job.kind, job, options);
+  }
+
+  static fromRedisUrl(redisUrl: string) {
+    return new BullMqAnalyticsTransport(
+      new Queue<AnalyticsCollectionJob>(ANALYTICS_QUEUE_NAME, {
+        connection: redisConnectionOptions(redisUrl),
+      }),
+    );
+  }
+
+  async close() {
+    await this.queue.close();
+  }
+}
+
+export class AnalyticsOutboxDispatcher {
+  private readonly leases: Leases;
+
+  constructor(
+    client: PrismaClient,
+    leaseConfig: LeaseConfig,
+    private readonly transport: AnalyticsJobTransport,
+    private readonly owner: string,
+    private readonly maxDispatchAttempts = 5,
+  ) {
+    if (!owner.trim()) throw new Error('OWNER_REQUIRED');
+    if (!Number.isSafeInteger(maxDispatchAttempts) || maxDispatchAttempts < 1) {
+      throw new Error('INVALID_DISPATCH_ATTEMPTS');
+    }
+    this.leases = new Leases(client, leaseConfig, {});
+  }
+
+  async dispatchOne() {
+    const event = await this.leases.claimOutbox(this.owner, ANALYTICS_OUTBOX_EVENT_TYPES);
+    if (!event) return { kind: 'NONE' } as const;
+    const token = event.claimToken;
+    if (!token) throw new Error('OUTBOX_CLAIM_TOKEN_REQUIRED');
+    let job: AnalyticsCollectionJob;
+    try {
+      job = parseAnalyticsOutboxEvent(event);
+    } catch {
+      await this.leases.finishOutbox(event.id, token, 'FAILED', 'INVALID_ANALYTICS_OUTBOX');
+      return { kind: 'FAILED', outboxEventId: event.id } as const;
+    }
+    try {
+      await this.transport.enqueue(job);
+      await this.leases.finishOutbox(event.id, token, 'DISPATCHED');
+      return { kind: 'DISPATCHED', outboxEventId: event.id, job } as const;
+    } catch {
+      if (event.attemptCount >= this.maxDispatchAttempts) {
+        await this.leases.finishOutbox(event.id, token, 'FAILED', 'ANALYTICS_QUEUE_ENQUEUE_FAILED');
+        return { kind: 'FAILED', outboxEventId: event.id } as const;
+      }
+      return { kind: 'RETRY_AFTER_LEASE', outboxEventId: event.id } as const;
+    }
+  }
+}
+
+export class AnalyticsControl {
+  private readonly persistence: Persistence;
+
+  constructor(private readonly client: PrismaClient) {
+    this.persistence = new Persistence(client);
+  }
+
+  planPublication(publicationId: string) {
+    return this.persistence.transaction(
+      { actorType: 'SYSTEM', actorId: 'control-analytics' },
+      (unit) => unit.analytics.planPublication(publicationId),
+    );
+  }
+
+  async planEligibleBatch(limit = 25) {
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+      throw new Error('INVALID_ANALYTICS_BATCH_SIZE');
+    }
+    const publications = await this.client.publication.findMany({
+      where: { status: 'PUBLISHED', publishedAt: { not: null } },
+      orderBy: [{ publishedAt: 'asc' }, { id: 'asc' }],
+      take: limit,
+      select: { id: true },
+    });
+    const results = [];
+    for (const publication of publications)
+      results.push(await this.planPublication(publication.id));
     return results;
   }
 }

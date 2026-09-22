@@ -10,6 +10,7 @@
     "@vision/domain": "workspace:*",
     "@vision/publishing": "workspace:*",
     "bullmq": "6.3.8",
-    "@vision/shared": "workspace:*"
+    "@vision/shared": "workspace:*",
+    "@vision/analytics": "workspace:*"
   }
 }

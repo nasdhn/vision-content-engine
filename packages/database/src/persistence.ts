@@ -31,6 +31,7 @@ import { Captures } from './captures.js';
 import { EditingProfiles } from './editing-profiles.js';
 import { Templates } from './templates.js';
 import { Distribution } from './distribution.js';
+import { AnalyticsRuntime } from './analytics.js';
 
 export class UnitOfWork {
   readonly recordings: Recordings;
@@ -38,6 +39,7 @@ export class UnitOfWork {
   readonly editingProfiles: EditingProfiles;
   readonly templates: Templates;
   readonly distribution: Distribution;
+  readonly analytics: AnalyticsRuntime;
   readonly knowledge: Knowledge;
   readonly patterns: Patterns;
   readonly versions: Versions;
@@ -50,6 +52,7 @@ export class UnitOfWork {
     this.editingProfiles = new EditingProfiles(tx, actor);
     this.templates = new Templates(tx, actor);
     this.distribution = new Distribution(tx, actor);
+    this.analytics = new AnalyticsRuntime(tx, actor);
     this.versions = new Versions(tx, actor);
     this.knowledge = new Knowledge(tx, actor);
     this.patterns = new Patterns(tx, actor);

@@ -19,3 +19,5 @@ export { KnowledgePayloadSchema } from './knowledge.js';
 export { Captures } from './captures.js';
 export { EditingProfiles } from './editing-profiles.js';
 export { Templates } from './templates.js';
+
+export { AnalyticsRuntime } from './analytics.js';

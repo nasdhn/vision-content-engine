@@ -11,7 +11,8 @@
     "pg": "8.23.0",
     "@vision/contracts": "workspace:*",
     "zod": "4.6.5",
-    "@vision/publishing": "workspace:*"
+    "@vision/publishing": "workspace:*",
+    "@vision/analytics": "workspace:*"
   },
   "exports": "./src/index.ts",
   "devDependencies": {

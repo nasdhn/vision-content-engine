@@ -1,0 +1,282 @@
+import { randomUUID } from 'node:crypto';
+import {
+  AnalyticsObservationSchema,
+  adapterKeyFor,
+  collectionDueAt,
+  collectionOperationIdFor,
+  collectionWindowsFor,
+  rawPayloadHash,
+} from '@vision/analytics';
+import type { AnalyticsCollectionSnapshot, AnalyticsWindowKey } from '@vision/analytics';
+import { invariant } from '@vision/domain';
+import type { Prisma } from './generated/prisma/client.js';
+import { audit, databaseTime, emit, lock } from './transaction.js';
+import type { Actor, Transaction } from './transaction.js';
+
+function json(value: unknown) {
+  return structuredClone(value) as Prisma.InputJsonValue;
+}
+
+function parseJobType(jobType: string) {
+  const match = /^ANALYTICS_COLLECT:([^:]+):(T_PLUS_(?:1H|6H|24H|72H|7D|30D))$/.exec(jobType);
+  invariant(match, 'INVALID_ANALYTICS_JOB_TYPE');
+  return { adapterKey: match[1]!, windowKey: match[2]! as AnalyticsWindowKey };
+}
+
+export class AnalyticsRuntime {
+  constructor(
+    private readonly tx: Transaction,
+    private readonly actor: Actor,
+  ) {}
+
+  async planPublication(publicationId: string) {
+    await this.tx
+      .$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`analytics:${publicationId}`}, 0))`;
+    const publication = await this.tx.publication.findUniqueOrThrow({
+      where: { id: publicationId },
+      include: { platformAccount: true },
+    });
+    invariant(
+      publication.status === 'PUBLISHED' && publication.publishedAt,
+      'PUBLICATION_NOT_PUBLISHED',
+    );
+    invariant(publication.remotePostId, 'REMOTE_POST_ID_REQUIRED');
+
+    const platform = publication.platformAccount.platform;
+    if (platform === 'TIKTOK') {
+      return { kind: 'MANUAL_DEFERRED', publicationId } as const;
+    }
+
+    const existing = await this.tx.workflowRun.findFirst({
+      where: {
+        workflowType: 'ANALYTICS',
+        rootEntityType: 'PublicationAnalytics',
+        rootEntityId: publication.id,
+      },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      include: { jobAttempts: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] } },
+    });
+    if (existing) {
+      return {
+        kind: 'EXISTING',
+        publicationId,
+        workflowRunId: existing.id,
+        jobAttemptIds: existing.jobAttempts.map((row) => row.id),
+      } as const;
+    }
+
+    const adapterKey = adapterKeyFor(platform);
+    const windows = collectionWindowsFor(platform, 'PLATFORM_API');
+    invariant(windows.length > 0, 'ANALYTICS_WINDOWS_UNAVAILABLE');
+    const now = await databaseTime(this.tx);
+    const workflow = await this.tx.workflowRun.create({
+      data: {
+        workflowType: 'ANALYTICS',
+        rootEntityType: 'PublicationAnalytics',
+        rootEntityId: publication.id,
+        status: 'WAITING',
+        currentStep: 'measurement_windows',
+        startedAt: now,
+      },
+    });
+
+    const jobAttemptIds: string[] = [];
+    for (const window of windows) {
+      const operationId = collectionOperationIdFor({
+        publicationId: publication.id,
+        adapterKey,
+        windowKey: window.key,
+        collectionMethod: 'PLATFORM_API',
+      });
+      const scheduledFor = collectionDueAt(publication.publishedAt, window);
+      const job = await this.tx.jobAttempt.create({
+        data: {
+          workflowRunId: workflow.id,
+          queueName: 'vce-analytics',
+          jobType: `ANALYTICS_COLLECT:${adapterKey}:${window.key}`,
+          operationId,
+          attemptNumber: 1,
+          status: 'QUEUED',
+        },
+      });
+      const payload = {
+        schemaVersion: 'v1',
+        kind: 'COLLECT_PLATFORM_METRICS',
+        workflowRunId: workflow.id,
+        jobAttemptId: job.id,
+        publicationId: publication.id,
+        platformAccountId: publication.platformAccountId,
+        platform,
+        adapterKey,
+        windowKey: window.key,
+        collectionOperationId: operationId,
+        scheduledFor: scheduledFor.toISOString(),
+      } as const;
+      await emit(this.tx, {
+        eventType: 'Analytics.collection.requested',
+        aggregateType: 'JobAttempt',
+        aggregateId: job.id,
+        payloadJson: json(payload),
+        availableAt: scheduledFor,
+      });
+      jobAttemptIds.push(job.id);
+    }
+
+    await audit(this.tx, this.actor, 'Analytics.collectionPlanned', 'Publication', publication.id);
+    return { kind: 'PLANNED', publicationId, workflowRunId: workflow.id, jobAttemptIds } as const;
+  }
+
+  async beginCollection(jobAttemptId: string) {
+    await lock(this.tx, 'JobAttempt', jobAttemptId);
+    const job = await this.tx.jobAttempt.findUniqueOrThrow({
+      where: { id: jobAttemptId },
+      include: { workflowRun: true },
+    });
+    invariant(
+      job.workflowRun && job.workflowRun.workflowType === 'ANALYTICS',
+      'ANALYTICS_WORKFLOW_REQUIRED',
+    );
+    if (job.status === 'SUCCEEDED') return { kind: 'ALREADY_DONE', jobAttemptId } as const;
+    invariant(job.status === 'QUEUED' || job.status === 'RUNNING', 'ANALYTICS_JOB_NOT_RUNNABLE');
+    invariant(job.workflowRun.rootEntityType === 'PublicationAnalytics', 'INVALID_ANALYTICS_ROOT');
+    const publication = await this.tx.publication.findUniqueOrThrow({
+      where: { id: job.workflowRun.rootEntityId },
+      include: { platformAccount: true },
+    });
+    invariant(
+      publication.status === 'PUBLISHED' && publication.publishedAt,
+      'PUBLICATION_NOT_PUBLISHED',
+    );
+    invariant(publication.remotePostId, 'REMOTE_POST_ID_REQUIRED');
+    const { adapterKey, windowKey } = parseJobType(job.jobType);
+    const event = await this.tx.outboxEvent.findFirstOrThrow({
+      where: {
+        eventType: 'Analytics.collection.requested',
+        aggregateType: 'JobAttempt',
+        aggregateId: job.id,
+      },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+    const payload = event.payloadJson as Record<string, unknown>;
+    invariant(
+      payload['scheduledFor'] && typeof payload['scheduledFor'] === 'string',
+      'SCHEDULED_FOR_REQUIRED',
+    );
+    invariant(
+      job.operationId === payload['collectionOperationId'],
+      'COLLECTION_OPERATION_MISMATCH',
+    );
+    const now = await databaseTime(this.tx);
+    await this.tx.jobAttempt.update({
+      where: { id: job.id },
+      data: {
+        status: 'RUNNING',
+        startedAt: job.startedAt ?? now,
+        workerId: 'worker-analytics',
+        leaseToken: randomUUID(),
+        leaseAcquiredAt: now,
+        heartbeatAt: now,
+        leaseExpiresAt: new Date(now.getTime() + 60_000),
+      },
+    });
+    await this.tx.workflowRun.update({
+      where: { id: job.workflowRun.id },
+      data: { status: 'RUNNING', currentStep: windowKey },
+    });
+    const snapshot: AnalyticsCollectionSnapshot = Object.freeze({
+      publicationId: publication.id,
+      platformAccountId: publication.platformAccountId,
+      platform: publication.platformAccount.platform,
+      remotePostId: publication.remotePostId,
+      publishedAt: publication.publishedAt.toISOString(),
+      adapterKey,
+      windowKey,
+      scheduledFor: payload['scheduledFor'],
+      collectionOperationId: job.operationId,
+    });
+    return { kind: 'READY', snapshot } as const;
+  }
+
+  async completeCollection(jobAttemptId: string, input: unknown) {
+    const observation = AnalyticsObservationSchema.parse(input);
+    await lock(this.tx, 'JobAttempt', jobAttemptId);
+    const job = await this.tx.jobAttempt.findUniqueOrThrow({
+      where: { id: jobAttemptId },
+      include: { workflowRun: true },
+    });
+    invariant(
+      job.workflowRun && job.workflowRun.workflowType === 'ANALYTICS',
+      'ANALYTICS_WORKFLOW_REQUIRED',
+    );
+    const publicationId = job.workflowRun.rootEntityId;
+    const publication = await this.tx.publication.findUniqueOrThrow({
+      where: { id: publicationId },
+      include: { platformAccount: true },
+    });
+    const existingRaw = await this.tx.metricSnapshotRaw.findUnique({
+      where: { collectionOperationId: job.operationId },
+      include: { normalizedSnapshots: true },
+    });
+    if (existingRaw) {
+      await this.tx.jobAttempt.updateMany({
+        where: { id: job.id, status: { not: 'SUCCEEDED' } },
+        data: { status: 'SUCCEEDED', finishedAt: await databaseTime(this.tx) },
+      });
+      return {
+        kind: 'EXISTING',
+        rawSnapshotId: existingRaw.id,
+        normalizedSnapshotId: existingRaw.normalizedSnapshots[0]?.id ?? null,
+      } as const;
+    }
+    invariant(job.status === 'RUNNING' || job.status === 'QUEUED', 'ANALYTICS_JOB_NOT_RUNNABLE');
+    const now = await databaseTime(this.tx);
+    const raw = await this.tx.metricSnapshotRaw.create({
+      data: {
+        publicationId,
+        platform: publication.platformAccount.platform,
+        collectedAt: new Date(observation.collectedAt),
+        providerSchemaVersion: observation.providerSchemaVersion,
+        collectionMethod: 'PLATFORM_API',
+        collectionOperationId: job.operationId,
+        payloadJson: json(observation.rawPayload),
+        payloadHash: rawPayloadHash(observation.rawPayload),
+      },
+    });
+    const normalized = await this.tx.metricSnapshotNormalized.create({
+      data: {
+        publicationId,
+        rawSnapshotId: raw.id,
+        collectedAt: new Date(observation.collectedAt),
+        ...observation.metrics,
+        ...(observation.otherMetrics === null
+          ? {}
+          : { otherMetricsJson: json(observation.otherMetrics) }),
+        availabilityJson: json(observation.availability),
+        comparabilityJson: json(observation.comparability),
+        normalizerVersion: observation.normalizerVersion,
+        metricSemanticsVersion: observation.metricSemanticsVersion,
+      },
+    });
+    await this.tx.jobAttempt.update({
+      where: { id: job.id },
+      data: { status: 'SUCCEEDED', finishedAt: now },
+    });
+    const remaining = await this.tx.jobAttempt.count({
+      where: { workflowRunId: job.workflowRun.id, status: { not: 'SUCCEEDED' } },
+    });
+    await this.tx.workflowRun.update({
+      where: { id: job.workflowRun.id },
+      data:
+        remaining === 0
+          ? { status: 'SUCCEEDED', currentStep: 'complete', finishedAt: now }
+          : { status: 'WAITING', currentStep: 'measurement_windows' },
+    });
+    await audit(this.tx, this.actor, 'Analytics.snapshotCollected', 'MetricSnapshotRaw', raw.id);
+    return {
+      kind: 'COLLECTED',
+      rawSnapshotId: raw.id,
+      normalizedSnapshotId: normalized.id,
+      payloadHash: raw.payloadHash,
+    } as const;
+  }
+}

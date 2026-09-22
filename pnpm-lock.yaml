@@ -108,6 +108,9 @@ importers:
 
   apps/control:
     dependencies:
+      '@vision/analytics':
+        specifier: workspace:*
+        version: link:../../packages/analytics
       '@vision/database':
         specifier: workspace:*
         version: link:../../packages/database
@@ -145,7 +148,17 @@ importers:
 
   apps/worker-ai: {}
 
-  apps/worker-analytics: {}
+  apps/worker-analytics:
+    dependencies:
+      '@vision/analytics':
+        specifier: workspace:*
+        version: link:../../packages/analytics
+      '@vision/database':
+        specifier: workspace:*
+        version: link:../../packages/database
+      bullmq:
+        specifier: 6.3.8
+        version: 6.3.8(ioredis@5.11.1)(pg@8.23.0)
 
   apps/worker-capture:
     dependencies:
@@ -241,7 +254,11 @@ importers:
         specifier: 4.6.5
         version: 4.6.5
 
-  packages/analytics: {}
+  packages/analytics:
+    dependencies:
+      zod:
+        specifier: 4.6.5
+        version: 4.6.5
 
   packages/application:
     dependencies:
@@ -281,6 +298,9 @@ importers:
       '@prisma/client':
         specifier: 7.10.0
         version: 7.10.0(prisma@7.10.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@5.9.3))(typescript@5.9.3)
+      '@vision/analytics':
+        specifier: workspace:*
+        version: link:../analytics
       '@vision/contracts':
         specifier: workspace:*
         version: link:../contracts
