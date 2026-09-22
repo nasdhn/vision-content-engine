@@ -21,4 +21,4 @@ export { EditingProfiles } from './editing-profiles.js';
 export { Templates } from './templates.js';
 
 export { AnalyticsRuntime } from './analytics.js';
-export type { VisionAttributionInput } from './analytics.js';
+export type { VisionAttributionInput, UmamiImportInput } from './analytics.js';

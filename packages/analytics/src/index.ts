@@ -387,3 +387,5 @@ export function parseAnalyticsOutboxEvent(event: {
 export * from './youtube.js';
 
 export * from './instagram.js';
+
+export * from './umami.js';

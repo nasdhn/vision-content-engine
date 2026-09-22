@@ -9,8 +9,19 @@ import {
   normalizeTikTokManualMetrics,
   parseManualTikTokJobType,
   rawPayloadHash,
+  attributionHintsForUmamiEvent,
+  platformHintForUmamiEvent,
+  umamiEventKind,
+  UMAMI_ATTRIBUTION_POLICY_VERSION,
+  UMAMI_PROVIDER_SCHEMA_VERSION,
+  UmamiInferencePolicySchema,
 } from '@vision/analytics';
-import type { AnalyticsCollectionSnapshot, AnalyticsWindowKey } from '@vision/analytics';
+import type {
+  AnalyticsCollectionSnapshot,
+  AnalyticsWindowKey,
+  UmamiEventRow,
+  UmamiInferencePolicy,
+} from '@vision/analytics';
 import { invariant } from '@vision/domain';
 import type { Prisma } from './generated/prisma/client.js';
 import { audit, databaseTime, emit, lock } from './transaction.js';
@@ -26,6 +37,11 @@ export type VisionAttributionInput = Readonly<{
   valueAmountMinor?: number;
   valueCurrency?: string;
   metadata?: Record<string, unknown>;
+}>;
+
+export type UmamiImportInput = Readonly<{
+  row: UmamiEventRow;
+  inferencePolicy: UmamiInferencePolicy;
 }>;
 
 function json(value: unknown) {
@@ -521,6 +537,193 @@ export class AnalyticsRuntime {
       confidenceType: row.confidenceType,
       publicationId: row.publicationId,
       campaignId: row.campaignId,
+    } as const;
+  }
+
+  async ingestUmamiEvent(input: UmamiImportInput) {
+    const policy = UmamiInferencePolicySchema.parse(input.inferencePolicy);
+    const row = input.row;
+    const lockKey = `umami-event:${row.id}`;
+    await this.tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
+
+    const existingAttribution = await this.tx.attributionEvent.findUnique({
+      where: {
+        sourceSystem_externalEventId: {
+          sourceSystem: 'UMAMI',
+          externalEventId: row.id,
+        },
+      },
+    });
+    if (existingAttribution) {
+      return {
+        kind: 'EXISTING',
+        evidenceKind: 'WEBSITE_VISIT',
+        evidenceId: existingAttribution.id,
+        confidenceType: existingAttribution.confidenceType,
+      } as const;
+    }
+
+    const existingObservation = await this.tx.auditEvent.findFirst({
+      where: {
+        action: 'Analytics.umamiMarketingObservationImported',
+        subjectType: 'UmamiEvent',
+        subjectId: row.id,
+      },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+    if (existingObservation) {
+      return {
+        kind: 'EXISTING',
+        evidenceKind: 'WEB_MARKETING_OBSERVATION',
+        evidenceId: existingObservation.id,
+        confidenceType: null,
+      } as const;
+    }
+
+    const hints = attributionHintsForUmamiEvent(row);
+    const baseMetadata = {
+      providerSchemaVersion: UMAMI_PROVIDER_SCHEMA_VERSION,
+      attributionPolicyVersion: UMAMI_ATTRIBUTION_POLICY_VERSION,
+      botExclusionApplied: false,
+      rawEvent: row,
+      attributionHints: hints,
+    };
+
+    if (umamiEventKind(row) === 'WEB_MARKETING_OBSERVATION') {
+      const created = await this.tx.auditEvent.create({
+        data: {
+          ...this.actor,
+          action: 'Analytics.umamiMarketingObservationImported',
+          subjectType: 'UmamiEvent',
+          subjectId: row.id,
+          metadataJson: json(baseMetadata),
+        },
+      });
+      return {
+        kind: 'IMPORTED',
+        evidenceKind: 'WEB_MARKETING_OBSERVATION',
+        evidenceId: created.id,
+        confidenceType: null,
+      } as const;
+    }
+
+    let publicationId: string | null = null;
+    let campaignId: string | null = null;
+    let confidenceType: 'DIRECT' | 'INFERRED' | 'UNKNOWN' = 'UNKNOWN';
+    let source = 'umami_unknown';
+
+    if (hints.trackingCode) {
+      const publication = await this.tx.publication.findUnique({
+        where: { trackingCode: hints.trackingCode },
+        select: {
+          id: true,
+          render: {
+            select: {
+              editingPlanVersion: {
+                select: {
+                  creativePlanVersion: {
+                    select: {
+                      creativePlan: {
+                        select: {
+                          concept: { select: { brief: { select: { campaignId: true } } } },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      if (publication) {
+        publicationId = publication.id;
+        campaignId =
+          publication.render.editingPlanVersion.creativePlanVersion.creativePlan.concept.brief
+            .campaignId;
+        confidenceType = 'DIRECT';
+        source = 'umami_utm_content_tracking_code';
+      }
+    }
+
+    if (confidenceType === 'UNKNOWN' && policy.enabled && hints.utmContent === null) {
+      const platform = platformHintForUmamiEvent(row);
+      if (platform) {
+        const occurredAt = new Date(row.createdAt);
+        const lowerBound = new Date(occurredAt.getTime() - policy.maxAgeMinutes * 60_000);
+        const candidates = await this.tx.publication.findMany({
+          where: {
+            status: 'PUBLISHED',
+            publishedAt: { gte: lowerBound, lte: occurredAt },
+            platformAccount: { platform },
+          },
+          orderBy: [{ publishedAt: 'desc' }, { id: 'asc' }],
+          take: 2,
+          select: {
+            id: true,
+            render: {
+              select: {
+                editingPlanVersion: {
+                  select: {
+                    creativePlanVersion: {
+                      select: {
+                        creativePlan: {
+                          select: {
+                            concept: { select: { brief: { select: { campaignId: true } } } },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        });
+        if (candidates.length === 1) {
+          const publication = candidates[0]!;
+          publicationId = publication.id;
+          campaignId =
+            publication.render.editingPlanVersion.creativePlanVersion.creativePlan.concept.brief
+              .campaignId;
+          confidenceType = 'INFERRED';
+          source = 'umami_platform_temporal_inference';
+        }
+      }
+    }
+
+    const created = await this.tx.attributionEvent.create({
+      data: {
+        publicationId,
+        campaignId,
+        eventType: 'WEBSITE_VISIT',
+        occurredAt: new Date(row.createdAt),
+        source,
+        sourceSystem: 'UMAMI',
+        externalEventId: row.id,
+        confidenceType,
+        externalVisitorId: row.sessionId,
+        metadataJson: json({
+          ...baseMetadata,
+          inferencePolicy: policy,
+          countsAsWebsiteVisit: true,
+        }),
+      },
+    });
+    await audit(
+      this.tx,
+      this.actor,
+      'Analytics.umamiVisitImported',
+      'AttributionEvent',
+      created.id,
+    );
+    return {
+      kind: 'IMPORTED',
+      evidenceKind: 'WEBSITE_VISIT',
+      evidenceId: created.id,
+      confidenceType: created.confidenceType,
+      publicationId: created.publicationId,
+      campaignId: created.campaignId,
     } as const;
   }
 }
