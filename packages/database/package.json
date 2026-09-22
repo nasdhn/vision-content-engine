@@ -10,7 +10,8 @@
     "@vision/domain": "workspace:*",
     "pg": "8.23.0",
     "@vision/contracts": "workspace:*",
-    "zod": "4.6.5"
+    "zod": "4.6.5",
+    "@vision/publishing": "workspace:*"
   },
   "exports": "./src/index.ts",
   "devDependencies": {

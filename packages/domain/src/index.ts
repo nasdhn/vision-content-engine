@@ -95,6 +95,38 @@ export function assertTransition(
   const states: Readonly<Record<string, readonly string[]>> = transitions[machine];
   invariant(states[from]?.includes(to), 'INVALID_TRANSITION');
 }
+
+export const publicationTransitions = {
+  API_AUTOMATED: {
+    DRAFT: ['SCHEDULED', 'CANCELLED'],
+    SCHEDULED: ['PUBLISHING', 'CANCELLED'],
+    PUBLISHING: ['PUBLISHED', 'FAILED', 'PUBLISHING_UNKNOWN'],
+    PUBLISHING_UNKNOWN: ['PUBLISHED', 'FAILED', 'PUBLISHING'],
+    PUBLISHED: [],
+    FAILED: [],
+    CANCELLED: [],
+  },
+  MANUAL_HANDOFF: {
+    DRAFT: ['SCHEDULED', 'CANCELLED'],
+    SCHEDULED: ['READY_FOR_MANUAL_PUBLISH', 'CANCELLED'],
+    READY_FOR_MANUAL_PUBLISH: ['PUBLISHED', 'CANCELLED'],
+    PUBLISHING: [],
+    PUBLISHING_UNKNOWN: [],
+    PUBLISHED: [],
+    FAILED: [],
+    CANCELLED: [],
+  },
+} as const;
+
+export function assertPublicationTransition(
+  deliveryMode: keyof typeof publicationTransitions,
+  from: string,
+  to: string,
+): void {
+  const states: Readonly<Record<string, readonly string[]>> = publicationTransitions[deliveryMode];
+  invariant(states[from]?.includes(to), 'INVALID_PUBLICATION_TRANSITION');
+}
+
 /** A lease expiry is never evidence of remote absence. */
 export function assertPublicationRetry(status: string, absenceEstablished: boolean): void {
   invariant(status !== 'PUBLISHING_UNKNOWN' || absenceEstablished, 'RECONCILIATION_REQUIRED');

@@ -104,14 +104,23 @@ export class Leases {
       return row;
     });
   }
-  async claimOutbox(owner: string) {
+  async claimOutbox(owner: string, eventTypes?: readonly string[]) {
     invariant(owner.trim(), 'OWNER_REQUIRED');
+    if (eventTypes !== undefined) invariant(eventTypes.length > 0, 'EVENT_TYPES_REQUIRED');
     return this.client.$transaction(async (tx) => {
-      const rows = await tx.$queryRaw<OutboxEvent[]>`
-        SELECT * FROM "OutboxEvent" WHERE
-          ("status" = 'PENDING' AND "availableAt" <= clock_timestamp()) OR
-          ("status" = 'DISPATCHING' AND "claimExpiresAt" <= clock_timestamp())
-        ORDER BY "availableAt", "id" FOR UPDATE SKIP LOCKED LIMIT 1`;
+      const rows =
+        eventTypes === undefined
+          ? await tx.$queryRaw<OutboxEvent[]>`
+            SELECT * FROM "OutboxEvent" WHERE
+              ("status" = 'PENDING' AND "availableAt" <= clock_timestamp()) OR
+              ("status" = 'DISPATCHING' AND "claimExpiresAt" <= clock_timestamp())
+            ORDER BY "availableAt", "id" FOR UPDATE SKIP LOCKED LIMIT 1`
+          : await tx.$queryRaw<OutboxEvent[]>(Prisma.sql`
+            SELECT * FROM "OutboxEvent" WHERE (
+              ("status" = 'PENDING' AND "availableAt" <= clock_timestamp()) OR
+              ("status" = 'DISPATCHING' AND "claimExpiresAt" <= clock_timestamp())
+            ) AND "eventType" = ANY(${[...eventTypes]}::text[])
+            ORDER BY "availableAt", "id" FOR UPDATE SKIP LOCKED LIMIT 1`);
       const row = rows[0];
       if (!row) return null;
       const now = await databaseTime(tx);

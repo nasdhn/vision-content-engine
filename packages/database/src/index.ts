@@ -2,6 +2,12 @@
 export { PrismaClient, Prisma } from './generated/prisma/client.js';
 export { createDatabaseClient } from './client.js';
 export { Persistence, UnitOfWork } from './persistence.js';
+export { Distribution } from './distribution.js';
+export type {
+  DistributionSnapshot,
+  PublishAttemptResult,
+  ReconciliationResult,
+} from './distribution.js';
 export { Leases, outboxDelivery } from './leases.js';
 export type { RecoveryPolicies } from './leases.js';
 export type { Actor, OutboxInput } from './transaction.js';
