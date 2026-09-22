@@ -13,6 +13,7 @@ import type {
   ManualHandoffService,
   DistributionOperationsService,
   TikTokManualAnalyticsService,
+  VisionAttributionIngestService,
 } from '@vision/application';
 
 import {
@@ -30,6 +31,10 @@ import { SupportingReadController, SUPPORTING_READ } from './supporting.js';
 import { ManualPublishController, MANUAL_HANDOFF } from './manual-publish.js';
 import { DistributionOperationsController, DISTRIBUTION_OPERATIONS } from './distribution.js';
 import { TikTokManualAnalyticsController, TIKTOK_MANUAL_ANALYTICS } from './analytics.js';
+import {
+  VisionAttributionIngestController,
+  VISION_ATTRIBUTION_INGEST,
+} from './vision-attribution.js';
 
 const PROBES = Symbol('bootstrap-readiness-probes');
 
@@ -44,6 +49,7 @@ export type ApiBusinessOptions = {
   manualHandoff?: ManualHandoffService;
   distribution?: DistributionOperationsService;
   analyticsManual?: TikTokManualAnalyticsService;
+  visionAttribution?: VisionAttributionIngestService;
 };
 
 @Controller()
@@ -77,6 +83,7 @@ export async function createApi(probes: ReadinessProbes, business?: ApiBusinessO
       ...(business?.manualHandoff ? [ManualPublishController] : []),
       ...(business?.distribution ? [DistributionOperationsController] : []),
       ...(business?.analyticsManual ? [TikTokManualAnalyticsController] : []),
+      ...(business?.visionAttribution ? [VisionAttributionIngestController] : []),
     ],
     providers: [
       { provide: PROBES, useValue: probes },
@@ -160,6 +167,14 @@ export async function createApi(probes: ReadinessProbes, business?: ApiBusinessO
             },
           ]
         : []),
+      ...(business?.visionAttribution
+        ? [
+            {
+              provide: VISION_ATTRIBUTION_INGEST,
+              useValue: business.visionAttribution,
+            },
+          ]
+        : []),
     ],
   })
   class BootstrapModule {}
@@ -167,5 +182,6 @@ export async function createApi(probes: ReadinessProbes, business?: ApiBusinessO
   return NestFactory.create(BootstrapModule, {
     logger: false,
     abortOnError: false,
+    rawBody: true,
   });
 }

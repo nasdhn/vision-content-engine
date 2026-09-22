@@ -6,6 +6,7 @@ const databasePassword = secret();
 const redisPassword = secret();
 const values = {
   VCE_LOCAL_ACCESS_KEY: secret(),
+  VCE_VISION_ATTRIBUTION_INGEST_SECRET: secret(),
   POSTGRES_PASSWORD: databasePassword,
   REDIS_PASSWORD: redisPassword,
   DATABASE_URL: `postgresql://vce_local:${databasePassword}@127.0.0.1:55432/vision_content_engine`,
@@ -25,13 +26,20 @@ try {
   if (error.code === 'EEXIST') {
     const path = new URL('../.env', import.meta.url);
     const existing = await readFile(path, 'utf8');
+    const additions = [];
     if (!/^VCE_LOCAL_ACCESS_KEY=/m.test(existing)) {
-      await writeFile(path, existing + `\nVCE_LOCAL_ACCESS_KEY=${values.VCE_LOCAL_ACCESS_KEY}\n`, {
-        mode: 0o600,
-      });
+      additions.push(`VCE_LOCAL_ACCESS_KEY=${values.VCE_LOCAL_ACCESS_KEY}`);
+    }
+    if (!/^VCE_VISION_ATTRIBUTION_INGEST_SECRET=/m.test(existing)) {
+      additions.push(
+        `VCE_VISION_ATTRIBUTION_INGEST_SECRET=${values.VCE_VISION_ATTRIBUTION_INGEST_SECRET}`,
+      );
+    }
+    if (additions.length > 0) {
+      await writeFile(path, `${existing.trimEnd()}\n${additions.join('\n')}\n`, { mode: 0o600 });
     }
     console.log(
-      'Existing LOCAL credentials preserved; missing local access key initialized privately.',
+      'Existing LOCAL credentials preserved; missing local secrets initialized privately.',
     );
   } else {
     // eslint-disable-next-line preserve-caught-error -- Do not expose secret-bearing I/O diagnostics.

@@ -10,6 +10,7 @@ import {
   ManualHandoffService,
   DistributionOperationsService,
   TikTokManualAnalyticsService,
+  VisionAttributionIngestService,
 } from '@vision/application';
 import { S3PrivateStorage } from '@vision/media';
 import { parseConfig } from '@vision/shared';
@@ -37,6 +38,11 @@ async function main() {
       realProvidersEnabled: false,
     });
     const analyticsManual = new TikTokManualAnalyticsService(db);
+    const visionAttribution = config.VCE_VISION_ATTRIBUTION_INGEST_SECRET
+      ? new VisionAttributionIngestService(db, {
+          secret: config.VCE_VISION_ATTRIBUTION_INGEST_SECRET,
+        })
+      : undefined;
     const supporting = new SupportingReadService(db, {
       environment: config.VCE_ENV,
       webOrigin: config.VCE_WEB_ORIGIN,
@@ -67,6 +73,7 @@ async function main() {
       manualHandoff,
       distribution,
       analyticsManual,
+      ...(visionAttribution ? { visionAttribution } : {}),
     });
 
     const close = async () => {

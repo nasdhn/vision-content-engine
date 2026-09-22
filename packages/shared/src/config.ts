@@ -5,6 +5,10 @@ const secret = z
   .string()
   .min(1)
   .refine((value) => value !== 'GENERATED_BY_LOCAL_INIT');
+const hmacSecret = z
+  .string()
+  .min(32)
+  .refine((value) => value !== 'GENERATED_BY_LOCAL_INIT');
 const url = (protocols: string[]) =>
   z
     .string()
@@ -17,6 +21,7 @@ const url = (protocols: string[]) =>
 const environmentSchema = z
   .object({
     VCE_LOCAL_ACCESS_KEY: secret.optional(),
+    VCE_VISION_ATTRIBUTION_INGEST_SECRET: hmacSecret.optional(),
     VCE_WEB_ORIGIN: z.literal('http://localhost:5174').default('http://localhost:5174'),
     VCE_ENV: z.enum(['LOCAL', 'STAGING_CAPTURE', 'PRODUCTION']).default('LOCAL'),
     VCE_API_HOST: z.literal('127.0.0.1').default('127.0.0.1'),

@@ -16,6 +16,18 @@ import type { Prisma } from './generated/prisma/client.js';
 import { audit, databaseTime, emit, lock } from './transaction.js';
 import type { Actor, Transaction } from './transaction.js';
 
+export type VisionAttributionInput = Readonly<{
+  externalEventId: string;
+  eventType: 'SIGNUP' | 'ACTIVATION' | 'CUSTOMER' | 'REVENUE';
+  occurredAt: Date;
+  userId?: string;
+  trackingCode?: string;
+  campaignTrackingCode?: string;
+  valueAmountMinor?: number;
+  valueCurrency?: string;
+  metadata?: Record<string, unknown>;
+}>;
+
 function json(value: unknown) {
   return structuredClone(value) as Prisma.InputJsonValue;
 }
@@ -417,6 +429,98 @@ export class AnalyticsRuntime {
       normalizedSnapshotId: normalized.id,
       windowKey,
       payloadHash: raw.payloadHash,
+    } as const;
+  }
+
+  async ingestVisionAttribution(input: VisionAttributionInput) {
+    await this.tx
+      .$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`vision-attribution:${input.externalEventId}`}, 0))`;
+    invariant(
+      !(await this.tx.attributionEvent.findUnique({
+        where: {
+          sourceSystem_externalEventId: {
+            sourceSystem: 'VISION_APP',
+            externalEventId: input.externalEventId,
+          },
+        },
+      })),
+      'VISION_ATTRIBUTION_REPLAY',
+    );
+
+    let publicationId: string | null = null;
+    let campaignId: string | null = null;
+    let confidenceType: 'DIRECT' | 'UNKNOWN' = 'UNKNOWN';
+    let source = 'vision_signed_ingest';
+
+    if (input.trackingCode) {
+      const publication = await this.tx.publication.findUnique({
+        where: { trackingCode: input.trackingCode },
+        select: {
+          id: true,
+          render: {
+            select: {
+              editingPlanVersion: {
+                select: {
+                  creativePlanVersion: {
+                    select: {
+                      creativePlan: {
+                        select: {
+                          concept: { select: { brief: { select: { campaignId: true } } } },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      invariant(publication, 'VISION_ATTRIBUTION_TRACKING_CODE_NOT_FOUND');
+      publicationId = publication.id;
+      campaignId =
+        publication.render.editingPlanVersion.creativePlanVersion.creativePlan.concept.brief
+          .campaignId;
+      confidenceType = 'DIRECT';
+      source = 'publication_tracking_code';
+    }
+
+    const metadata = {
+      ...(input.metadata ?? {}),
+      ...(input.campaignTrackingCode ? { campaignTrackingCode: input.campaignTrackingCode } : {}),
+    };
+    const row = await this.tx.attributionEvent.create({
+      data: {
+        publicationId,
+        campaignId,
+        eventType: input.eventType,
+        occurredAt: input.occurredAt,
+        source,
+        sourceSystem: 'VISION_APP',
+        externalEventId: input.externalEventId,
+        confidenceType,
+        ...(input.userId ? { userId: input.userId } : {}),
+        ...(input.valueAmountMinor !== undefined
+          ? { valueAmountMinor: BigInt(input.valueAmountMinor) }
+          : {}),
+        ...(input.valueCurrency !== undefined ? { valueCurrency: input.valueCurrency } : {}),
+        ...(Object.keys(metadata).length > 0 ? { metadataJson: json(metadata) } : {}),
+      },
+    });
+    await audit(
+      this.tx,
+      this.actor,
+      'Analytics.visionAttributionIngested',
+      'AttributionEvent',
+      row.id,
+    );
+    return {
+      kind: 'INGESTED',
+      attributionEventId: row.id,
+      externalEventId: row.externalEventId,
+      confidenceType: row.confidenceType,
+      publicationId: row.publicationId,
+      campaignId: row.campaignId,
     } as const;
   }
 }

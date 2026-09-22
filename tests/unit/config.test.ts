@@ -24,6 +24,15 @@ describe('bootstrap configuration safety', () => {
       'DATABASE_URL',
     );
   });
+  it('accepts only strong optional Vision attribution ingest secrets', () => {
+    expect(
+      parseConfig({ ...configFixture, VCE_VISION_ATTRIBUTION_INGEST_SECRET: 'x'.repeat(64) })
+        .VCE_VISION_ATTRIBUTION_INGEST_SECRET,
+    ).toHaveLength(64);
+    expect(() =>
+      parseConfig({ ...configFixture, VCE_VISION_ATTRIBUTION_INGEST_SECRET: 'too-short' }),
+    ).toThrow('VCE_VISION_ATTRIBUTION_INGEST_SECRET');
+  });
   it('does not reflect secret-bearing input values in validation errors', () => {
     expect(() =>
       parseConfig({ ...configFixture, DATABASE_URL: 'invalid-sensitive-value' }),
