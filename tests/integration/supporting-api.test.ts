@@ -59,7 +59,7 @@ const settingsSummary = vi.fn(async () => ({
   authMode: 'LOCAL_SINGLE_USER',
   storageMode: 'PRIVATE_S3_COMPATIBLE',
   publicationMutationAvailable: false,
-  analyticsEvidenceAvailable: false,
+  analyticsEvidenceAvailable: true,
   safety: {
     pauseAllPublishing: true,
     pauseAiGeneration: true,

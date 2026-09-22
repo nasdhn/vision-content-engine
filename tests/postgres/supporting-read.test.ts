@@ -116,7 +116,7 @@ it('reads calendar, published state and settings without creating Phase 7 capabi
   expect(published).toMatchObject({ readOnly: true, remotePublishingAvailable: false });
   expect(settings).toMatchObject({
     publicationMutationAvailable: false,
-    analyticsEvidenceAvailable: false,
+    analyticsEvidenceAvailable: true,
     platformAccounts: [
       expect.objectContaining({
         id: seeded.account.id,

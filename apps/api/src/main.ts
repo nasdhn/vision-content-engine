@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { createDatabaseClient } from '@vision/database';
 import {
+  AnalyticsReadService,
   ConceptReviewService,
   DashboardReadService,
   ProductionReadService,
@@ -37,6 +38,7 @@ async function main() {
     const distribution = new DistributionOperationsService(db, {
       realProvidersEnabled: false,
     });
+    const analyticsRead = new AnalyticsReadService(db);
     const analyticsManual = new TikTokManualAnalyticsService(db);
     const visionAttribution = config.VCE_VISION_ATTRIBUTION_INGEST_SECRET
       ? new VisionAttributionIngestService(db, {
@@ -72,6 +74,7 @@ async function main() {
       supporting,
       manualHandoff,
       distribution,
+      analyticsRead,
       analyticsManual,
       ...(visionAttribution ? { visionAttribution } : {}),
     });

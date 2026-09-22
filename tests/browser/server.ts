@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { postgresFixture } from '../../packages/database/test/support.js';
 import { createApi } from '../../apps/api/src/app.js';
 import {
+  AnalyticsReadService,
   ConceptReviewService,
   DashboardReadService,
   ProductionReadService,
@@ -29,6 +30,7 @@ const distribution = new DistributionOperationsService(fixture.client, {
   realProvidersEnabled: false,
   publishers: new StaticPublisherRegistry([browserHealthPublisher]),
 });
+const analyticsRead = new AnalyticsReadService(fixture.client);
 const analyticsManual = new TikTokManualAnalyticsService(fixture.client);
 const supporting = new SupportingReadService(fixture.client, {
   environment: 'LOCAL',
@@ -62,6 +64,7 @@ const app = await createApi(
     supporting,
     manualHandoff,
     distribution,
+    analyticsRead,
     analyticsManual,
   },
 );
@@ -306,7 +309,7 @@ try {
     },
   });
 
-  await fixture.client.publication.create({
+  const analyticsInstagramPublication = await fixture.client.publication.create({
     data: {
       renderId: publicationRender.id,
       platformAccountId: platformAccount.id,
@@ -319,6 +322,73 @@ try {
       mediaAssetId: publicationAsset.id,
       metadataJson: {},
     },
+  });
+
+  const analyticsRaw = await fixture.client.metricSnapshotRaw.create({
+    data: {
+      publicationId: analyticsInstagramPublication.id,
+      platform: 'INSTAGRAM',
+      collectedAt: new Date('2026-09-22T08:05:00.000Z'),
+      providerSchemaVersion: 'browser-instagram-fixture-v1',
+      collectionMethod: 'PLATFORM_API',
+      collectionOperationId: randomUUID(),
+      payloadJson: { fixture: true },
+    },
+  });
+  await fixture.client.metricSnapshotNormalized.create({
+    data: {
+      publicationId: analyticsInstagramPublication.id,
+      rawSnapshotId: analyticsRaw.id,
+      collectedAt: analyticsRaw.collectedAt,
+      views: 1200n,
+      likes: 0n,
+      comments: null,
+      shares: 12n,
+      availabilityJson: {
+        status: 'AVAILABLE',
+        unavailableMetrics: ['comments'],
+        notes: ['Commentaires indisponibles dans cette fixture.'],
+      },
+      comparabilityJson: {
+        crossPlatformViewsComparable: false,
+        notes: [
+          'Les vues Instagram ne doivent pas être comparées automatiquement aux vues YouTube.',
+        ],
+      },
+      normalizerVersion: 'browser-instagram-normalizer-v1',
+      metricSemanticsVersion: 'canonical-metrics-v1',
+    },
+  });
+  await fixture.client.attributionEvent.createMany({
+    data: [
+      {
+        publicationId: analyticsInstagramPublication.id,
+        eventType: 'WEBSITE_VISIT',
+        occurredAt: new Date('2026-09-22T08:10:00.000Z'),
+        source: 'browser-direct',
+        sourceSystem: 'UMAMI',
+        externalEventId: `browser-direct-${randomUUID()}`,
+        confidenceType: 'DIRECT',
+      },
+      {
+        publicationId: analyticsInstagramPublication.id,
+        eventType: 'WEBSITE_VISIT',
+        occurredAt: new Date('2026-09-22T08:11:00.000Z'),
+        source: 'browser-inferred',
+        sourceSystem: 'UMAMI',
+        externalEventId: `browser-inferred-${randomUUID()}`,
+        confidenceType: 'INFERRED',
+      },
+      {
+        publicationId: analyticsInstagramPublication.id,
+        eventType: 'SIGNUP',
+        occurredAt: new Date('2026-09-22T08:12:00.000Z'),
+        source: 'browser-signup',
+        sourceSystem: 'VISION_APP',
+        externalEventId: `browser-signup-${randomUUID()}`,
+        confidenceType: 'DIRECT',
+      },
+    ],
   });
 
   const tiktokAccount = await fixture.client.platformAccount.create({

@@ -1388,3 +1388,170 @@ textarea {
     grid-template-columns: 1fr;
   }
 }
+
+.analytics-section-heading {
+  max-width: none;
+  margin-top: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.analytics-funnel-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.analytics-funnel-card {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.analytics-funnel-card small {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.analytics-revenue-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.analytics-revenue-row > div:first-child {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.analytics-revenue-row strong {
+  font-size: 1.5rem;
+}
+
+.analytics-revenue-values,
+.analytics-quality-list {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.analytics-two-column {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.analytics-detail-list {
+  grid-template-columns: minmax(130px, 0.5fr) minmax(0, 1fr);
+}
+
+.analytics-confidence-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.analytics-confidence-grid > div,
+.analytics-publication-metrics > div {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+  padding: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #f7f9f7;
+}
+
+.analytics-confidence-grid span,
+.analytics-publication-metrics span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.analytics-confidence-grid strong,
+.analytics-publication-metrics strong {
+  overflow-wrap: anywhere;
+}
+
+.analytics-platform-grid,
+.analytics-experiment-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.analytics-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.analytics-card-header h3 {
+  margin-top: 0;
+}
+
+.analytics-warning {
+  margin: 0.65rem 0 0;
+  padding: 0.65rem 0.75rem;
+  border-radius: 12px;
+  background: #fff6df;
+  color: #725414;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.analytics-publication-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.analytics-publication-card {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.analytics-publication-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+@media (max-width: 980px) {
+  .analytics-funnel-grid,
+  .analytics-publication-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .analytics-platform-grid,
+  .analytics-experiment-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .analytics-section-heading,
+  .analytics-revenue-row,
+  .analytics-card-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .analytics-two-column,
+  .analytics-platform-grid,
+  .analytics-experiment-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .analytics-funnel-grid,
+  .analytics-confidence-grid,
+  .analytics-publication-metrics {
+    grid-template-columns: 1fr;
+  }
+}

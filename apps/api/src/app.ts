@@ -12,6 +12,7 @@ import type {
   SupportingReadService,
   ManualHandoffService,
   DistributionOperationsService,
+  AnalyticsReadService,
   TikTokManualAnalyticsService,
   VisionAttributionIngestService,
 } from '@vision/application';
@@ -30,7 +31,12 @@ import { RenderReviewController, RENDER_REVIEW } from './review.js';
 import { SupportingReadController, SUPPORTING_READ } from './supporting.js';
 import { ManualPublishController, MANUAL_HANDOFF } from './manual-publish.js';
 import { DistributionOperationsController, DISTRIBUTION_OPERATIONS } from './distribution.js';
-import { TikTokManualAnalyticsController, TIKTOK_MANUAL_ANALYTICS } from './analytics.js';
+import {
+  ANALYTICS_READ,
+  AnalyticsReadController,
+  TikTokManualAnalyticsController,
+  TIKTOK_MANUAL_ANALYTICS,
+} from './analytics.js';
 import {
   VisionAttributionIngestController,
   VISION_ATTRIBUTION_INGEST,
@@ -48,6 +54,7 @@ export type ApiBusinessOptions = {
   supporting?: SupportingReadService;
   manualHandoff?: ManualHandoffService;
   distribution?: DistributionOperationsService;
+  analyticsRead?: AnalyticsReadService;
   analyticsManual?: TikTokManualAnalyticsService;
   visionAttribution?: VisionAttributionIngestService;
 };
@@ -82,6 +89,7 @@ export async function createApi(probes: ReadinessProbes, business?: ApiBusinessO
       ...(business?.supporting ? [SupportingReadController] : []),
       ...(business?.manualHandoff ? [ManualPublishController] : []),
       ...(business?.distribution ? [DistributionOperationsController] : []),
+      ...(business?.analyticsRead ? [AnalyticsReadController] : []),
       ...(business?.analyticsManual ? [TikTokManualAnalyticsController] : []),
       ...(business?.visionAttribution ? [VisionAttributionIngestController] : []),
     ],
@@ -156,6 +164,14 @@ export async function createApi(probes: ReadinessProbes, business?: ApiBusinessO
             {
               provide: DISTRIBUTION_OPERATIONS,
               useValue: business.distribution,
+            },
+          ]
+        : []),
+      ...(business?.analyticsRead
+        ? [
+            {
+              provide: ANALYTICS_READ,
+              useValue: business.analyticsRead,
             },
           ]
         : []),

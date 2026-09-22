@@ -459,6 +459,94 @@ type DistributionOverview = {
   }[];
 };
 
+type AnalyticsReadModel = {
+  generatedAt: string;
+  funnel: {
+    websiteVisits: ConfidenceCounts;
+    signups: ConfidenceCounts;
+    activations: ConfidenceCounts;
+    customers: ConfidenceCounts;
+    revenueEvents: ConfidenceCounts;
+    revenueByCurrency: { currency: string; amountMinor: string; eventCount: number }[];
+  };
+  attribution: ConfidenceCounts;
+  freshness: {
+    latestEvidenceAt: string | null;
+    ageSeconds: number | null;
+    publicationsWithoutMeasurement: number;
+  };
+  quality: { states: { code: string; count: number }[] };
+  platforms: {
+    platform: string;
+    publishedCount: number;
+    measuredCount: number;
+    latestCollectedAt: string | null;
+    attribution: ConfidenceCounts;
+    warnings: string[];
+  }[];
+  publications: {
+    publicationId: string;
+    platform: string;
+    accountName: string;
+    title: string;
+    campaignName: string;
+    remoteUrl: string | null;
+    publishedAt: string;
+    measurement: null | {
+      collectedAt: string;
+      ageSeconds: number;
+      windowKey: string | null;
+      windowLabel: string;
+      collectionMethod: string;
+      metricSemanticsVersion: string;
+      availabilityStatus: string;
+      unavailableMetrics: string[];
+      notes: string[];
+      comparabilityNotes: string[];
+      metrics: {
+        views: string | null;
+        engagedViews: string | null;
+        reach: string | null;
+        impressions: string | null;
+        likes: string | null;
+        comments: string | null;
+        shares: string | null;
+        saves: string | null;
+        watchTimeMs: string | null;
+        avgWatchDurationMs: number | null;
+        avgWatchPercentage: number | null;
+        completionRate: number | null;
+        profileVisits: string | null;
+        websiteClicks: string | null;
+        follows: string | null;
+      };
+    };
+    attribution: ConfidenceCounts;
+  }[];
+  experiments: {
+    id: string;
+    name: string;
+    hypothesis: string;
+    primaryMetric: string | null;
+    status: string;
+    startedAt: string | null;
+    endedAt: string | null;
+    arms: {
+      id: string;
+      label: string;
+      publicationId: string | null;
+      conceptVersionId: string | null;
+    }[];
+  }[];
+};
+
+type ConfidenceCounts = {
+  total: number;
+  direct: number;
+  inferred: number;
+  unknown: number;
+};
+
 type TikTokManualAnalyticsOverview = {
   generatedAt: string;
   collectionMethod: 'MANUAL_ENTRY';
@@ -483,7 +571,7 @@ type SettingsSummary = {
   authMode: 'LOCAL_SINGLE_USER';
   storageMode: 'PRIVATE_S3_COMPATIBLE';
   publicationMutationAvailable: false;
-  analyticsEvidenceAvailable: false;
+  analyticsEvidenceAvailable: boolean;
   safety: {
     pauseAllPublishing: boolean;
     pauseAiGeneration: boolean;
@@ -2696,18 +2784,20 @@ function DistributionView({
   );
 }
 
-function TikTokManualAnalyticsView({
+function AnalyticsView({
   model,
+  manual,
   busy,
   onSubmit,
 }: {
-  model: TikTokManualAnalyticsOverview | null;
+  model: AnalyticsReadModel | null;
+  manual: TikTokManualAnalyticsOverview | null;
   busy: boolean;
   onSubmit: (jobAttemptId: string, values: Record<string, number>) => Promise<void>;
 }) {
   const [drafts, setDrafts] = useState<Record<string, Record<string, string>>>({});
   const duePrompts =
-    model?.prompts.filter((prompt) => ['DUE', 'OVERDUE'].includes(prompt.state)) ?? [];
+    manual?.prompts.filter((prompt) => ['DUE', 'OVERDUE'].includes(prompt.state)) ?? [];
 
   function update(jobAttemptId: string, key: string, value: string) {
     setDrafts((current) => ({
@@ -2728,42 +2818,313 @@ function TikTokManualAnalyticsView({
     ['follows', 'Abonnements'],
   ] as const;
 
+  const funnelStages = model
+    ? ([
+        ['Visites', model.funnel.websiteVisits],
+        ['Inscriptions', model.funnel.signups],
+        ['Activations', model.funnel.activations],
+        ['Clients', model.funnel.customers],
+      ] as const)
+    : [];
+
+  function metric(value: string | number | null) {
+    return value === null ? 'Indisponible' : String(value);
+  }
+
+  function age(seconds: number | null) {
+    if (seconds === null) return 'Indisponible';
+    if (seconds < 60) return `${seconds}s`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)} min`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)} h`;
+    return `${Math.floor(seconds / 86400)} j`;
+  }
+
+  function confidence(counts: ConfidenceCounts) {
+    return `Direct ${counts.direct} · Inféré ${counts.inferred} · Inconnu ${counts.unknown}`;
+  }
+
   return (
     <>
       <section className="page-heading">
-        <p className="eyebrow">PHASE 8 · TIKTOK MANUEL</p>
+        <p className="eyebrow">PHASE 8 · ÉVIDENCE</p>
         <h1>Analytics</h1>
         <p>
-          TikTok reste en saisie manuelle. Les champs laissés vides restent indisponibles et ne
-          deviennent jamais zéro.
+          Lecture canonique des mesures, du funnel et de l’attribution. Une donnée indisponible
+          reste indisponible : elle ne devient jamais zéro.
         </p>
       </section>
-      <section className="metric-grid analytics-summary">
-        <article className="metric-card">
-          <span>À saisir</span>
-          <strong data-testid="analytics-due-count">{model?.summary.due ?? 0}</strong>
+
+      <section className="panel analytics-funnel-panel">
+        <div className="section-heading analytics-section-heading">
+          <div>
+            <p className="eyebrow">FUNNEL MÉTIER</p>
+            <h2>De la visite au client</h2>
+          </div>
+          <p className="support-note">Attribution directe, inférée et inconnue restent séparées.</p>
+        </div>
+        <div className="metric-grid analytics-funnel-grid">
+          {funnelStages.map(([label, counts]) => (
+            <article className="metric-card analytics-funnel-card" key={label}>
+              <span>{label}</span>
+              <strong>{counts.total}</strong>
+              <small>{confidence(counts)}</small>
+            </article>
+          ))}
+        </div>
+        <div className="analytics-revenue-row">
+          <div>
+            <span className="support-note">Événements revenu</span>
+            <strong>{model?.funnel.revenueEvents.total ?? 0}</strong>
+          </div>
+          <div className="analytics-revenue-values">
+            {(model?.funnel.revenueByCurrency.length ?? 0) === 0 ? (
+              <span className="support-note">Aucun revenu observé.</span>
+            ) : (
+              model?.funnel.revenueByCurrency.map((row) => (
+                <span className="status-pill" key={row.currency}>
+                  {row.currency} {row.amountMinor} unités mineures · {row.eventCount} événement(s)
+                </span>
+              ))
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="analytics-two-column">
+        <article className="panel">
+          <div className="section-heading analytics-section-heading">
+            <div>
+              <p className="eyebrow">FRAÎCHEUR & QUALITÉ</p>
+              <h2>État des preuves</h2>
+            </div>
+          </div>
+          <dl className="detail-list analytics-detail-list">
+            <dt>Dernière mesure</dt>
+            <dd>
+              {model?.freshness.latestEvidenceAt
+                ? new Date(model.freshness.latestEvidenceAt).toLocaleString('fr-FR')
+                : 'Indisponible'}
+            </dd>
+            <dt>Âge</dt>
+            <dd>{age(model?.freshness.ageSeconds ?? null)}</dd>
+            <dt>Publications sans mesure</dt>
+            <dd>{model?.freshness.publicationsWithoutMeasurement ?? 0}</dd>
+          </dl>
+          <div className="analytics-quality-list">
+            {(model?.quality.states.length ?? 0) === 0 ? (
+              <p className="empty-state">Aucun état qualité matérialisé actuellement.</p>
+            ) : (
+              model?.quality.states.map((state) => (
+                <span className="status-pill" key={state.code}>
+                  {state.code} · {state.count}
+                </span>
+              ))
+            )}
+          </div>
         </article>
-        <article className="metric-card">
-          <span>En retard</span>
-          <strong data-testid="analytics-overdue-count">{model?.summary.overdue ?? 0}</strong>
-        </article>
-        <article className="metric-card">
-          <span>À venir</span>
-          <strong data-testid="analytics-upcoming-count">{model?.summary.upcoming ?? 0}</strong>
-        </article>
-        <article className="metric-card">
-          <span>Terminées</span>
-          <strong data-testid="analytics-completed-count">{model?.summary.completed ?? 0}</strong>
+
+        <article className="panel">
+          <div className="section-heading analytics-section-heading">
+            <div>
+              <p className="eyebrow">ATTRIBUTION GLOBALE</p>
+              <h2>Confiance explicite</h2>
+            </div>
+          </div>
+          <div className="analytics-confidence-grid">
+            <div>
+              <span>Direct</span>
+              <strong data-testid="analytics-direct-total">{model?.attribution.direct ?? 0}</strong>
+            </div>
+            <div>
+              <span>Inféré</span>
+              <strong data-testid="analytics-inferred-total">
+                {model?.attribution.inferred ?? 0}
+              </strong>
+            </div>
+            <div>
+              <span>Inconnu</span>
+              <strong>{model?.attribution.unknown ?? 0}</strong>
+            </div>
+          </div>
+          <p className="support-note">
+            Les événements inférés ne sont jamais fusionnés silencieusement avec les attributions
+            directes.
+          </p>
         </article>
       </section>
+
       <section className="panel">
-        <div className="section-heading">
+        <div className="section-heading analytics-section-heading">
           <div>
-            <p className="eyebrow">PROMPTS DUS</p>
-            <h2>Mesures TikTok</h2>
+            <p className="eyebrow">PLATEFORMES</p>
+            <h2>Couverture de mesure</h2>
           </div>
-          <p className="support-note">Objectif : moins d’une minute par saisie.</p>
         </div>
+        <div className="analytics-platform-grid">
+          {(model?.platforms.length ?? 0) === 0 ? (
+            <p className="empty-state">Aucune publication mesurable.</p>
+          ) : (
+            model?.platforms.map((platform) => (
+              <article className="support-card analytics-platform-card" key={platform.platform}>
+                <div className="analytics-card-header">
+                  <h3>{platform.platform}</h3>
+                  <span className="status-pill">
+                    {platform.measuredCount}/{platform.publishedCount} mesurée(s)
+                  </span>
+                </div>
+                <p className="support-note">{confidence(platform.attribution)}</p>
+                {platform.warnings.map((warning) => (
+                  <p className="analytics-warning" key={warning}>
+                    {warning}
+                  </p>
+                ))}
+              </article>
+            ))
+          )}
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="section-heading analytics-section-heading">
+          <div>
+            <p className="eyebrow">CONTENU</p>
+            <h2>Performance par publication</h2>
+          </div>
+          <p className="support-note">
+            Dernière observation disponible par publication, sans classement ni score.
+          </p>
+        </div>
+        <div className="analytics-publication-list">
+          {(model?.publications.length ?? 0) === 0 ? (
+            <p className="empty-state">Aucune publication publiée.</p>
+          ) : (
+            model?.publications.map((publication) => (
+              <article
+                className="support-card analytics-publication-card"
+                key={publication.publicationId}
+              >
+                <div className="analytics-card-header">
+                  <div>
+                    <p className="eyebrow">
+                      {publication.platform} · {publication.accountName}
+                    </p>
+                    <h3>{publication.title}</h3>
+                    <p className="support-note">{publication.campaignName}</p>
+                  </div>
+                  <span className="status-pill">
+                    {publication.measurement?.windowLabel ?? 'Sans mesure'}
+                  </span>
+                </div>
+                <div className="analytics-publication-metrics">
+                  <div>
+                    <span>Vues</span>
+                    <strong>{metric(publication.measurement?.metrics.views ?? null)}</strong>
+                  </div>
+                  <div>
+                    <span>Likes</span>
+                    <strong data-testid="analytics-publication-likes">
+                      {metric(publication.measurement?.metrics.likes ?? null)}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Commentaires</span>
+                    <strong data-testid="analytics-publication-comments">
+                      {metric(publication.measurement?.metrics.comments ?? null)}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Partages</span>
+                    <strong>{metric(publication.measurement?.metrics.shares ?? null)}</strong>
+                  </div>
+                </div>
+                <p className="support-note">
+                  Attribution : {confidence(publication.attribution)} · mesure{' '}
+                  {publication.measurement
+                    ? `âgée de ${age(publication.measurement.ageSeconds)}`
+                    : 'indisponible'}
+                </p>
+                {publication.measurement?.availabilityStatus !== 'AVAILABLE' &&
+                  publication.measurement && (
+                    <p className="analytics-warning">
+                      Qualité : {publication.measurement.availabilityStatus}
+                    </p>
+                  )}
+                {publication.measurement?.notes.map((note) => (
+                  <p className="support-note" key={note}>
+                    {note}
+                  </p>
+                ))}
+                {publication.remoteUrl && (
+                  <a href={publication.remoteUrl} target="_blank" rel="noreferrer">
+                    Ouvrir la publication
+                  </a>
+                )}
+              </article>
+            ))
+          )}
+        </div>
+      </section>
+
+      {(model?.experiments.length ?? 0) > 0 && (
+        <section className="panel">
+          <div className="section-heading analytics-section-heading">
+            <div>
+              <p className="eyebrow">EXPÉRIENCES</p>
+              <h2>Métadonnées observables</h2>
+            </div>
+            <p className="support-note">
+              Aucun gagnant ni conclusion causale n’est produit en Phase 8.
+            </p>
+          </div>
+          <div className="analytics-experiment-list">
+            {model?.experiments.map((experiment) => (
+              <article className="support-card" key={experiment.id}>
+                <div className="analytics-card-header">
+                  <h3>{experiment.name}</h3>
+                  <span className="status-pill">{experiment.status}</span>
+                </div>
+                <p>{experiment.hypothesis}</p>
+                <p className="support-note">
+                  Métrique primaire : {experiment.primaryMetric ?? 'Non définie'} ·{' '}
+                  {experiment.arms.length} bras
+                </p>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section className="panel">
+        <div className="section-heading analytics-section-heading">
+          <div>
+            <p className="eyebrow">TIKTOK · SAISIE MANUELLE</p>
+            <h2>Mesures dues</h2>
+          </div>
+          <p className="support-note">
+            TikTok reste en saisie manuelle. Les champs laissés vides restent indisponibles et ne
+            deviennent jamais zéro.
+          </p>
+        </div>
+        <section className="metric-grid analytics-summary">
+          <article className="metric-card">
+            <span>À saisir</span>
+            <strong data-testid="analytics-due-count">{manual?.summary.due ?? 0}</strong>
+          </article>
+          <article className="metric-card">
+            <span>En retard</span>
+            <strong data-testid="analytics-overdue-count">{manual?.summary.overdue ?? 0}</strong>
+          </article>
+          <article className="metric-card">
+            <span>À venir</span>
+            <strong data-testid="analytics-upcoming-count">{manual?.summary.upcoming ?? 0}</strong>
+          </article>
+          <article className="metric-card">
+            <span>Terminées</span>
+            <strong data-testid="analytics-completed-count">
+              {manual?.summary.completed ?? 0}
+            </strong>
+          </article>
+        </section>
         {duePrompts.length === 0 ? (
           <p className="empty-state">Aucune mesure TikTok n’est due pour le moment.</p>
         ) : (
@@ -2868,6 +3229,7 @@ function App() {
   const [templates, setTemplates] = useState<TemplateReadItem[]>([]);
   const [settings, setSettings] = useState<SettingsSummary | null>(null);
   const [distribution, setDistribution] = useState<DistributionOverview | null>(null);
+  const [analytics, setAnalytics] = useState<AnalyticsReadModel | null>(null);
   const [analyticsManual, setAnalyticsManual] = useState<TikTokManualAnalyticsOverview | null>(
     null,
   );
@@ -2911,6 +3273,7 @@ function App() {
       templateList,
       settingsRead,
       distributionRead,
+      analyticsRead,
       analyticsManualRead,
       recordingPacks,
       currentProduction,
@@ -2931,6 +3294,7 @@ function App() {
       call('templates', csrf),
       call('settings/summary', csrf),
       call('distribution', csrf),
+      call('analytics', csrf),
       call('analytics/manual', csrf),
       call('recording-packs', csrf),
       productionVersionId ? call(`production/${productionVersionId}`, csrf) : Promise.resolve(null),
@@ -2954,6 +3318,7 @@ function App() {
     setTemplates(templateList as TemplateReadItem[]);
     setSettings(settingsRead as SettingsSummary);
     setDistribution(distributionRead as DistributionOverview);
+    setAnalytics(analyticsRead as AnalyticsReadModel);
     setAnalyticsManual(analyticsManualRead as TikTokManualAnalyticsOverview);
     setPacks(recordingPacks as Pack[]);
     if (productionVersionId) setProductionDetail(currentProduction as ProductionDetail);
@@ -3355,8 +3720,9 @@ function App() {
           ) : pathname === '/settings' ? (
             <SettingsView summary={settings} />
           ) : pathname === '/analytics' ? (
-            <TikTokManualAnalyticsView
-              model={analyticsManual}
+            <AnalyticsView
+              model={analytics}
+              manual={analyticsManual}
               busy={busy}
               onSubmit={async (jobAttemptId, values) => {
                 setBusy(true);

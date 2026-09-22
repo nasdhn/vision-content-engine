@@ -464,7 +464,7 @@ export class SupportingReadService {
       authMode: 'LOCAL_SINGLE_USER' as const,
       storageMode: 'PRIVATE_S3_COMPATIBLE' as const,
       publicationMutationAvailable: false as const,
-      analyticsEvidenceAvailable: false as const,
+      analyticsEvidenceAvailable: true as const,
       safety: { ...this.options.safety },
       platformAccounts: accounts.map((account) => ({
         id: account.id,
