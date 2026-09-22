@@ -5,7 +5,9 @@ import type { PrismaClient } from '@vision/database';
 import type { RuntimeConfig } from '@vision/shared';
 import {
   DEFAULT_PUBLISH_RETRY_POLICY,
+  ProviderPublishError,
   PublishQueueJobSchema,
+  providerPublishFailure,
   retryDelayMs,
 } from '@vision/publishing';
 import type {
@@ -51,7 +53,10 @@ function redisConnectionOptions(redisUrl: string): WorkerOptions['connection'] {
 function assertPublisherAllowed(publisher: PlatformPublisher, options: PublishWorkerOptions) {
   if (options.pauseAllPublishing) throw new Error('PUBLISHING_PAUSED');
   if (publisher.isRealProvider && !options.realProvidersEnabled) {
-    throw new Error('REAL_PROVIDERS_DISABLED');
+    throw new ProviderPublishError({
+      responseClass: 'PERMANENT_FAILURE',
+      failureCode: 'REAL_PROVIDERS_DISABLED',
+    });
   }
 }
 
@@ -84,20 +89,22 @@ export class PublishWorkerOrchestrator {
     );
     if (begin.kind !== 'READY') return begin;
     const publisher = this.publishers.resolve(begin.snapshot.platform);
-    assertPublisherAllowed(publisher, this.options);
     let result: PublishResult;
     try {
+      assertPublisherAllowed(publisher, this.options);
       const preparation = await publisher.prepare(begin.snapshot);
       await this.persistence.transaction(
         { actorType: 'WORKER', actorId: 'worker-publish' },
         (unit) => unit.distribution.recordAttemptPreparation(job.publicationAttemptId, preparation),
       );
       result = await publisher.publish(begin.snapshot, preparation);
-    } catch {
-      result = {
-        responseClass: 'UNKNOWN_SIDE_EFFECT',
-        failureCode: 'UNCLASSIFIED_PROVIDER_ERROR',
-      };
+    } catch (error) {
+      result =
+        providerPublishFailure(error) ??
+        ({
+          responseClass: 'UNKNOWN_SIDE_EFFECT',
+          failureCode: 'UNCLASSIFIED_PROVIDER_ERROR',
+        } as const);
     }
     const delay =
       result.responseClass === 'TRANSIENT_FAILURE' || result.responseClass === 'RATE_LIMITED'
@@ -143,3 +150,5 @@ export function createBullMqPublishWorker(input: {
     { connection: redisConnectionOptions(input.redisUrl) },
   );
 }
+
+export * from './instagram-asset-lease.js';

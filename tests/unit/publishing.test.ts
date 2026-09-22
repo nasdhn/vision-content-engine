@@ -169,6 +169,7 @@ it('provides a deterministic fake publisher without real-provider capability', a
       attemptId: null,
       attemptNumber: null,
       remoteRequestId: null,
+      remotePostId: null,
       responseMetadata: null,
     },
     media: {
@@ -179,6 +180,9 @@ it('provides a deterministic fake publisher without real-provider capability', a
       width: 1080,
       height: 1920,
       durationMs: 10_000,
+      fps: 30,
+      audioChannels: 2,
+      sampleRate: 48_000,
     },
   };
   const preparation = await publisher.prepare(snapshot);

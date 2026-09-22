@@ -47,6 +47,7 @@ export type DistributionSnapshot = Readonly<{
     attemptId: string | null;
     attemptNumber: number | null;
     remoteRequestId: string | null;
+    remotePostId: string | null;
     responseMetadata: unknown;
   }>;
   media: Readonly<{
@@ -57,6 +58,9 @@ export type DistributionSnapshot = Readonly<{
     width: number | null;
     height: number | null;
     durationMs: number | null;
+    fps: number | null;
+    audioChannels: number | null;
+    sampleRate: number | null;
   }>;
 }>;
 
@@ -132,6 +136,7 @@ export class Distribution {
         attemptId: latestAttempt?.id ?? null,
         attemptNumber: latestAttempt?.attemptNumber ?? null,
         remoteRequestId: latestAttempt?.remoteRequestId ?? null,
+        remotePostId: latestAttempt?.remotePostId ?? null,
         responseMetadata: latestAttempt?.responseMetadataJson ?? null,
       }),
       media: Object.freeze({
@@ -142,6 +147,9 @@ export class Distribution {
         width: asset.width,
         height: asset.height,
         durationMs: asset.durationMs,
+        fps: asset.fps,
+        audioChannels: asset.audioChannels,
+        sampleRate: asset.sampleRate,
       }),
     });
   }

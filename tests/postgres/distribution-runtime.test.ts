@@ -288,6 +288,48 @@ it('publishes once with the fake provider and makes duplicate queue delivery har
   expect(publication.remotePostId).toMatch(/^fake-/);
 });
 
+it('fails closed before any real-provider side effect when live providers are disabled', async () => {
+  const created = await automatedPublication();
+  await new DistributionControl(db).dispatchDueOne(false);
+  const job = await publishJobFor(created.publication.id);
+  let providerCalls = 0;
+  const realPublisher = {
+    platform: 'INSTAGRAM' as const,
+    isRealProvider: true,
+    async prepare() {
+      providerCalls += 1;
+      return {};
+    },
+    async publish() {
+      providerCalls += 1;
+      return { responseClass: 'SUCCESS' as const, remotePostId: 'should-not-happen' };
+    },
+    async reconcile() {
+      providerCalls += 1;
+      return { kind: 'UNKNOWN' as const };
+    },
+  };
+  const worker = new PublishWorkerOrchestrator(db, new StaticPublisherRegistry([realPublisher]), {
+    pauseAllPublishing: false,
+    realProvidersEnabled: false,
+  });
+
+  await expect(worker.process(job)).resolves.toMatchObject({ kind: 'FAILED' });
+  expect(providerCalls).toBe(0);
+  expect(
+    await db.publication.findUniqueOrThrow({ where: { id: created.publication.id } }),
+  ).toHaveProperty('status', 'FAILED');
+  expect(
+    await db.publicationAttempt.findFirstOrThrow({
+      where: { publicationId: created.publication.id },
+    }),
+  ).toMatchObject({
+    status: 'FAILED',
+    responseClass: 'PERMANENT_FAILURE',
+    failureCode: 'REAL_PROVIDERS_DISABLED',
+  });
+});
+
 it('treats a redelivered RUNNING attempt as ambiguous instead of calling the provider twice', async () => {
   const created = await automatedPublication();
   await new DistributionControl(db).dispatchDueOne(false);

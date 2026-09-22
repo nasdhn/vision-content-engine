@@ -143,6 +143,7 @@ export type PublicationSnapshot = Readonly<{
     attemptId: string | null;
     attemptNumber: number | null;
     remoteRequestId: string | null;
+    remotePostId: string | null;
     responseMetadata: unknown;
   }>;
   media: Readonly<{
@@ -153,6 +154,9 @@ export type PublicationSnapshot = Readonly<{
     width: number | null;
     height: number | null;
     durationMs: number | null;
+    fps: number | null;
+    audioChannels: number | null;
+    sampleRate: number | null;
   }>;
 }>;
 
@@ -361,3 +365,6 @@ export function parseDistributionOutboxEvent(event: {
   }
   throw new Error('UNSUPPORTED_DISTRIBUTION_EVENT');
 }
+
+export * from './provider-error.js';
+export * from './instagram.js';
