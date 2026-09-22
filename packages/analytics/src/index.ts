@@ -68,7 +68,7 @@ export function collectionWindowsFor(
 
 export function adapterKeyFor(platform: z.infer<typeof AnalyticsPlatformSchema>) {
   if (platform === 'YOUTUBE') return 'YOUTUBE_ANALYTICS_V1';
-  if (platform === 'INSTAGRAM') return 'INSTAGRAM_INSIGHTS_V1';
+  if (platform === 'INSTAGRAM') return 'INSTAGRAM_ANALYTICS_V1';
   return 'TIKTOK_MANUAL_V1';
 }
 
@@ -385,3 +385,5 @@ export function parseAnalyticsOutboxEvent(event: {
 }
 
 export * from './youtube.js';
+
+export * from './instagram.js';
