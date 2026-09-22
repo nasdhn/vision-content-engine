@@ -8,6 +8,7 @@ import {
   RecordingPackService,
   RenderReviewService,
   SupportingReadService,
+  ManualHandoffService,
 } from '../../packages/application/src/index.js';
 import { Persistence } from '../../packages/database/src/index.js';
 import { MemoryStorage, recordingGraph } from '../fixtures/recordings/support.js';
@@ -19,6 +20,7 @@ const dashboard = new DashboardReadService(fixture.client);
 const concepts = new ConceptReviewService(fixture.client);
 const production = new ProductionReadService(fixture.client);
 const review = new RenderReviewService(fixture.client, storage);
+const manualHandoff = new ManualHandoffService(fixture.client, storage);
 const supporting = new SupportingReadService(fixture.client, {
   environment: 'LOCAL',
   webOrigin: 'http://localhost:5174',
@@ -49,6 +51,7 @@ const app = await createApi(
     production,
     review,
     supporting,
+    manualHandoff,
   },
 );
 
@@ -231,6 +234,15 @@ try {
     where: { id: publicationRender.id },
     data: { status: 'APPROVED', approvedAssetId: publicationAsset.id },
   });
+  await fixture.client.approval.create({
+    data: {
+      subjectType: 'RENDER',
+      renderId: publicationRender.id,
+      decision: 'APPROVED',
+      actorType: 'USER',
+      actorId: 'browser-fixture',
+    },
+  });
 
   const platformAccount = await fixture.client.platformAccount.create({
     data: {
@@ -265,6 +277,34 @@ try {
       remoteUrl: 'https://example.test/vision-browser-post',
       mediaAssetId: publicationAsset.id,
       metadataJson: {},
+    },
+  });
+
+  const tiktokAccount = await fixture.client.platformAccount.create({
+    data: {
+      platform: 'TIKTOK',
+      displayName: 'Vision TikTok',
+      remoteAccountId: `browser-tiktok-${randomUUID()}`,
+      status: 'ACTIVE',
+    },
+  });
+  await fixture.client.publication.create({
+    data: {
+      renderId: publicationRender.id,
+      platformAccountId: tiktokAccount.id,
+      deliveryMode: 'MANUAL_HANDOFF',
+      status: 'READY_FOR_MANUAL_PUBLISH',
+      scheduledAt: new Date('2026-09-22T10:00:00.000Z'),
+      mediaAssetId: publicationAsset.id,
+      metadataJson: {
+        schemaVersion: 'tiktok-manual-handoff-v1',
+        platform: 'TIKTOK',
+        caption: 'Voici comment Vision transforme une recherche en prospects qualifiés.',
+        hashtags: ['Vision', 'ProspectionB2B'],
+        ctaNotes: 'Tester Vision depuis le lien du profil.',
+        coverRecommendation: 'Résultat Vision visible dès la première frame.',
+        commercialDisclosureReminder: true,
+      },
     },
   });
 

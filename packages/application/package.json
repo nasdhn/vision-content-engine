@@ -11,6 +11,7 @@
     "@vision/domain": "workspace:*",
     "@vision/ai": "workspace:*",
     "zod": "4.6.5",
-    "@vision/media": "workspace:*"
+    "@vision/media": "workspace:*",
+    "@vision/publishing": "workspace:*"
   }
 }

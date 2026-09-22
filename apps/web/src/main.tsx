@@ -297,6 +297,37 @@ type PublishedReadModel = {
   entries: PublicationReadItem[];
 };
 
+type ManualHandoffItem = {
+  publicationId: string;
+  accountName: string;
+  status: string;
+  scheduledAt: string;
+  captionPreview: string;
+  hashtagCount: number;
+  commercialDisclosureReminder: boolean;
+};
+
+type ManualHandoffDetail = ManualHandoffItem & {
+  completionAllowed: boolean;
+  publishedAt: string | null;
+  remoteUrl: string | null;
+  metadata: {
+    caption: string;
+    hashtags: string[];
+    ctaNotes: string | null;
+    coverRecommendation: string | null;
+    commercialDisclosureReminder: boolean;
+  };
+  media: {
+    assetId: string;
+    mimeType: string;
+    sizeBytes: string;
+    width: number | null;
+    height: number | null;
+    durationMs: number | null;
+  };
+};
+
 type AssetReadItem = {
   assetId: string;
   kind: string;
@@ -479,6 +510,15 @@ const errors: Record<string, string> = {
   INVALID_RENDER_REASON: 'La raison de rejet du rendu n’est pas valide.',
   SUPPORTING_READ_OPERATION_FAILED: 'Cette surface de lecture est momentanément indisponible.',
   ASSET_NOT_FOUND: 'Cet asset est introuvable.',
+  MANUAL_HANDOFF_OPERATION_FAILED: 'Le handoff TikTok est momentanément indisponible.',
+  PUBLICATION_NOT_FOUND: 'Cette publication est introuvable.',
+  MANUAL_HANDOFF_REQUIRED: 'Cette publication ne relève pas du handoff manuel.',
+  TIKTOK_MANUAL_ONLY: 'Cette opération est réservée au handoff TikTok manuel.',
+  MANUAL_HANDOFF_NOT_AVAILABLE: 'Ce handoff TikTok n’est plus disponible dans cet état.',
+  MANUAL_TARGET_TIME_REQUIRED: 'L’heure cible du handoff est absente.',
+  INVALID_PUBLICATION_TRANSITION: 'Cette publication a déjà changé d’état. Rechargez la page.',
+  PLATFORM_ACCOUNT_NOT_ACTIVE: 'Le compte TikTok n’est plus actif.',
+  PUBLICATION_LINEAGE_INVALID: 'La lineage de cette publication n’est plus valide.',
 };
 
 const navigation = [
@@ -487,6 +527,7 @@ const navigation = [
   ['/concepts', 'Concepts'],
   ['/production', 'Production'],
   ['/review', 'Review finale'],
+  ['/manual-publish', 'TikTok manuel'],
   ['/calendar', 'Calendrier'],
   ['/published', 'Publiées'],
   ['/assets', 'Assets'],
@@ -1720,6 +1761,270 @@ function formatBytes(value: string | null) {
   return `${(size / 1024 ** 3).toFixed(1)} Gio`;
 }
 
+function ManualHandoffView({
+  pathname,
+  items,
+  detail,
+  busy,
+  onNavigate,
+  onComplete,
+}: {
+  pathname: string;
+  items: ManualHandoffItem[];
+  detail: ManualHandoffDetail | null;
+  busy: boolean;
+  onNavigate: (path: string) => void;
+  onComplete: (remoteUrl?: string) => Promise<void>;
+}) {
+  const publicationId = pathname.match(/^\/manual-publish\/([0-9a-f-]+)$/)?.[1];
+  const [remoteUrl, setRemoteUrl] = useState('');
+  const [confirmed, setConfirmed] = useState(false);
+  const [copyNotice, setCopyNotice] = useState('');
+
+  useEffect(() => {
+    setRemoteUrl(detail?.remoteUrl ?? '');
+    setConfirmed(false);
+    setCopyNotice('');
+  }, [detail?.publicationId]);
+
+  async function copyText(value: string, label: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopyNotice(`${label} copié.`);
+    } catch {
+      setCopyNotice('Copie impossible depuis ce navigateur. Sélectionnez le texte manuellement.');
+    }
+  }
+
+  if (!publicationId) {
+    return (
+      <>
+        <section className="page-heading">
+          <p className="eyebrow">TIKTOK — HANDOFF MANUEL</p>
+          <h1>À publier sur TikTok</h1>
+          <p>
+            Vision prépare la vidéo et les métadonnées. La publication finale reste une action
+            humaine dans l’application TikTok : aucun Direct Post API n’est utilisé.
+          </p>
+        </section>
+        {!items.length ? (
+          <section className="panel empty-state">
+            <h2>Aucun handoff TikTok prêt</h2>
+            <p>Les publications dues apparaîtront ici après passage à READY FOR MANUAL PUBLISH.</p>
+          </section>
+        ) : (
+          <section className="support-grid" aria-label="Handoffs TikTok prêts">
+            {items.map((item) => (
+              <article className="support-card" key={item.publicationId}>
+                <div className="support-card-head">
+                  <span className="badge">TIKTOK</span>
+                  <span className="badge subtle">PRÊT MANUELLEMENT</span>
+                </div>
+                <h2>{item.accountName}</h2>
+                <p>{item.captionPreview}</p>
+                <dl className="detail-list compact">
+                  <dt>Heure cible</dt>
+                  <dd>{formatDateTime(item.scheduledAt)}</dd>
+                  <dt>Hashtags</dt>
+                  <dd>{item.hashtagCount}</dd>
+                </dl>
+                {item.commercialDisclosureReminder && (
+                  <p className="manual-warning">Rappel de divulgation commerciale requis.</p>
+                )}
+                <AppLink
+                  href={`/manual-publish/${item.publicationId}`}
+                  onNavigate={onNavigate}
+                  className="text-link"
+                >
+                  Ouvrir le handoff
+                </AppLink>
+              </article>
+            ))}
+          </section>
+        )}
+      </>
+    );
+  }
+
+  if (!detail || detail.publicationId !== publicationId) {
+    return (
+      <section className="panel" aria-busy="true">
+        <p>Chargement du handoff TikTok…</p>
+      </section>
+    );
+  }
+
+  const hashtags = detail.metadata.hashtags
+    .map((tag) => (tag.startsWith('#') ? tag : `#${tag}`))
+    .join(' ');
+  const completeText = [detail.metadata.caption.trim(), hashtags].filter(Boolean).join('\n\n');
+
+  return (
+    <>
+      <section className="page-heading">
+        <p className="eyebrow">TIKTOK — HANDOFF MANUEL</p>
+        <h1>{detail.accountName}</h1>
+        <p>
+          Téléchargez la vidéo, copiez le paquet éditorial, publiez dans TikTok puis confirmez ici
+          uniquement lorsque la publication distante existe réellement.
+        </p>
+      </section>
+
+      <section className="manual-handoff-layout">
+        <article className="panel review-player-panel">
+          <div className="support-card-head">
+            <span className="badge">TIKTOK</span>
+            <span className="badge subtle">{detail.status.replaceAll('_', ' ')}</span>
+          </div>
+          <video
+            controls
+            preload="metadata"
+            src={`/api/manual-publish/${detail.publicationId}/media`}
+            aria-label="Prévisualisation privée TikTok"
+          />
+          <div className="actions">
+            <a
+              className="secondary-button download-link"
+              href={`/api/manual-publish/${detail.publicationId}/download`}
+              download
+            >
+              Télécharger la vidéo
+            </a>
+          </div>
+          <dl className="detail-list compact">
+            <dt>Heure cible</dt>
+            <dd>{formatDateTime(detail.scheduledAt)}</dd>
+            <dt>Format</dt>
+            <dd>
+              {detail.media.width ?? '?'} × {detail.media.height ?? '?'} ·{' '}
+              {detail.media.durationMs
+                ? `${(detail.media.durationMs / 1000).toFixed(1)} s`
+                : 'durée inconnue'}
+            </dd>
+            <dt>Asset</dt>
+            <dd>
+              <code>{detail.media.assetId.slice(0, 8)}</code>
+            </dd>
+          </dl>
+        </article>
+
+        <div className="manual-handoff-stack">
+          <article className="panel">
+            <p className="eyebrow">PAQUET ÉDITORIAL</p>
+            <h2>Légende</h2>
+            <pre className="copy-block">{detail.metadata.caption}</pre>
+            <div className="actions">
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => void copyText(detail.metadata.caption, 'Légende')}
+              >
+                Copier la légende
+              </button>
+            </div>
+
+            <h3>Hashtags</h3>
+            <pre className="copy-block">{hashtags || 'Aucun hashtag'}</pre>
+            <div className="actions">
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => void copyText(hashtags, 'Hashtags')}
+                disabled={!hashtags}
+              >
+                Copier les hashtags
+              </button>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => void copyText(completeText, 'Texte complet')}
+              >
+                Copier tout
+              </button>
+            </div>
+            {copyNotice && (
+              <p className="live-status" role="status" aria-live="polite">
+                {copyNotice}
+              </p>
+            )}
+
+            {detail.metadata.ctaNotes && (
+              <>
+                <h3>CTA</h3>
+                <p>{detail.metadata.ctaNotes}</p>
+              </>
+            )}
+            {detail.metadata.coverRecommendation && (
+              <>
+                <h3>Couverture</h3>
+                <p>{detail.metadata.coverRecommendation}</p>
+              </>
+            )}
+          </article>
+
+          <article className="panel manual-completion-panel">
+            <p className="eyebrow">APRÈS PUBLICATION DANS TIKTOK</p>
+            {detail.metadata.commercialDisclosureReminder && (
+              <div className="manual-warning" role="note">
+                Vérifiez le réglage de divulgation commerciale approprié dans TikTok avant de
+                publier. Vision ne l’active pas à votre place.
+              </div>
+            )}
+
+            {detail.completionAllowed ? (
+              <>
+                <label>
+                  URL TikTok publiée — optionnelle
+                  <input
+                    type="url"
+                    inputMode="url"
+                    placeholder="https://www.tiktok.com/@.../video/..."
+                    value={remoteUrl}
+                    onChange={(event) => setRemoteUrl(event.target.value)}
+                  />
+                </label>
+                <label className="confirmation-check">
+                  <input
+                    type="checkbox"
+                    checked={confirmed}
+                    onChange={(event) => setConfirmed(event.target.checked)}
+                  />
+                  <span>Je confirme que cette vidéo a réellement été publiée dans TikTok.</span>
+                </label>
+                <button
+                  type="button"
+                  className="primary-button"
+                  disabled={busy || !confirmed}
+                  onClick={() => void onComplete(remoteUrl.trim() || undefined)}
+                >
+                  Marquer comme publiée
+                </button>
+              </>
+            ) : (
+              <>
+                <p>Cette publication a déjà été confirmée dans l’état canonique.</p>
+                <dl className="detail-list compact">
+                  <dt>Publiée</dt>
+                  <dd>{formatDateTime(detail.publishedAt)}</dd>
+                </dl>
+                {detail.remoteUrl && (
+                  <a className="text-link" href={detail.remoteUrl} target="_blank" rel="noreferrer">
+                    Ouvrir la publication TikTok
+                  </a>
+                )}
+              </>
+            )}
+          </article>
+        </div>
+      </section>
+
+      <AppLink href="/manual-publish" onNavigate={onNavigate} className="text-link">
+        Retour aux handoffs TikTok
+      </AppLink>
+    </>
+  );
+}
+
 function CalendarView({ model }: { model: CalendarReadModel | null }) {
   return (
     <>
@@ -1727,8 +2032,8 @@ function CalendarView({ model }: { model: CalendarReadModel | null }) {
         <p className="eyebrow">LECTURE SEULE</p>
         <h1>Calendrier</h1>
         <p>
-          État canonique des publications déjà planifiées. La création et la modification du
-          scheduling appartiennent à la Phase 7.
+          État canonique des publications déjà planifiées. Le scheduler Phase 7A peut les faire
+          avancer, mais cette vue reste volontairement en lecture seule.
         </p>
       </section>
       {!model ? (
@@ -1775,7 +2080,7 @@ function PublishedView({ model }: { model: PublishedReadModel | null }) {
         <h1>Publiées</h1>
         <p>
           Publications déjà présentes dans l’état canonique. Aucun upload distant, retry ou
-          reconcile n’est déclenché depuis cette page en Phase 6.
+          reconcile n’est déclenché directement depuis cette page.
         </p>
       </section>
       {!model ? (
@@ -1785,7 +2090,7 @@ function PublishedView({ model }: { model: PublishedReadModel | null }) {
       ) : !model.entries.length ? (
         <section className="panel empty-state">
           <h2>Aucune publication enregistrée</h2>
-          <p>La Phase 7 apportera les opérations de distribution.</p>
+          <p>Aucune publication canonique terminée n’est actuellement présente.</p>
         </section>
       ) : (
         <section className="support-grid" aria-label="Publications terminées">
@@ -2171,6 +2476,8 @@ function App() {
   const [reviewDetail, setReviewDetail] = useState<RenderReviewDetail | null>(null);
   const [calendar, setCalendar] = useState<CalendarReadModel | null>(null);
   const [published, setPublished] = useState<PublishedReadModel | null>(null);
+  const [manualHandoffs, setManualHandoffs] = useState<ManualHandoffItem[]>([]);
+  const [manualHandoffDetail, setManualHandoffDetail] = useState<ManualHandoffDetail | null>(null);
   const [assets, setAssets] = useState<AssetReadItem[]>([]);
   const [assetDetail, setAssetDetail] = useState<AssetReadDetail | null>(null);
   const [patterns, setPatterns] = useState<PatternReadItem[]>([]);
@@ -2200,6 +2507,7 @@ function App() {
   async function refresh() {
     const productionVersionId = pathname.match(/^\/production\/([0-9a-f-]+)$/)?.[1];
     const reviewRenderId = pathname.match(/^\/review\/([0-9a-f-]+)$/)?.[1];
+    const manualPublicationId = pathname.match(/^\/manual-publish\/([0-9a-f-]+)$/)?.[1];
     const assetId = pathname.match(/^\/assets\/([0-9a-f-]+)$/)?.[1];
     const [
       summary,
@@ -2207,6 +2515,7 @@ function App() {
       conceptQueue,
       productionQueue,
       reviewQueue,
+      manualQueue,
       calendarRead,
       publishedRead,
       assetList,
@@ -2216,6 +2525,7 @@ function App() {
       recordingPacks,
       currentProduction,
       currentReview,
+      currentManualHandoff,
       currentAsset,
     ] = await Promise.all([
       call('dashboard', csrf),
@@ -2223,6 +2533,7 @@ function App() {
       call('concepts/review', csrf),
       call('production', csrf),
       call('review', csrf),
+      call('manual-publish', csrf),
       call('calendar', csrf),
       call('published', csrf),
       call('assets', csrf),
@@ -2232,6 +2543,9 @@ function App() {
       call('recording-packs', csrf),
       productionVersionId ? call(`production/${productionVersionId}`, csrf) : Promise.resolve(null),
       reviewRenderId ? call(`review/${reviewRenderId}`, csrf) : Promise.resolve(null),
+      manualPublicationId
+        ? call(`manual-publish/${manualPublicationId}`, csrf)
+        : Promise.resolve(null),
       assetId ? call(`assets/${assetId}`, csrf) : Promise.resolve(null),
     ]);
 
@@ -2240,6 +2554,7 @@ function App() {
     setConcepts(conceptQueue as ConceptReviewItem[]);
     setProductions(productionQueue as ProductionItem[]);
     setReviews(reviewQueue as RenderReviewItem[]);
+    setManualHandoffs(manualQueue as ManualHandoffItem[]);
     setCalendar(calendarRead as CalendarReadModel);
     setPublished(publishedRead as PublishedReadModel);
     setAssets(assetList as AssetReadItem[]);
@@ -2249,6 +2564,7 @@ function App() {
     setPacks(recordingPacks as Pack[]);
     if (productionVersionId) setProductionDetail(currentProduction as ProductionDetail);
     if (reviewRenderId) setReviewDetail(currentReview as RenderReviewDetail);
+    if (manualPublicationId) setManualHandoffDetail(currentManualHandoff as ManualHandoffDetail);
     if (assetId) setAssetDetail(currentAsset as AssetReadDetail);
   }
 
@@ -2299,6 +2615,19 @@ function App() {
     setReviewDetail(null);
     void call(`review/${renderId}`, csrf)
       .then((value) => setReviewDetail(value as RenderReviewDetail))
+      .catch((caught) => setError(caught instanceof Error ? caught.message : 'Action impossible.'));
+  }, [csrf, pathname]);
+
+  useEffect(() => {
+    const publicationId = pathname.match(/^\/manual-publish\/([0-9a-f-]+)$/)?.[1];
+    if (!csrf || !publicationId) {
+      setManualHandoffDetail(null);
+      return;
+    }
+
+    setManualHandoffDetail(null);
+    void call(`manual-publish/${publicationId}`, csrf)
+      .then((value) => setManualHandoffDetail(value as ManualHandoffDetail))
       .catch((caught) => setError(caught instanceof Error ? caught.message : 'Action impossible.'));
   }, [csrf, pathname]);
 
@@ -2456,6 +2785,8 @@ function App() {
                   setProductionDetail(null);
                   setReviews([]);
                   setReviewDetail(null);
+                  setManualHandoffs([]);
+                  setManualHandoffDetail(null);
                   setCalendar(null);
                   setPublished(null);
                   setAssets([]);
@@ -2554,6 +2885,27 @@ function App() {
                       ? 'Rendu final approuvé.'
                       : 'Rendu rejeté et feedback enregistré.',
                   );
+                });
+              }}
+            />
+          ) : pathname === '/manual-publish' || pathname.startsWith('/manual-publish/') ? (
+            <ManualHandoffView
+              pathname={pathname}
+              items={manualHandoffs}
+              detail={manualHandoffDetail}
+              busy={busy}
+              onNavigate={navigate}
+              onComplete={async (remoteUrl) => {
+                const publicationId = pathname.match(/^\/manual-publish\/([0-9a-f-]+)$/)?.[1];
+                if (!publicationId) return;
+                await action(async () => {
+                  await call(`manual-publish/${publicationId}/complete`, csrf, {
+                    ...(remoteUrl ? { remoteUrl } : {}),
+                  });
+                  await refresh();
+                  setManualHandoffDetail(null);
+                  navigate('/published');
+                  setNotice('Publication TikTok confirmée dans l’état canonique.');
                 });
               }}
             />

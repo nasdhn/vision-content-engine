@@ -276,6 +276,35 @@ export class Distribution {
     } as const;
   }
 
+  async completeManual(publicationId: string, remoteUrl?: string) {
+    await lock(this.tx, 'Publication', publicationId);
+    const publication = await this.tx.publication.findUniqueOrThrow({
+      where: { id: publicationId },
+      include: { platformAccount: true },
+    });
+    invariant(publication.platformAccount.platform === 'TIKTOK', 'TIKTOK_MANUAL_ONLY');
+    invariant(publication.deliveryMode === 'MANUAL_HANDOFF', 'MANUAL_HANDOFF_REQUIRED');
+    assertPublicationTransition(publication.deliveryMode, publication.status, 'PUBLISHED');
+    await this.snapshot(publicationId);
+    const now = await databaseTime(this.tx);
+    const row = await this.tx.publication.update({
+      where: { id: publicationId },
+      data: {
+        status: 'PUBLISHED',
+        publishedAt: now,
+        ...(remoteUrl !== undefined ? { remoteUrl } : {}),
+      },
+    });
+    await changed(
+      this.tx,
+      this.actor,
+      'Publication.manual_completed',
+      'Publication',
+      publicationId,
+    );
+    return row;
+  }
+
   async beginAttempt(publicationAttemptId: string) {
     const attempt = await this.tx.publicationAttempt.findUniqueOrThrow({
       where: { id: publicationAttemptId },

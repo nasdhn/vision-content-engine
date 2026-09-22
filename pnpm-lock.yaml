@@ -254,6 +254,9 @@ importers:
       '@vision/media':
         specifier: workspace:*
         version: link:../media
+      '@vision/publishing':
+        specifier: workspace:*
+        version: link:../publishing
       zod:
         specifier: 4.6.5
         version: 4.6.5

@@ -7,6 +7,7 @@ import {
   RecordingPackService,
   RenderReviewService,
   SupportingReadService,
+  ManualHandoffService,
 } from '@vision/application';
 import { S3PrivateStorage } from '@vision/media';
 import { parseConfig } from '@vision/shared';
@@ -29,6 +30,7 @@ async function main() {
     const concepts = new ConceptReviewService(db);
     const production = new ProductionReadService(db);
     const review = new RenderReviewService(db, storage);
+    const manualHandoff = new ManualHandoffService(db, storage);
     const supporting = new SupportingReadService(db, {
       environment: config.VCE_ENV,
       webOrigin: config.VCE_WEB_ORIGIN,
@@ -56,6 +58,7 @@ async function main() {
       production,
       review,
       supporting,
+      manualHandoff,
     });
 
     const close = async () => {
