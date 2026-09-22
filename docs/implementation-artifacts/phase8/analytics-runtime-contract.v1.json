@@ -1,0 +1,96 @@
+{
+  "version": "phase8-analytics-runtime-v1",
+  "baselineHead": "754487d5b9d1ee5e2a39c8a355b00b9b647da883",
+  "branch": "phase/8-analytics",
+  "expectedPrismaMigration": false,
+  "authoritativeStore": "PostgreSQL",
+  "collectionSchedule": {
+    "source": "Publication.publishedAt + versioned collection window",
+    "eligiblePublicationStatus": "PUBLISHED",
+    "automatedWindows": [
+      "T_PLUS_1H",
+      "T_PLUS_6H",
+      "T_PLUS_24H",
+      "T_PLUS_72H",
+      "T_PLUS_7D",
+      "T_PLUS_30D"
+    ],
+    "manualTikTokWindows": ["T_PLUS_24H", "T_PLUS_72H", "T_PLUS_7D"],
+    "optionalManualTikTokWindows": ["T_PLUS_30D"]
+  },
+  "evidenceLayers": ["RAW", "NORMALIZED", "ATTRIBUTION"],
+  "nullSemantics": {
+    "null": "UNAVAILABLE_OR_UNOBSERVED",
+    "zero": "OBSERVED_ZERO"
+  },
+  "idempotence": {
+    "raw": "MetricSnapshotRaw.collectionOperationId",
+    "normalized": "rawSnapshotId + normalizerVersion",
+    "attribution": "sourceSystem + externalEventId"
+  },
+  "transport": {
+    "kind": "BullMQ",
+    "authoritative": false,
+    "businessIntent": "PostgreSQL WorkflowRun/JobAttempt + transactional OutboxEvent"
+  },
+  "jobPayloadPolicy": {
+    "allowedIdentifiers": [
+      "publicationId",
+      "platformAccountId",
+      "collectionOperationId",
+      "windowKey",
+      "jobAttemptId",
+      "outboxEventId"
+    ],
+    "forbidden": ["accessToken", "refreshToken", "apiKey", "hmacSecret", "credentialsValue"]
+  },
+  "collectionMethods": {
+    "INSTAGRAM": "PLATFORM_API",
+    "YOUTUBE": "PLATFORM_API",
+    "TIKTOK": "MANUAL_ENTRY"
+  },
+  "attributionConfidence": ["DIRECT", "INFERRED", "UNKNOWN"],
+  "sourceAuthority": {
+    "VISION_APP": ["SIGNUP", "ACTIVATION", "CUSTOMER", "REVENUE"],
+    "UMAMI": ["WEBSITE_VISIT", "WEB_MARKETING_OBSERVATION"]
+  },
+  "phaseBoundary": {
+    "phase8Owns": [
+      "raw snapshots",
+      "normalization",
+      "collection windows",
+      "TikTok manual metrics",
+      "Instagram analytics adapter",
+      "YouTube analytics adapter",
+      "Umami import",
+      "signed Vision event ingest",
+      "attribution",
+      "analytics read models/UI"
+    ],
+    "phase9Owns": [
+      "EvidencePolicy engine",
+      "Analyst",
+      "Insights",
+      "Recommendations",
+      "weekly learning report",
+      "next-test proposals"
+    ]
+  },
+  "liveSafety": {
+    "canonicalTestsUseFakeProviders": true,
+    "tiktokScrapingAllowed": false,
+    "instagramLiveRetentionVerificationRequired": true,
+    "youtubeAuthorizationComplianceRequired": true,
+    "youtubeDerivedMetricsPolicyAcceptanceNotAssumed": true
+  },
+  "tranches": [
+    "8A_RUNTIME_FOUNDATION",
+    "8B_TIKTOK_MANUAL_METRICS",
+    "8C_YOUTUBE_ANALYTICS_ADAPTER",
+    "8D_INSTAGRAM_ANALYTICS_ADAPTER",
+    "8E_VISION_SIGNED_ATTRIBUTION_INGEST",
+    "8F_UMAMI_IMPORT_ATTRIBUTION",
+    "8G_ANALYTICS_UI_READ_MODELS",
+    "8H_PHASE_CLOSURE"
+  ]
+}
