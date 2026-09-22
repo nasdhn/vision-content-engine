@@ -1,0 +1,71 @@
+{
+  "contractVersion": "phase9-learning-runtime-v1",
+  "baseCheckpoint": "e3c5494ceb0316c86119346b2228e5da10dd987d",
+  "branch": "phase/9-learning",
+  "prismaMigrationExpected": false,
+  "realProvidersEnabled": false,
+  "causalClaimsAllowed": false,
+  "strategyAutopilotAllowed": false,
+  "evidencePolicy": {
+    "key": "EVIDENCE_POLICY_RUNTIME_V1",
+    "confidenceLevels": ["INSUFFICIENT_DATA", "WEAK_SIGNAL", "INTERESTING_SIGNAL", "FAIRLY_SOLID"],
+    "singlePublicationMaxConfidence": "WEAK_SIGNAL",
+    "interestingSignal": {
+      "minimumComparablePublications": 3,
+      "minimumDistinctPublishDates": 2
+    },
+    "fairlySolid": {
+      "minimumComparablePublications": 6,
+      "minimumDistinctPublishDates": 3,
+      "requiresCompatibleMetricSemantics": true,
+      "requiresConsistentDirection": true,
+      "requiresOutlierCheck": true,
+      "requiresConfoundersDocumented": true
+    },
+    "outlierDominanceShare": 0.6,
+    "consistentDirectionShare": 0.75,
+    "requiresSameMeasurementWindowForDirectComparison": true
+  },
+  "sourceAuthority": {
+    "WEBSITE_VISIT": "UMAMI",
+    "SIGNUP": "VISION_APP",
+    "ACTIVATION": "VISION_APP",
+    "CUSTOMER": "VISION_APP",
+    "REVENUE": "VISION_APP"
+  },
+  "analyst": {
+    "capability": "ANALYST",
+    "receivesRawProviderPayload": false,
+    "mayExceedDeterministicConfidenceCeiling": false,
+    "evidenceIdsMustBeSubsetOfInput": true,
+    "deterministicLimitationsAreMandatory": true,
+    "promptInjectionDataIsInstructions": false
+  },
+  "recommendationLifecycle": {
+    "initialStatus": "PROPOSED",
+    "allowedTransitions": [
+      ["PROPOSED", "ACCEPTED"],
+      ["PROPOSED", "REJECTED"],
+      ["ACCEPTED", "EXECUTED"]
+    ],
+    "acceptanceCreatesExperimentAutomatically": false,
+    "explicitProposalActionCreatesDraftExperiment": true,
+    "proposalActionMustBeIdempotent": true
+  },
+  "weeklyAnalysis": {
+    "workflowType": "WEEKLY_ANALYSIS",
+    "window": "explicit UTC half-open [from,to)",
+    "operationIdentityStableAcrossRetry": true,
+    "atomicLearningOutputPersistence": true,
+    "workerPayloadSecretFree": true
+  },
+  "implementationSequence": [
+    "9A_EVIDENCE_COMPARABILITY_ENGINE",
+    "9B_EXPERIMENT_EVIDENCE_ANALYZER",
+    "9C_ANALYST_RUNTIME",
+    "9D_DURABLE_LEARNING_OUTPUTS",
+    "9E_WEEKLY_ANALYSIS_ORCHESTRATION",
+    "9F_LEARNING_UI_WEEKLY_REPORT",
+    "9G_PHASE_CLOSURE"
+  ]
+}
