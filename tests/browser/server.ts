@@ -7,6 +7,7 @@ import {
   ProductionReadService,
   RecordingPackService,
   RenderReviewService,
+  SupportingReadService,
 } from '../../packages/application/src/index.js';
 import { Persistence } from '../../packages/database/src/index.js';
 import { MemoryStorage, recordingGraph } from '../fixtures/recordings/support.js';
@@ -18,6 +19,18 @@ const dashboard = new DashboardReadService(fixture.client);
 const concepts = new ConceptReviewService(fixture.client);
 const production = new ProductionReadService(fixture.client);
 const review = new RenderReviewService(fixture.client, storage);
+const supporting = new SupportingReadService(fixture.client, {
+  environment: 'LOCAL',
+  webOrigin: 'http://localhost:5174',
+  safety: {
+    pauseAllPublishing: true,
+    pauseAiGeneration: true,
+    pauseCapture: false,
+    pauseRendering: false,
+    pauseAnalyticsCollection: true,
+    realProvidersEnabled: false,
+  },
+});
 
 const app = await createApi(
   {
@@ -35,6 +48,7 @@ const app = await createApi(
     concepts,
     production,
     review,
+    supporting,
   },
 );
 
@@ -176,6 +190,97 @@ try {
       },
     });
   }
+
+  // Phase 6E read-only fixture: real canonical rows, but no Phase 7 mutation path.
+  const publicationRender = await fixture.client.render.create({
+    data: { editingPlanVersionId: editingPlanVersion.id, status: 'REQUESTED' },
+  });
+  const publicationAttemptId = randomUUID();
+  const publicationBytes = Buffer.from('fixture-private-published-render');
+  const publicationObjectKey = `renders/${publicationRender.id}/attempts/1/master.mp4`;
+  const publicationAsset = await fixture.client.asset.create({
+    data: {
+      kind: 'VIDEO',
+      sourceType: 'RENDER',
+      sourceEntityType: 'RenderAttempt',
+      sourceEntityId: publicationAttemptId,
+      storageProvider: 'S3',
+      bucket: storage.bucket,
+      objectKey: publicationObjectKey,
+      checksumSha256: createHash('sha256').update(publicationBytes).digest('hex'),
+      mimeType: 'video/mp4',
+      sizeBytes: BigInt(publicationBytes.byteLength),
+      width: 1080,
+      height: 1920,
+      durationMs: 12_000,
+      fps: 30,
+      status: 'READY',
+    },
+  });
+  storage.objects.set(publicationObjectKey, publicationBytes);
+  await fixture.client.renderAttempt.create({
+    data: {
+      id: publicationAttemptId,
+      renderId: publicationRender.id,
+      attemptNumber: 1,
+      status: 'SUCCEEDED',
+      outputAssetId: publicationAsset.id,
+    },
+  });
+  await fixture.client.render.update({
+    where: { id: publicationRender.id },
+    data: { status: 'APPROVED', approvedAssetId: publicationAsset.id },
+  });
+
+  const platformAccount = await fixture.client.platformAccount.create({
+    data: {
+      platform: 'INSTAGRAM',
+      displayName: 'Vision Instagram',
+      remoteAccountId: `browser-${randomUUID()}`,
+      status: 'ACTIVE',
+      credentialsRef: 'secret://browser-fixture',
+      capabilitiesJson: { publish: true },
+    },
+  });
+  await fixture.client.publication.create({
+    data: {
+      renderId: publicationRender.id,
+      platformAccountId: platformAccount.id,
+      deliveryMode: 'API_AUTOMATED',
+      status: 'SCHEDULED',
+      scheduledAt: new Date('2026-09-23T08:00:00.000Z'),
+      mediaAssetId: publicationAsset.id,
+      metadataJson: {},
+    },
+  });
+  await fixture.client.publication.create({
+    data: {
+      renderId: publicationRender.id,
+      platformAccountId: platformAccount.id,
+      deliveryMode: 'MANUAL_HANDOFF',
+      status: 'PUBLISHED',
+      scheduledAt: new Date('2026-09-21T08:00:00.000Z'),
+      publishedAt: new Date('2026-09-21T08:05:00.000Z'),
+      remotePostId: `browser-post-${randomUUID()}`,
+      remoteUrl: 'https://example.test/vision-browser-post',
+      mediaAssetId: publicationAsset.id,
+      metadataJson: {},
+    },
+  });
+
+  const browserPattern = await fixture.client.pattern.create({
+    data: { key: 'RESULT_FIRST_BROWSER', name: 'Résultat d’abord', status: 'ACTIVE' },
+  });
+  await fixture.client.patternVersion.create({
+    data: {
+      patternId: browserPattern.id,
+      version: 1,
+      description: 'Montrer une preuve concrète avant l’explication.',
+      whenToUse: 'Quand Vision peut être montré immédiatement.',
+      sourceType: 'INTERNAL',
+      confidence: 0.9,
+    },
+  });
 
   const persistence = new Persistence(fixture.client);
   for (const title of ['Concept à approuver', 'Concept à rejeter']) {

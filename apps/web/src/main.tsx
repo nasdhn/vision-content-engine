@@ -269,6 +269,151 @@ type RenderReviewDetail = RenderReviewItem & {
   } | null;
 };
 
+type PublicationReadItem = {
+  publicationId: string;
+  renderId: string;
+  platform: string;
+  accountName: string;
+  accountStatus: string;
+  deliveryMode: string;
+  status: string;
+  scheduledAt: string | null;
+  publishedAt: string | null;
+  remoteUrl: string | null;
+  mediaAssetId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type CalendarReadModel = {
+  readOnly: true;
+  schedulingAvailable: false;
+  entries: PublicationReadItem[];
+};
+
+type PublishedReadModel = {
+  readOnly: true;
+  remotePublishingAvailable: false;
+  entries: PublicationReadItem[];
+};
+
+type AssetReadItem = {
+  assetId: string;
+  kind: string;
+  status: string;
+  sourceType: string;
+  sourceEntityType: string | null;
+  sourceEntityId: string | null;
+  mimeType: string | null;
+  sizeBytes: string | null;
+  width: number | null;
+  height: number | null;
+  durationMs: number | null;
+  fps: number | null;
+  audioChannels: number | null;
+  sampleRate: number | null;
+  createdAt: string;
+  deletedAt: string | null;
+  usage: {
+    recordings: number;
+    captureRuns: number;
+    renderInputs: number;
+    templateVersions: number;
+    renderOutputs: number;
+    renderDiagnostics: number;
+    approvedRenders: number;
+    publications: number;
+  };
+};
+
+type AssetReadDetail = AssetReadItem & {
+  derivation: {
+    parent: null | {
+      sourceAssetId: string;
+      type: string;
+      platform: string | null;
+      transformationProfileKey: string;
+      transformationProfileVersion: string;
+      createdAt: string;
+    };
+    children: {
+      derivedAssetId: string;
+      type: string;
+      platform: string | null;
+      transformationProfileKey: string;
+      transformationProfileVersion: string;
+      createdAt: string;
+    }[];
+  };
+};
+
+type PatternReadItem = {
+  patternId: string;
+  key: string;
+  name: string;
+  category: string | null;
+  status: string;
+  versionCount: number;
+  usageCount: number;
+  latestVersion: null | {
+    id: string;
+    version: number;
+    description: string | null;
+    whenToUse: string | null;
+    sourceType: string | null;
+    confidence: number | null;
+    createdAt: string;
+  };
+  updatedAt: string;
+};
+
+type TemplateReadItem = {
+  templateId: string;
+  key: string;
+  name: string;
+  category: string | null;
+  status: string;
+  versionCount: number;
+  latestVersion: null | {
+    id: string;
+    version: number;
+    supportedAspectRatios: string[];
+    minDurationMs: number | null;
+    maxDurationMs: number | null;
+    rendererVersion: string;
+    sourceRevision: string | null;
+    usage: { assets: number; creativePlans: number; editingPlans: number };
+    createdAt: string;
+  };
+  updatedAt: string;
+};
+
+type SettingsSummary = {
+  environment: string;
+  webOrigin: string;
+  authMode: 'LOCAL_SINGLE_USER';
+  storageMode: 'PRIVATE_S3_COMPATIBLE';
+  publicationMutationAvailable: false;
+  analyticsEvidenceAvailable: false;
+  safety: {
+    pauseAllPublishing: boolean;
+    pauseAiGeneration: boolean;
+    pauseCapture: boolean;
+    pauseRendering: boolean;
+    pauseAnalyticsCollection: boolean;
+    realProvidersEnabled: boolean;
+  };
+  platformAccounts: {
+    id: string;
+    platform: string;
+    displayName: string;
+    status: string;
+    credentialsConfigured: boolean;
+    capabilitiesConfigured: boolean;
+    updatedAt: string;
+  }[];
+};
+
 const labels: Record<string, string> = {
   ACCEPTED: 'Prise sélectionnée',
   UPLOADED: 'Sélection requise',
@@ -332,6 +477,8 @@ const errors: Record<string, string> = {
   RENDER_REVIEW_EVIDENCE_INVALID: 'Les preuves QA du rendu sont incomplètes.',
   RENDER_REJECTION_REASON_REQUIRED: 'Choisissez une raison avant de rejeter le rendu.',
   INVALID_RENDER_REASON: 'La raison de rejet du rendu n’est pas valide.',
+  SUPPORTING_READ_OPERATION_FAILED: 'Cette surface de lecture est momentanément indisponible.',
+  ASSET_NOT_FOUND: 'Cet asset est introuvable.',
 };
 
 const navigation = [
@@ -1559,6 +1706,441 @@ function RenderReviewView({
   );
 }
 
+function formatDateTime(value: string | null) {
+  return value ? new Date(value).toLocaleString('fr-FR') : 'Non renseigné';
+}
+
+function formatBytes(value: string | null) {
+  if (!value) return 'Non renseignée';
+  const size = Number(value);
+  if (!Number.isFinite(size)) return `${value} octets`;
+  if (size < 1024) return `${size} o`;
+  if (size < 1024 ** 2) return `${(size / 1024).toFixed(1)} Kio`;
+  if (size < 1024 ** 3) return `${(size / 1024 ** 2).toFixed(1)} Mio`;
+  return `${(size / 1024 ** 3).toFixed(1)} Gio`;
+}
+
+function CalendarView({ model }: { model: CalendarReadModel | null }) {
+  return (
+    <>
+      <section className="page-heading">
+        <p className="eyebrow">LECTURE SEULE</p>
+        <h1>Calendrier</h1>
+        <p>
+          État canonique des publications déjà planifiées. La création et la modification du
+          scheduling appartiennent à la Phase 7.
+        </p>
+      </section>
+      {!model ? (
+        <section className="panel" aria-busy="true">
+          <p>Chargement du calendrier…</p>
+        </section>
+      ) : !model.entries.length ? (
+        <section className="panel empty-state">
+          <h2>Aucune publication planifiée</h2>
+          <p>Aucun scheduling canonique n’est actuellement présent.</p>
+        </section>
+      ) : (
+        <section className="support-grid" aria-label="Publications planifiées">
+          {model.entries.map((entry) => (
+            <article className="support-card" key={entry.publicationId}>
+              <div className="support-card-head">
+                <span className="badge">{entry.platform}</span>
+                <span className="badge subtle">{entry.status.replaceAll('_', ' ')}</span>
+              </div>
+              <h2>{entry.accountName}</h2>
+              <dl className="detail-list compact">
+                <dt>Prévue</dt>
+                <dd>{formatDateTime(entry.scheduledAt)}</dd>
+                <dt>Mode</dt>
+                <dd>{entry.deliveryMode.replaceAll('_', ' ')}</dd>
+                <dt>Render</dt>
+                <dd>
+                  <code>{entry.renderId.slice(0, 8)}</code>
+                </dd>
+              </dl>
+            </article>
+          ))}
+        </section>
+      )}
+    </>
+  );
+}
+
+function PublishedView({ model }: { model: PublishedReadModel | null }) {
+  return (
+    <>
+      <section className="page-heading">
+        <p className="eyebrow">LECTURE SEULE</p>
+        <h1>Publiées</h1>
+        <p>
+          Publications déjà présentes dans l’état canonique. Aucun upload distant, retry ou
+          reconcile n’est déclenché depuis cette page en Phase 6.
+        </p>
+      </section>
+      {!model ? (
+        <section className="panel" aria-busy="true">
+          <p>Chargement des publications…</p>
+        </section>
+      ) : !model.entries.length ? (
+        <section className="panel empty-state">
+          <h2>Aucune publication enregistrée</h2>
+          <p>La Phase 7 apportera les opérations de distribution.</p>
+        </section>
+      ) : (
+        <section className="support-grid" aria-label="Publications terminées">
+          {model.entries.map((entry) => (
+            <article className="support-card" key={entry.publicationId}>
+              <div className="support-card-head">
+                <span className="badge">{entry.platform}</span>
+                <span className="badge subtle">Publié</span>
+              </div>
+              <h2>{entry.accountName}</h2>
+              <dl className="detail-list compact">
+                <dt>Publié</dt>
+                <dd>{formatDateTime(entry.publishedAt)}</dd>
+                <dt>Mode</dt>
+                <dd>{entry.deliveryMode.replaceAll('_', ' ')}</dd>
+                <dt>Render</dt>
+                <dd>
+                  <code>{entry.renderId.slice(0, 8)}</code>
+                </dd>
+              </dl>
+              {entry.remoteUrl && (
+                <a className="text-link" href={entry.remoteUrl} target="_blank" rel="noreferrer">
+                  Ouvrir la publication distante
+                </a>
+              )}
+            </article>
+          ))}
+        </section>
+      )}
+    </>
+  );
+}
+
+function AssetsView({
+  pathname,
+  items,
+  detail,
+  onNavigate,
+}: {
+  pathname: string;
+  items: AssetReadItem[];
+  detail: AssetReadDetail | null;
+  onNavigate: (path: string) => void;
+}) {
+  if (pathname === '/assets') {
+    return (
+      <>
+        <section className="page-heading">
+          <p className="eyebrow">MÉDIAS PRIVÉS</p>
+          <h1>Assets</h1>
+          <p>
+            Métadonnées techniques et usages canoniques, sans exposition des chemins de stockage.
+          </p>
+        </section>
+        {!items.length ? (
+          <section className="panel empty-state">
+            <h2>Aucun asset</h2>
+            <p>La médiathèque canonique est vide.</p>
+          </section>
+        ) : (
+          <section className="support-grid" aria-label="Assets">
+            {items.map((asset) => (
+              <article className="support-card" key={asset.assetId}>
+                <div className="support-card-head">
+                  <span className="badge">{asset.kind}</span>
+                  <span className="badge subtle">{asset.status}</span>
+                </div>
+                <h2>{asset.sourceType}</h2>
+                <p className="muted">{asset.mimeType ?? 'Type MIME non renseigné'}</p>
+                <dl className="detail-list compact">
+                  <dt>Taille</dt>
+                  <dd>{formatBytes(asset.sizeBytes)}</dd>
+                  <dt>Créé</dt>
+                  <dd>{formatDateTime(asset.createdAt)}</dd>
+                </dl>
+                <AppLink
+                  href={`/assets/${asset.assetId}`}
+                  onNavigate={onNavigate}
+                  className="text-link"
+                >
+                  Inspecter l’asset
+                </AppLink>
+              </article>
+            ))}
+          </section>
+        )}
+      </>
+    );
+  }
+
+  if (!detail)
+    return (
+      <section className="panel" aria-busy="true">
+        <p>Chargement de l’asset…</p>
+      </section>
+    );
+
+  const usageTotal = Object.values(detail.usage).reduce((sum, count) => sum + count, 0);
+  return (
+    <>
+      <section className="page-heading">
+        <p className="eyebrow">ASSET · {detail.kind}</p>
+        <h1>Asset {detail.assetId.slice(0, 8)}</h1>
+        <p>
+          {detail.status} · {detail.sourceType}
+        </p>
+      </section>
+      <section className="detail-two-column">
+        <article className="panel">
+          <h2>Métadonnées techniques</h2>
+          <dl className="detail-list">
+            <dt>MIME</dt>
+            <dd>{detail.mimeType ?? 'Non renseigné'}</dd>
+            <dt>Taille</dt>
+            <dd>{formatBytes(detail.sizeBytes)}</dd>
+            <dt>Dimensions</dt>
+            <dd>
+              {detail.width && detail.height
+                ? `${detail.width} × ${detail.height}`
+                : 'Non renseignées'}
+            </dd>
+            <dt>Durée</dt>
+            <dd>
+              {detail.durationMs === null
+                ? 'Non renseignée'
+                : `${(detail.durationMs / 1000).toFixed(1)} s`}
+            </dd>
+            <dt>FPS</dt>
+            <dd>{detail.fps ?? 'Non renseigné'}</dd>
+            <dt>Audio</dt>
+            <dd>
+              {detail.audioChannels === null
+                ? 'Non renseigné'
+                : `${detail.audioChannels} canal(aux) · ${detail.sampleRate ?? '?'} Hz`}
+            </dd>
+            <dt>Créé</dt>
+            <dd>{formatDateTime(detail.createdAt)}</dd>
+          </dl>
+        </article>
+        <article className="panel">
+          <h2>Lineage & usages</h2>
+          <dl className="detail-list">
+            <dt>Source</dt>
+            <dd>
+              {detail.sourceEntityType
+                ? `${detail.sourceEntityType} · ${detail.sourceEntityId?.slice(0, 8) ?? '?'}`
+                : detail.sourceType}
+            </dd>
+            <dt>Références</dt>
+            <dd>{usageTotal}</dd>
+            <dt>Dérivé de</dt>
+            <dd>{detail.derivation.parent?.sourceAssetId.slice(0, 8) ?? 'Aucun'}</dd>
+            <dt>Dérivés</dt>
+            <dd>{detail.derivation.children.length}</dd>
+          </dl>
+          <p className="muted">Les bucket/object keys restent volontairement hors du navigateur.</p>
+        </article>
+      </section>
+      <AppLink href="/assets" onNavigate={onNavigate} className="text-link">
+        Retour aux assets
+      </AppLink>
+    </>
+  );
+}
+
+function PatternsView({ items }: { items: PatternReadItem[] }) {
+  return (
+    <>
+      <section className="page-heading">
+        <p className="eyebrow">PATTERN LIBRARY</p>
+        <h1>Patterns</h1>
+        <p>
+          Définitions versionnées disponibles pour la création, sans leaderboard de performance.
+        </p>
+      </section>
+      {!items.length ? (
+        <section className="panel empty-state">
+          <h2>Aucun pattern importé</h2>
+          <p>La bibliothèque persistée est vide.</p>
+        </section>
+      ) : (
+        <section className="support-grid" aria-label="Patterns">
+          {items.map((pattern) => (
+            <article className="support-card" key={pattern.patternId}>
+              <div className="support-card-head">
+                <span className="badge">{pattern.status}</span>
+                <span>v{pattern.latestVersion?.version ?? '—'}</span>
+              </div>
+              <h2>{pattern.name}</h2>
+              <code className="definition-key">{pattern.key}</code>
+              <p>{pattern.latestVersion?.description ?? 'Aucune description persistée.'}</p>
+              <dl className="detail-list compact">
+                <dt>Versions</dt>
+                <dd>{pattern.versionCount}</dd>
+                <dt>Usage latest</dt>
+                <dd>{pattern.usageCount}</dd>
+                <dt>Confiance</dt>
+                <dd>{pattern.latestVersion?.confidence ?? 'Non renseignée'}</dd>
+              </dl>
+            </article>
+          ))}
+        </section>
+      )}
+    </>
+  );
+}
+
+function TemplatesView({ items }: { items: TemplateReadItem[] }) {
+  return (
+    <>
+      <section className="page-heading">
+        <p className="eyebrow">VIDEO ENGINE</p>
+        <h1>Templates</h1>
+        <p>Contrats de rendu versionnés en lecture seule. Aucun éditeur JSON n’est exposé.</p>
+      </section>
+      {!items.length ? (
+        <section className="panel empty-state">
+          <h2>Aucun template importé</h2>
+          <p>Le registre persisté est vide.</p>
+        </section>
+      ) : (
+        <section className="support-grid" aria-label="Templates">
+          {items.map((template) => (
+            <article className="support-card" key={template.templateId}>
+              <div className="support-card-head">
+                <span className="badge">{template.status}</span>
+                <span>v{template.latestVersion?.version ?? '—'}</span>
+              </div>
+              <h2>{template.name}</h2>
+              <code className="definition-key">{template.key}</code>
+              <dl className="detail-list compact">
+                <dt>Renderer</dt>
+                <dd>{template.latestVersion?.rendererVersion ?? 'Non renseigné'}</dd>
+                <dt>Ratios</dt>
+                <dd>
+                  {template.latestVersion?.supportedAspectRatios.join(', ') || 'Non renseignés'}
+                </dd>
+                <dt>Creative plans</dt>
+                <dd>{template.latestVersion?.usage.creativePlans ?? 0}</dd>
+                <dt>Editing plans</dt>
+                <dd>{template.latestVersion?.usage.editingPlans ?? 0}</dd>
+              </dl>
+            </article>
+          ))}
+        </section>
+      )}
+    </>
+  );
+}
+
+function SettingsView({ summary }: { summary: SettingsSummary | null }) {
+  if (!summary)
+    return (
+      <section className="panel" aria-busy="true">
+        <p>Chargement des réglages…</p>
+      </section>
+    );
+  const switches = [
+    ['Publication en pause', summary.safety.pauseAllPublishing],
+    ['Génération IA en pause', summary.safety.pauseAiGeneration],
+    ['Capture en pause', summary.safety.pauseCapture],
+    ['Rendering en pause', summary.safety.pauseRendering],
+    ['Analytics en pause', summary.safety.pauseAnalyticsCollection],
+    ['Providers réels activés', summary.safety.realProvidersEnabled],
+  ] as const;
+  return (
+    <>
+      <section className="page-heading">
+        <p className="eyebrow">CONFIGURATION MASQUÉE</p>
+        <h1>Réglages</h1>
+        <p>État opérationnel sans secrets, credentials ni valeurs sensibles.</p>
+      </section>
+      <section className="detail-two-column">
+        <article className="panel">
+          <h2>Runtime</h2>
+          <dl className="detail-list">
+            <dt>Environnement</dt>
+            <dd>{summary.environment}</dd>
+            <dt>Auth</dt>
+            <dd>{summary.authMode}</dd>
+            <dt>Stockage</dt>
+            <dd>{summary.storageMode}</dd>
+            <dt>Origin web</dt>
+            <dd>{summary.webOrigin}</dd>
+            <dt>Writes publication</dt>
+            <dd>Phase 7</dd>
+            <dt>Evidence analytics</dt>
+            <dd>Phase 8</dd>
+          </dl>
+        </article>
+        <article className="panel">
+          <h2>Safety switches</h2>
+          <ul className="status-list">
+            {switches.map(([name, enabled]) => (
+              <li key={name}>
+                <span>{name}</span>
+                <strong>{enabled ? 'Oui' : 'Non'}</strong>
+              </li>
+            ))}
+          </ul>
+        </article>
+      </section>
+      <section className="panel">
+        <div className="section-head">
+          <div>
+            <p className="eyebrow">PLATEFORMES</p>
+            <h2>Comptes configurés</h2>
+          </div>
+        </div>
+        {!summary.platformAccounts.length ? (
+          <p className="muted">Aucun compte plateforme configuré.</p>
+        ) : (
+          <div className="support-grid compact-grid">
+            {summary.platformAccounts.map((account) => (
+              <article className="support-card" key={account.id}>
+                <div className="support-card-head">
+                  <span className="badge">{account.platform}</span>
+                  <span className="badge subtle">{account.status}</span>
+                </div>
+                <h3>{account.displayName}</h3>
+                <p className="muted">
+                  Credentials :{' '}
+                  {account.credentialsConfigured ? 'référence configurée' : 'non configurée'} ·
+                  capacités : {account.capabilitiesConfigured ? 'configurées' : 'non configurées'}
+                </p>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+    </>
+  );
+}
+
+function AnalyticsDeferredView() {
+  return (
+    <>
+      <section className="page-heading">
+        <p className="eyebrow">PHASE 8</p>
+        <h1>Analytics</h1>
+        <p>
+          Cette destination est stable, mais aucune donnée de performance n’est inventée en Phase 6.
+        </p>
+      </section>
+      <section className="panel deferred-boundary">
+        <h2>Analytics non activées</h2>
+        <p>
+          La Phase 8 possédera l’ingestion brute, la normalisation, l’attribution et les
+          comparaisons fondées sur des preuves réelles.
+        </p>
+      </section>
+    </>
+  );
+}
+
 function DeferredView({ pathname }: { pathname: string }) {
   const base = `/${pathname.split('/').filter(Boolean)[0] ?? ''}`;
   const content = deferredTitles[base] ?? {
@@ -1587,6 +2169,13 @@ function App() {
   const [productionDetail, setProductionDetail] = useState<ProductionDetail | null>(null);
   const [reviews, setReviews] = useState<RenderReviewItem[]>([]);
   const [reviewDetail, setReviewDetail] = useState<RenderReviewDetail | null>(null);
+  const [calendar, setCalendar] = useState<CalendarReadModel | null>(null);
+  const [published, setPublished] = useState<PublishedReadModel | null>(null);
+  const [assets, setAssets] = useState<AssetReadItem[]>([]);
+  const [assetDetail, setAssetDetail] = useState<AssetReadDetail | null>(null);
+  const [patterns, setPatterns] = useState<PatternReadItem[]>([]);
+  const [templates, setTemplates] = useState<TemplateReadItem[]>([]);
+  const [settings, setSettings] = useState<SettingsSummary | null>(null);
   const [packs, setPacks] = useState<Pack[]>([]);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -1611,24 +2200,39 @@ function App() {
   async function refresh() {
     const productionVersionId = pathname.match(/^\/production\/([0-9a-f-]+)$/)?.[1];
     const reviewRenderId = pathname.match(/^\/review\/([0-9a-f-]+)$/)?.[1];
+    const assetId = pathname.match(/^\/assets\/([0-9a-f-]+)$/)?.[1];
     const [
       summary,
       items,
       conceptQueue,
       productionQueue,
       reviewQueue,
+      calendarRead,
+      publishedRead,
+      assetList,
+      patternList,
+      templateList,
+      settingsRead,
       recordingPacks,
       currentProduction,
       currentReview,
+      currentAsset,
     ] = await Promise.all([
       call('dashboard', csrf),
       call('attention', csrf),
       call('concepts/review', csrf),
       call('production', csrf),
       call('review', csrf),
+      call('calendar', csrf),
+      call('published', csrf),
+      call('assets', csrf),
+      call('patterns', csrf),
+      call('templates', csrf),
+      call('settings/summary', csrf),
       call('recording-packs', csrf),
       productionVersionId ? call(`production/${productionVersionId}`, csrf) : Promise.resolve(null),
       reviewRenderId ? call(`review/${reviewRenderId}`, csrf) : Promise.resolve(null),
+      assetId ? call(`assets/${assetId}`, csrf) : Promise.resolve(null),
     ]);
 
     setDashboard(summary as DashboardSummary);
@@ -1636,9 +2240,16 @@ function App() {
     setConcepts(conceptQueue as ConceptReviewItem[]);
     setProductions(productionQueue as ProductionItem[]);
     setReviews(reviewQueue as RenderReviewItem[]);
+    setCalendar(calendarRead as CalendarReadModel);
+    setPublished(publishedRead as PublishedReadModel);
+    setAssets(assetList as AssetReadItem[]);
+    setPatterns(patternList as PatternReadItem[]);
+    setTemplates(templateList as TemplateReadItem[]);
+    setSettings(settingsRead as SettingsSummary);
     setPacks(recordingPacks as Pack[]);
     if (productionVersionId) setProductionDetail(currentProduction as ProductionDetail);
     if (reviewRenderId) setReviewDetail(currentReview as RenderReviewDetail);
+    if (assetId) setAssetDetail(currentAsset as AssetReadDetail);
   }
 
   useEffect(() => {
@@ -1688,6 +2299,19 @@ function App() {
     setReviewDetail(null);
     void call(`review/${renderId}`, csrf)
       .then((value) => setReviewDetail(value as RenderReviewDetail))
+      .catch((caught) => setError(caught instanceof Error ? caught.message : 'Action impossible.'));
+  }, [csrf, pathname]);
+
+  useEffect(() => {
+    const assetId = pathname.match(/^\/assets\/([0-9a-f-]+)$/)?.[1];
+    if (!csrf || !assetId) {
+      setAssetDetail(null);
+      return;
+    }
+
+    setAssetDetail(null);
+    void call(`assets/${assetId}`, csrf)
+      .then((value) => setAssetDetail(value as AssetReadDetail))
       .catch((caught) => setError(caught instanceof Error ? caught.message : 'Action impossible.'));
   }, [csrf, pathname]);
 
@@ -1832,6 +2456,13 @@ function App() {
                   setProductionDetail(null);
                   setReviews([]);
                   setReviewDetail(null);
+                  setCalendar(null);
+                  setPublished(null);
+                  setAssets([]);
+                  setAssetDetail(null);
+                  setPatterns([]);
+                  setTemplates([]);
+                  setSettings(null);
                   setPacks([]);
                 })
               }
@@ -1926,6 +2557,25 @@ function App() {
                 });
               }}
             />
+          ) : pathname === '/calendar' ? (
+            <CalendarView model={calendar} />
+          ) : pathname === '/published' ? (
+            <PublishedView model={published} />
+          ) : pathname === '/assets' || pathname.startsWith('/assets/') ? (
+            <AssetsView
+              pathname={pathname}
+              items={assets}
+              detail={assetDetail}
+              onNavigate={navigate}
+            />
+          ) : pathname === '/patterns' ? (
+            <PatternsView items={patterns} />
+          ) : pathname === '/templates' ? (
+            <TemplatesView items={templates} />
+          ) : pathname === '/settings' ? (
+            <SettingsView summary={settings} />
+          ) : pathname === '/analytics' ? (
+            <AnalyticsDeferredView />
           ) : (
             <DeferredView pathname={pathname} />
           )}

@@ -6,6 +6,7 @@ import {
   ProductionReadService,
   RecordingPackService,
   RenderReviewService,
+  SupportingReadService,
 } from '@vision/application';
 import { S3PrivateStorage } from '@vision/media';
 import { parseConfig } from '@vision/shared';
@@ -28,6 +29,18 @@ async function main() {
     const concepts = new ConceptReviewService(db);
     const production = new ProductionReadService(db);
     const review = new RenderReviewService(db, storage);
+    const supporting = new SupportingReadService(db, {
+      environment: config.VCE_ENV,
+      webOrigin: config.VCE_WEB_ORIGIN,
+      safety: {
+        pauseAllPublishing: config.PAUSE_ALL_PUBLISHING,
+        pauseAiGeneration: config.PAUSE_AI_GENERATION,
+        pauseCapture: config.PAUSE_CAPTURE,
+        pauseRendering: config.PAUSE_RENDERING,
+        pauseAnalyticsCollection: config.PAUSE_ANALYTICS_COLLECTION,
+        realProvidersEnabled: false,
+      },
+    });
 
     await recordings.recoverInterrupted();
     await recordings.prepareExisting();
@@ -42,6 +55,7 @@ async function main() {
       concepts,
       production,
       review,
+      supporting,
     });
 
     const close = async () => {
