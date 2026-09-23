@@ -22,3 +22,4 @@ export { Templates } from './templates.js';
 
 export { AnalyticsRuntime } from './analytics.js';
 export type { VisionAttributionInput, UmamiImportInput } from './analytics.js';
+export { Learning } from './learning.js';

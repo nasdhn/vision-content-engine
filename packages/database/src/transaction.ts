@@ -25,6 +25,7 @@ export const tables = [
   'PlatformAccount',
   'WorkflowRun',
   'JobAttempt',
+  'Recommendation',
   'OutboxEvent',
 ] as const;
 export type LockTable = (typeof tables)[number];
