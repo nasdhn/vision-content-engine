@@ -25,3 +25,4 @@ export * from './vision-attribution-ingest.js';
 export * from './umami-import.js';
 export * from './analytics-read.js';
 export * from './learning-evidence.js';
+export * from './experiment-evidence.js';
