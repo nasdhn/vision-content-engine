@@ -44,3 +44,4 @@ export {
   EditingIntelligenceBlockedResultSchema,
   EditingIntelligenceOutputV11Schema,
 } from './editing-intelligence.js';
+export * from './analyst.js';
