@@ -23,3 +23,4 @@ export { Templates } from './templates.js';
 export { AnalyticsRuntime } from './analytics.js';
 export type { VisionAttributionInput, UmamiImportInput } from './analytics.js';
 export { Learning } from './learning.js';
+export { WeeklyAnalysisRepository, DEFAULT_WEEKLY_ANALYSIS_LEASE } from './weekly-analysis.js';

@@ -11,6 +11,8 @@
     "@vision/publishing": "workspace:*",
     "bullmq": "6.3.8",
     "@vision/shared": "workspace:*",
-    "@vision/analytics": "workspace:*"
+    "@vision/analytics": "workspace:*",
+    "@vision/application": "workspace:*",
+    "@vision/contracts": "workspace:*"
   }
 }

@@ -63,6 +63,7 @@ export type InvocationRequest<I> = {
   prompt: { key: string; version: string };
   knowledgeSnapshot: { id: string; version: number; contentHash: string };
   knowledgeContext?: unknown;
+  successCheckpointMetadata?: unknown;
   input: I;
 };
 export type ModelPolicy = z.infer<typeof ModelPolicySchema>;
@@ -136,6 +137,10 @@ export class AIProviderGateway {
     const knowledge = BrandKnowledgeSnapshotSchema.parse(suppliedKnowledge);
 
     assertNoSecrets(knowledge);
+
+    if (request.successCheckpointMetadata !== undefined) {
+      assertNoSecrets(request.successCheckpointMetadata);
+    }
 
     if (embeddedKnowledge !== undefined && request.knowledgeContext !== undefined)
       invariant(
@@ -342,7 +347,16 @@ export class AIProviderGateway {
         },
       });
       if (attemptStatus === 'SUCCEEDED' && output !== undefined) {
-        await this.repository.finish(request.requestId, 'SUCCEEDED', contentHash(output));
+        const outputHash = contentHash(output);
+        await this.repository.finish(
+          request.requestId,
+          'SUCCEEDED',
+          outputHash,
+          undefined,
+          request.successCheckpointMetadata === undefined
+            ? undefined
+            : { output, metadata: request.successCheckpointMetadata },
+        );
         return {
           modelInvocationId: request.requestId,
           output,

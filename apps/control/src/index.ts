@@ -6,10 +6,17 @@ import {
 } from '@vision/analytics';
 import type { AnalyticsCollectionJob } from '@vision/analytics';
 import type { JobsOptions, QueueOptions } from 'bullmq';
-import { Leases, Persistence } from '@vision/database';
+import { Leases, Persistence, WeeklyAnalysisRepository } from '@vision/database';
 import type { PrismaClient } from '@vision/database';
 import type { LeaseConfig } from '@vision/domain';
 import type { RuntimeConfig } from '@vision/shared';
+import { latestCompletedUtcWeek } from '@vision/application';
+import {
+  WEEKLY_ANALYSIS_OUTBOX_EVENT_TYPES,
+  WEEKLY_ANALYSIS_QUEUE_NAME,
+  parseWeeklyAnalysisOutboxEvent,
+} from '@vision/contracts';
+import type { WeeklyAnalysisPlan, WeeklyAnalysisQueueJob } from '@vision/contracts';
 import { DISTRIBUTION_OUTBOX_EVENT_TYPES, parseDistributionOutboxEvent } from '@vision/publishing';
 import type { PlatformPublisher, PublishQueueJob, PublisherRegistry } from '@vision/publishing';
 
@@ -295,5 +302,109 @@ export class AnalyticsControl {
     for (const publication of publications)
       results.push(await this.planPublication(publication.id));
     return results;
+  }
+}
+export interface WeeklyAnalysisJobTransport {
+  enqueue(job: WeeklyAnalysisQueueJob): Promise<void>;
+}
+
+export class BullMqWeeklyAnalysisTransport implements WeeklyAnalysisJobTransport {
+  constructor(private readonly queue: Queue<WeeklyAnalysisQueueJob>) {}
+
+  async enqueue(job: WeeklyAnalysisQueueJob) {
+    const options: JobsOptions = {
+      jobId: `outbox-${job.outboxEventId}`,
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 1_000 },
+      removeOnComplete: false,
+      removeOnFail: false,
+    };
+    await this.queue.add(job.kind, job, options);
+  }
+
+  static fromRedisUrl(redisUrl: string) {
+    return new BullMqWeeklyAnalysisTransport(
+      new Queue<WeeklyAnalysisQueueJob>(WEEKLY_ANALYSIS_QUEUE_NAME, {
+        connection: redisConnectionOptions(redisUrl),
+      }),
+    );
+  }
+
+  async close() {
+    await this.queue.close();
+  }
+}
+
+export class WeeklyAnalysisOutboxDispatcher {
+  private readonly leases: Leases;
+
+  constructor(
+    client: PrismaClient,
+    leaseConfig: LeaseConfig,
+    private readonly transport: WeeklyAnalysisJobTransport,
+    private readonly owner: string,
+    private readonly maxDispatchAttempts = 5,
+  ) {
+    if (!owner.trim()) throw new Error('OWNER_REQUIRED');
+    if (!Number.isSafeInteger(maxDispatchAttempts) || maxDispatchAttempts < 1) {
+      throw new Error('INVALID_DISPATCH_ATTEMPTS');
+    }
+    this.leases = new Leases(client, leaseConfig, {});
+  }
+
+  async dispatchOne() {
+    const event = await this.leases.claimOutbox(this.owner, WEEKLY_ANALYSIS_OUTBOX_EVENT_TYPES);
+    if (!event) return { kind: 'NONE' } as const;
+    const token = event.claimToken;
+    if (!token) throw new Error('OUTBOX_CLAIM_TOKEN_REQUIRED');
+
+    let job: WeeklyAnalysisQueueJob;
+    try {
+      job = parseWeeklyAnalysisOutboxEvent(event);
+    } catch {
+      await this.leases.finishOutbox(event.id, token, 'FAILED', 'INVALID_WEEKLY_ANALYSIS_OUTBOX');
+      return { kind: 'FAILED', outboxEventId: event.id } as const;
+    }
+
+    try {
+      await this.transport.enqueue(job);
+      await this.leases.finishOutbox(event.id, token, 'DISPATCHED');
+      return { kind: 'DISPATCHED', outboxEventId: event.id, job } as const;
+    } catch {
+      if (event.attemptCount >= this.maxDispatchAttempts) {
+        await this.leases.finishOutbox(
+          event.id,
+          token,
+          'FAILED',
+          'WEEKLY_ANALYSIS_QUEUE_ENQUEUE_FAILED',
+        );
+        return { kind: 'FAILED', outboxEventId: event.id } as const;
+      }
+      return { kind: 'RETRY_AFTER_LEASE', outboxEventId: event.id } as const;
+    }
+  }
+}
+
+export class WeeklyAnalysisControl {
+  private readonly repository: WeeklyAnalysisRepository;
+
+  constructor(private readonly client: PrismaClient) {
+    this.repository = new WeeklyAnalysisRepository(client);
+  }
+
+  planWindow(input: WeeklyAnalysisPlan) {
+    return this.repository.plan(input);
+  }
+
+  async planLatestCompletedWeek(input: Omit<WeeklyAnalysisPlan, 'analysisWindow'>) {
+    const rows = await this.client.$queryRaw<{ now: Date }[]>`
+      SELECT clock_timestamp()::timestamptz(3) AS now
+    `;
+    const now = rows[0]?.now;
+    if (!now) throw new Error('DATABASE_CLOCK_UNAVAILABLE');
+    return this.repository.plan({
+      ...input,
+      analysisWindow: latestCompletedUtcWeek(now),
+    });
   }
 }

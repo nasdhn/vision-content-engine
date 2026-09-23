@@ -45,3 +45,4 @@ export {
   EditingIntelligenceOutputV11Schema,
 } from './editing-intelligence.js';
 export * from './analyst.js';
+export * from './weekly-analysis.js';

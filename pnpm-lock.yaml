@@ -111,6 +111,12 @@ importers:
       '@vision/analytics':
         specifier: workspace:*
         version: link:../../packages/analytics
+      '@vision/application':
+        specifier: workspace:*
+        version: link:../../packages/application
+      '@vision/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@vision/database':
         specifier: workspace:*
         version: link:../../packages/database
@@ -146,7 +152,23 @@ importers:
         specifier: 7.3.6
         version: 7.3.6(@types/node@24.13.6)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)
 
-  apps/worker-ai: {}
+  apps/worker-ai:
+    dependencies:
+      '@vision/application':
+        specifier: workspace:*
+        version: link:../../packages/application
+      '@vision/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@vision/database':
+        specifier: workspace:*
+        version: link:../../packages/database
+      '@vision/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      bullmq:
+        specifier: 6.3.8
+        version: 6.3.8(ioredis@5.11.1)(pg@8.23.0)
 
   apps/worker-analytics:
     dependencies:

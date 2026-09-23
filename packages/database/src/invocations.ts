@@ -26,6 +26,14 @@ export type InvocationStart = {
   requestedModel?: string;
   reasoningLevel?: string;
 };
+export const MODEL_INVOCATION_OUTPUT_CHECKPOINTED_ACTION =
+  'ModelInvocation.output_checkpointed' as const;
+
+export type InvocationSuccessCheckpoint = Readonly<{
+  output: unknown;
+  metadata: unknown;
+}>;
+
 export type AttemptResult = {
   status: 'SUCCEEDED' | 'FAILED' | 'REJECTED_SCHEMA';
   responseHash?: string;
@@ -39,6 +47,10 @@ export type AttemptResult = {
   validation: Prisma.InputJsonObject;
 };
 const actor = { actorType: 'SYSTEM', actorId: 'ai-gateway' } as const;
+const asInputJson = (value: unknown): Prisma.InputJsonValue => {
+  contentHash(value);
+  return value as Prisma.InputJsonValue;
+};
 const jsonObject = (value: Prisma.JsonValue | null) =>
   (value ?? {}) as Record<string, Prisma.JsonValue>;
 
@@ -194,6 +206,7 @@ export class InvocationRepository {
     status: 'SUCCEEDED' | 'FAILED' | 'REJECTED_SCHEMA',
     outputHash?: string,
     failureCode?: string,
+    checkpoint?: InvocationSuccessCheckpoint,
   ) {
     return this.db.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "ModelInvocation" WHERE id = ${id}::uuid FOR UPDATE`;
@@ -244,6 +257,25 @@ export class InvocationRepository {
           },
         },
       });
+      if (checkpoint !== undefined) {
+        invariant(status === 'SUCCEEDED' && outputHash, 'CHECKPOINT_REQUIRES_SUCCESS');
+        invariant(contentHash(checkpoint.output) === outputHash, 'CHECKPOINT_OUTPUT_HASH_MISMATCH');
+        const metadataHash = contentHash(checkpoint.metadata);
+        await tx.auditEvent.create({
+          data: {
+            ...actor,
+            action: MODEL_INVOCATION_OUTPUT_CHECKPOINTED_ACTION,
+            subjectType: 'ModelInvocation',
+            subjectId: id,
+            afterJson: asInputJson({
+              outputHash,
+              output: checkpoint.output,
+              metadata: checkpoint.metadata,
+              metadataHash,
+            }),
+          },
+        });
+      }
       await changed(tx, actor, `ModelInvocation.${status.toLowerCase()}`, 'ModelInvocation', id);
       return row;
     });

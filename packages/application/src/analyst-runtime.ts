@@ -49,6 +49,7 @@ export type AnalystRuntimeRequest = Readonly<{
   validationContext: AnalystValidationContext;
   policy: ModelPolicy;
   budget: Budget;
+  successCheckpointMetadata?: unknown;
 }>;
 
 type AnalystGateway = {
@@ -218,6 +219,9 @@ export class AnalystRuntime {
         prompt: ANALYST_PROMPT,
         knowledgeSnapshot: request.knowledgeSnapshot,
         knowledgeContext: request.knowledgeContext,
+        ...(request.successCheckpointMetadata === undefined
+          ? {}
+          : { successCheckpointMetadata: request.successCheckpointMetadata }),
         input,
       },
       {

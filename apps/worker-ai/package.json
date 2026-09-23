@@ -4,5 +4,12 @@
   "private": true,
   "type": "module",
   "license": "UNLICENSED",
-  "exports": "./src/index.ts"
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@vision/application": "workspace:*",
+    "@vision/contracts": "workspace:*",
+    "@vision/database": "workspace:*",
+    "@vision/domain": "workspace:*",
+    "bullmq": "6.3.8"
+  }
 }
