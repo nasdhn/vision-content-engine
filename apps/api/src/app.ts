@@ -20,6 +20,7 @@ import type {
 
 import {
   LOCAL_SESSION,
+  LocalAuthExceptionFilter,
   LocalSessionController,
   LocalSessionService,
   type LocalSessionOptions,
@@ -207,9 +208,11 @@ export async function createApi(probes: ReadinessProbes, business?: ApiBusinessO
   })
   class BootstrapModule {}
 
-  return NestFactory.create(BootstrapModule, {
+  const app = await NestFactory.create(BootstrapModule, {
     logger: false,
     abortOnError: false,
     rawBody: true,
   });
+  if (business) app.useGlobalFilters(new LocalAuthExceptionFilter(app.getHttpAdapter()));
+  return app;
 }

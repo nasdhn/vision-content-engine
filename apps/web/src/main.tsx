@@ -4096,9 +4096,12 @@ function App() {
   async function login(event: FormEvent) {
     event.preventDefault();
     await action(async () => {
-      const result = (await call('session', '', { accessKey })) as { csrf: string };
-      setCsrf(result.csrf);
-      setAccessKey('');
+      try {
+        const result = (await call('session', '', { accessKey })) as { csrf: string };
+        setCsrf(result.csrf);
+      } finally {
+        setAccessKey('');
+      }
     });
   }
 

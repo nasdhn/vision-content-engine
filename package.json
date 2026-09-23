@@ -44,7 +44,8 @@
     "test:analytics:runtime": "tsx tests/runtime/analytics-bullmq-smoke.ts",
     "check:phase8": "pnpm test:infra && pnpm check && pnpm test:postgres && pnpm test:storage && pnpm test:analytics:runtime && pnpm test:distribution:runtime && pnpm build:web && pnpm test:browser",
     "test:learning:runtime": "tsx tests/runtime/learning-bullmq-smoke.ts",
-    "check:phase9": "pnpm check:phase8 && pnpm test:learning:runtime"
+    "check:phase9": "pnpm check:phase8 && pnpm test:learning:runtime",
+    "check:phase10a": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm check:secrets && pnpm exec vitest run tests/unit/local-session.test.ts tests/integration/auth-session-api.test.ts && pnpm test:browser tests/browser/auth-session.spec.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
