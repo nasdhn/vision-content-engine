@@ -42,7 +42,9 @@
     "test:distribution:runtime": "tsx tests/runtime/distribution-bullmq-smoke.ts",
     "check:phase7": "pnpm test:infra && pnpm check && pnpm test:postgres && pnpm test:storage && pnpm test:distribution:runtime && pnpm build:web && pnpm test:browser",
     "test:analytics:runtime": "tsx tests/runtime/analytics-bullmq-smoke.ts",
-    "check:phase8": "pnpm test:infra && pnpm check && pnpm test:postgres && pnpm test:storage && pnpm test:analytics:runtime && pnpm test:distribution:runtime && pnpm build:web && pnpm test:browser"
+    "check:phase8": "pnpm test:infra && pnpm check && pnpm test:postgres && pnpm test:storage && pnpm test:analytics:runtime && pnpm test:distribution:runtime && pnpm build:web && pnpm test:browser",
+    "test:learning:runtime": "tsx tests/runtime/learning-bullmq-smoke.ts",
+    "check:phase9": "pnpm check:phase8 && pnpm test:learning:runtime"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
