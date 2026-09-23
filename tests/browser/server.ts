@@ -12,6 +12,7 @@ import {
   ManualHandoffService,
   DistributionOperationsService,
   TikTokManualAnalyticsService,
+  LearningDashboardService,
 } from '../../packages/application/src/index.js';
 import { Persistence } from '../../packages/database/src/index.js';
 import { FakePublisher, StaticPublisherRegistry } from '../../packages/publishing/src/index.js';
@@ -32,6 +33,7 @@ const distribution = new DistributionOperationsService(fixture.client, {
 });
 const analyticsRead = new AnalyticsReadService(fixture.client);
 const analyticsManual = new TikTokManualAnalyticsService(fixture.client);
+const learning = new LearningDashboardService(fixture.client);
 const supporting = new SupportingReadService(fixture.client, {
   environment: 'LOCAL',
   webOrigin: 'http://localhost:5174',
@@ -66,6 +68,7 @@ const app = await createApi(
     distribution,
     analyticsRead,
     analyticsManual,
+    learning,
   },
 );
 
@@ -452,6 +455,310 @@ try {
     },
   });
 
+  const learningKey = 'e'.repeat(64);
+  const learningPublicationId = randomUUID();
+  const learningPatternVersionId = randomUUID();
+  const learningTemplateVersionId = randomUUID();
+  const learningEditingProfileVersionId = randomUUID();
+  const learningExperimentId = randomUUID();
+
+  const learningWorkflow = await fixture.client.workflowRun.create({
+    data: {
+      workflowType: 'WEEKLY_ANALYSIS',
+      rootEntityType: 'WeeklyAnalysisOperation',
+      rootEntityId: learningKey,
+      status: 'SUCCEEDED',
+      currentStep: 'complete',
+      startedAt: new Date('2026-09-21T00:00:01.000Z'),
+      finishedAt: new Date('2026-09-21T00:00:03.000Z'),
+    },
+  });
+  const learningOperationId = randomUUID();
+  const learningJob = await fixture.client.jobAttempt.create({
+    data: {
+      workflowRunId: learningWorkflow.id,
+      queueName: 'ai',
+      jobType: 'WEEKLY_ANALYSIS',
+      operationId: learningOperationId,
+      attemptNumber: 1,
+      status: 'SUCCEEDED',
+    },
+  });
+  const learningSnapshot = await fixture.client.knowledgeSnapshot.create({
+    data: {
+      key: `browser-learning-${randomUUID()}`,
+      version: 1,
+      contentHash: createHash('sha256').update('browser-learning').digest('hex'),
+      status: 'ACTIVE',
+      effectiveAt: new Date('2026-09-14T00:00:00.000Z'),
+      payloadJson: {},
+    },
+  });
+  await fixture.client.outboxEvent.create({
+    data: {
+      eventType: 'WeeklyAnalysis.requested',
+      aggregateType: 'JobAttempt',
+      aggregateId: learningJob.id,
+      payloadJson: {
+        schemaVersion: 'v1',
+        kind: 'WEEKLY_ANALYSIS',
+        workflowRunId: learningWorkflow.id,
+        jobAttemptId: learningJob.id,
+        operationId: learningOperationId,
+        analysisOperationKey: learningKey,
+        analysisWindow: {
+          from: '2026-09-14T00:00:00.000Z',
+          to: '2026-09-21T00:00:00.000Z',
+        },
+        measurementWindow: 'T_PLUS_24H',
+        evidencePolicyVersion: 'EVIDENCE_POLICY_RUNTIME_V1',
+        analystPromptVersion: '1.0.0',
+        contextBuilderVersion: 'WEEKLY_ANALYSIS_CONTEXT_V1',
+        knowledgeSnapshot: {
+          id: learningSnapshot.id,
+          version: learningSnapshot.version,
+          contentHash: learningSnapshot.contentHash,
+        },
+        policy: {
+          capability: 'ANALYST',
+          maxAttempts: 1,
+          timeoutMs: 1000,
+          fallbackPolicy: 'NONE',
+          maxInputTokens: 10000,
+          maxOutputTokens: 1000,
+          maxEstimatedCost: 0.1,
+        },
+        budget: {
+          key: `browser-learning-${learningOperationId}`,
+          from: '2026-09-14T00:00:00.000Z',
+          to: '2026-09-21T00:00:00.000Z',
+          limit: '1.00000000',
+          currency: 'EUR',
+        },
+      },
+    },
+  });
+
+  const learningOutput = {
+    insights: [
+      {
+        statement: 'Dans ce petit échantillon, le signal reste descriptif.',
+        confidence: 'WEAK_SIGNAL',
+        evidencePublicationIds: [learningPublicationId],
+        limitations: ['Small sample.', 'Causal claims are forbidden.'],
+        dimensions: {
+          patternVersionIds: [learningPatternVersionId],
+          editingProfileVersionIds: [learningEditingProfileVersionId],
+          platforms: ['INSTAGRAM'],
+        },
+      },
+    ],
+    recommendations: [
+      {
+        title: 'Tester une accroche résultat',
+        description: 'Modifier uniquement l’accroche.',
+        nextTest: {
+          hypothesis: 'Une accroche résultat pourrait modifier la complétion observée.',
+          change: 'Modifier uniquement l’accroche.',
+          keepConstant: ['CTA', 'format', 'montage'],
+          primaryMetric: 'views',
+          measurementWindow: 'T_PLUS_24H',
+        },
+      },
+    ],
+  };
+  const learningInvocation = await fixture.client.modelInvocation.create({
+    data: {
+      purpose: 'browser-weekly-analysis',
+      promptKey: 'analyst',
+      promptVersion: '1.0.0',
+      promptContentHash: 'd'.repeat(64),
+      knowledgeSnapshotId: learningSnapshot.id,
+      inputSchemaVersion: '1.0.0',
+      outputSchemaVersion: '1.0.0',
+      policyJson: { capability: 'ANALYST' },
+      status: 'SUCCEEDED',
+      inputHash: createHash('sha256').update(`${learningKey}:input`).digest('hex'),
+      outputHash: createHash('sha256').update(JSON.stringify(learningOutput)).digest('hex'),
+      attemptCount: 1,
+      startedAt: new Date('2026-09-21T00:00:01.000Z'),
+      finishedAt: new Date('2026-09-21T00:00:02.000Z'),
+    },
+  });
+
+  const learningExperimentContext = [
+    {
+      experimentId: learningExperimentId,
+      experimentName: 'Hook test',
+      hypothesis: 'Comparer deux variantes sur views.',
+      experimentStatus: 'RUNNING',
+      primaryMetric: 'views',
+      measurementWindow: 'T_PLUS_24H',
+      readiness: 'READY',
+      arms: [
+        {
+          armId: randomUUID(),
+          label: 'A',
+          conceptVersionId: null,
+          publicationId: learningPublicationId,
+          readiness: 'READY',
+          metricValue: 120,
+          platform: 'INSTAGRAM',
+          publishedAt: '2026-09-18T12:00:00.000Z',
+          collectedAt: '2026-09-19T12:00:00.000Z',
+          metricSemanticsVersion: 'canonical-metrics-v1',
+          limitations: [],
+        },
+      ],
+      evidenceFrame: null,
+      limitations: ['Descriptive only; no authoritative winner.'],
+    },
+  ];
+
+  const learningAttributionSignals = {
+    websiteVisits: 9,
+    signups: 2,
+    activations: 1,
+    customers: 1,
+    revenueAmountMinor: 3900,
+    revenueCurrency: 'EUR',
+    directPublicationLinks: 1,
+    inferredSignals: 1,
+  };
+
+  const learningEvidence = {
+    analysisOperationKey: learningKey,
+    evidencePolicyVersion: 'EVIDENCE_POLICY_RUNTIME_V1',
+    analysisWindow: {
+      from: '2026-09-14T00:00:00.000Z',
+      to: '2026-09-21T00:00:00.000Z',
+    },
+    measurementWindow: 'T_PLUS_24H',
+    metric: null,
+    businessOutcome: 'weekly_cross_metric_analysis',
+    eligiblePublicationIds: [learningPublicationId],
+    excludedPublicationIds: [],
+    exclusionReasons: {},
+    sampleSize: 1,
+    distinctPublishDates: ['2026-09-18'],
+    contentDimensions: {
+      publications: [
+        {
+          publicationId: learningPublicationId,
+          dimensions: {
+            patternVersionId: learningPatternVersionId,
+            templateVersionId: learningTemplateVersionId,
+            editingProfileVersionId: learningEditingProfileVersionId,
+            durationMs: 23000,
+          },
+        },
+      ],
+    },
+    metricSemantics: [
+      {
+        platform: 'INSTAGRAM',
+        metric: 'views',
+        version: 'canonical-metrics-v1',
+        sampleSize: 1,
+      },
+    ],
+    platforms: ['INSTAGRAM'],
+    deterministicConfidenceCeiling: 'WEAK_SIGNAL',
+    attributionContext: learningAttributionSignals,
+    sourceAuthority: { WEBSITE_VISIT: 'UMAMI', SIGNUP: 'VISION_APP' },
+    outlierDiagnostics: [],
+    directionDiagnostics: [],
+    experimentContext: learningExperimentContext,
+  };
+
+  const learningPersisted = await new Persistence(fixture.client).transaction(
+    { actorType: 'AI', actorId: 'browser-learning' },
+    (unit) =>
+      unit.learning.persistValidatedAnalystOutput({
+        modelInvocationId: learningInvocation.id,
+        output: learningOutput,
+        insightContexts: [
+          {
+            scopeType: 'WEEKLY_ANALYSIS',
+            scopeId: learningKey,
+            evidence: learningEvidence,
+            limitations: {
+              deterministic: ['Small sample.'],
+              analyst: [],
+              dataQuality: ['One frozen metric is unavailable.'],
+              comparability: ['Cross-platform metric equivalence is not assumed.'],
+              attribution: [],
+            },
+          },
+        ],
+        recommendationInsightIndexes: [null],
+      }),
+  );
+
+  const learningFrozenInput = {
+    analysisWindow: learningEvidence.analysisWindow,
+    publications: [
+      {
+        publicationId: learningPublicationId,
+        platform: 'INSTAGRAM',
+        publishedAt: '2026-09-18T12:00:00.000Z',
+        measurementWindow: 'T_PLUS_24H',
+        contentDimensions: {
+          patternVersionId: learningPatternVersionId,
+          templateVersionId: learningTemplateVersionId,
+          editingProfileVersionId: learningEditingProfileVersionId,
+          durationMs: 23000,
+        },
+        normalizedMetrics: { views: 120, completionRate: null },
+        comparability: {
+          comparableMetricKeys: ['views'],
+          limitations: ['Cross-platform metric equivalence is not assumed.'],
+        },
+      },
+    ],
+    experiments: [],
+    priorInsights: [],
+    attributionSignals: learningAttributionSignals,
+    minimumEvidencePolicy: {
+      minimumComparableSamples: 3,
+      confidenceRulesVersion: 'EVIDENCE_POLICY_RUNTIME_V1',
+    },
+  };
+
+  await fixture.client.auditEvent.create({
+    data: {
+      actorType: 'AI',
+      actorId: 'browser-learning',
+      action: 'ModelInvocation.output_checkpointed',
+      subjectType: 'ModelInvocation',
+      subjectId: learningInvocation.id,
+      afterJson: {
+        outputHash: learningInvocation.outputHash,
+        output: learningOutput,
+        metadata: {
+          schemaVersion: 'v1',
+          analysisOperationKey: learningKey,
+          workflowRunId: learningWorkflow.id,
+          input: learningFrozenInput,
+          validationContext: {
+            deterministicConfidenceCeiling: 'WEAK_SIGNAL',
+            mandatoryLimitations: learningOutput.insights[0]!.limitations,
+            allowedPrimaryMetrics: ['views'],
+            allowedMeasurementWindows: ['T_PLUS_24H'],
+          },
+          evidence: learningEvidence,
+          limitations: {
+            deterministic: ['Small sample.'],
+            dataQuality: ['One frozen metric is unavailable.'],
+            comparability: ['Cross-platform metric equivalence is not assumed.'],
+            attribution: [],
+          },
+        },
+        metadataHash: 'a'.repeat(64),
+      },
+    },
+  });
+  void learningPersisted;
   const persistence = new Persistence(fixture.client);
   for (const title of ['Concept à approuver', 'Concept à rejeter']) {
     await persistence.transaction(

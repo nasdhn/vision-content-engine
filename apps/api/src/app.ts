@@ -15,6 +15,7 @@ import type {
   AnalyticsReadService,
   TikTokManualAnalyticsService,
   VisionAttributionIngestService,
+  LearningDashboardService,
 } from '@vision/application';
 
 import {
@@ -41,6 +42,7 @@ import {
   VisionAttributionIngestController,
   VISION_ATTRIBUTION_INGEST,
 } from './vision-attribution.js';
+import { LearningDashboardController, LEARNING_DASHBOARD } from './learning.js';
 
 const PROBES = Symbol('bootstrap-readiness-probes');
 
@@ -57,6 +59,7 @@ export type ApiBusinessOptions = {
   analyticsRead?: AnalyticsReadService;
   analyticsManual?: TikTokManualAnalyticsService;
   visionAttribution?: VisionAttributionIngestService;
+  learning?: LearningDashboardService;
 };
 
 @Controller()
@@ -92,6 +95,7 @@ export async function createApi(probes: ReadinessProbes, business?: ApiBusinessO
       ...(business?.analyticsRead ? [AnalyticsReadController] : []),
       ...(business?.analyticsManual ? [TikTokManualAnalyticsController] : []),
       ...(business?.visionAttribution ? [VisionAttributionIngestController] : []),
+      ...(business?.learning ? [LearningDashboardController] : []),
     ],
     providers: [
       { provide: PROBES, useValue: probes },
@@ -188,6 +192,14 @@ export async function createApi(probes: ReadinessProbes, business?: ApiBusinessO
             {
               provide: VISION_ATTRIBUTION_INGEST,
               useValue: business.visionAttribution,
+            },
+          ]
+        : []),
+      ...(business?.learning
+        ? [
+            {
+              provide: LEARNING_DASHBOARD,
+              useValue: business.learning,
             },
           ]
         : []),

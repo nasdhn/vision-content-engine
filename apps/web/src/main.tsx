@@ -625,6 +625,149 @@ const labels: Record<string, string> = {
   APPROVED: 'Approuvé',
 };
 
+type LearningReportSummary = {
+  analysisOperationKey: string;
+  workflowRunId: string;
+  status: string;
+  currentStep: string | null;
+  analysisWindow: { from: string; to: string };
+  measurementWindow: string;
+  createdAt: string;
+  finishedAt: string | null;
+  insightCount: number;
+};
+
+type LearningWeeklyReport = LearningReportSummary & {
+  generatedAt: string;
+  businessOutcomes: Record<
+    'websiteVisits' | 'signups' | 'activations' | 'customers' | 'revenueEvents',
+    {
+      total: number | null;
+      direct: number | null;
+      inferred: number | null;
+      unknown: number | null;
+      sourceSystem: string;
+    }
+  > & {
+    revenueByCurrency: { currency: string; amountMinor: string }[];
+    attributionSummary: {
+      directPublicationLinks: number | null;
+      inferredSignals: number | null;
+      unknownSignals: number | null;
+    };
+  };
+  funnel: {
+    stage: 'CONTENT' | 'WEBSITE' | 'SIGNUP' | 'ACTIVATION' | 'CUSTOMER' | 'REVENUE';
+    value: number | null;
+    availability: 'OBSERVED' | 'UNAVAILABLE';
+    unit: string | null;
+  }[];
+  platformPerformance: {
+    platform: string;
+    publicationCount: number;
+    measurementWindow: string;
+    metrics: {
+      metric: string;
+      observedValues: number[];
+      unavailableCount: number;
+      comparableSampleSize: number;
+      semanticVersions: string[];
+      limitations: string[];
+    }[];
+  }[];
+  contentSignals: {
+    insightId: string;
+    statement: string;
+    confidence: string;
+    sampleSize: number;
+    measurementWindow: string;
+    limitations: string[];
+    patternVersionIds: string[];
+    hookTypes: string[];
+    platforms: string[];
+  }[];
+  contentContext: {
+    patternVersionIds: { value: string; count: number }[];
+    hookTypes: { value: string; count: number }[];
+    primaryFormats: { value: string; count: number }[];
+    ctaTypes: { value: string; count: number }[];
+  };
+  editingSignals: {
+    insightId: string;
+    statement: string;
+    confidence: string;
+    sampleSize: number;
+    measurementWindow: string;
+    limitations: string[];
+    editingProfileVersionIds: string[];
+  }[];
+  editingContext: {
+    editingProfileVersionIds: { value: string; count: number }[];
+    templateVersionIds: { value: string; count: number }[];
+    durationsMs: { value: string; count: number }[];
+  };
+  insights: {
+    id: string;
+    statement: string;
+    confidence: string;
+    citedPublicationIds: string[];
+    citedSampleSize: number;
+    weeklySampleSize: number | null;
+    measurementWindow: string;
+    limitations: string[];
+    dimensions: Record<string, string[]>;
+    sourceContext: {
+      evidencePolicyVersion: string | null;
+      platforms: string[];
+      sourceAuthority: Record<string, string>;
+    };
+    createdAt: string;
+  }[];
+  recommendations: {
+    id: string;
+    title: string;
+    description: string | null;
+    status: string;
+    recommendedTest: null | {
+      hypothesis: string;
+      change: string;
+      keepConstant: string[];
+      primaryMetric: string;
+      measurementWindow: string;
+    };
+    experimentProposal: null | {
+      experimentId: string;
+      status: string;
+      campaignId: string | null;
+    };
+    createdAt: string;
+  }[];
+  experiments: {
+    experimentId: string;
+    name: string;
+    hypothesis: string;
+    status: string;
+    primaryMetric: string | null;
+    measurementWindow: string;
+    readiness: string;
+    arms: {
+      label: string;
+      publicationId: string | null;
+      readiness: string;
+      metricValue: number | null;
+      platform: string | null;
+      metricSemanticsVersion: string | null;
+      limitations: string[];
+    }[];
+    limitations: string[];
+  }[];
+  dataQuality: {
+    issues: { category: string; detail: string }[];
+    excludedPublicationCount: number;
+    unavailableMetricCount: number;
+  };
+};
+
 const errors: Record<string, string> = {
   AUTH_FAILED: 'Clé incorrecte.',
   AUTH_REQUIRED: 'Reconnectez-vous pour continuer.',
@@ -677,6 +820,12 @@ const errors: Record<string, string> = {
   MANUAL_SNAPSHOT_NOT_DUE: 'Cette fenêtre de mesure TikTok n’est pas encore due.',
   MANUAL_ANALYTICS_JOB_NOT_PENDING: 'Cette mesure TikTok a déjà été traitée.',
   MANUAL_ANALYTICS_OPERATION_FAILED: 'La saisie Analytics n’a pas pu être enregistrée.',
+  LEARNING_OPERATION_FAILED: 'Le rapport Learning est momentanément indisponible.',
+  LEARNING_REPORT_NOT_FOUND: 'Ce rapport Learning est introuvable.',
+  INVALID_RECOMMENDATION_TRANSITION: 'Cette Recommendation a déjà changé d’état.',
+  RECOMMENDATION_NOT_ACCEPTED:
+    'La Recommendation doit être acceptée avant de créer une expérience.',
+  EXPERIMENT_PROPOSAL_CONFLICT: 'Une proposition d’expérience différente existe déjà.',
 };
 
 const navigation = [
@@ -694,6 +843,7 @@ const navigation = [
   ['/templates', 'Templates'],
   ['/settings', 'Réglages'],
   ['/analytics', 'Analytics'],
+  ['/learning', 'Learning'],
 ] as const;
 
 const deferredTitles: Record<string, { title: string; note: string }> = {
@@ -3191,6 +3341,515 @@ function AnalyticsView({
   );
 }
 
+function learningValue(value: number | null) {
+  return value === null ? 'Indisponible' : String(value);
+}
+
+function learningConfidence(value: string) {
+  return value.replaceAll('_', ' ');
+}
+
+function countSummary(values: { value: string; count: number }[]) {
+  return values.map((row) => `${row.value} (${row.count})`).join(', ') || 'Indisponible';
+}
+
+function sourceAuthoritySummary(value: Record<string, string>) {
+  const entries = Object.entries(value);
+  return entries.length
+    ? entries.map(([key, source]) => `${key}: ${source}`).join(' · ')
+    : 'Indisponible';
+}
+
+function LearningView({
+  pathname,
+  reports,
+  detail,
+  busy,
+  onNavigate,
+  onTransition,
+  onCreateProposal,
+}: {
+  pathname: string;
+  reports: LearningReportSummary[];
+  detail: LearningWeeklyReport | null;
+  busy: boolean;
+  onNavigate: (path: string) => void;
+  onTransition: (
+    recommendationId: string,
+    transition: 'accept' | 'reject' | 'execute',
+  ) => Promise<void>;
+  onCreateProposal: (recommendationId: string) => Promise<void>;
+}) {
+  if (pathname === '/learning') {
+    return (
+      <>
+        <section className="page-heading">
+          <p className="eyebrow">PHASE 9 · LEARNING LOOP</p>
+          <h1>Learning</h1>
+          <p>
+            Rapports hebdomadaires descriptifs. Les limites restent visibles et aucune stratégie
+            n’est modifiée automatiquement.
+          </p>
+        </section>
+
+        {!reports.length ? (
+          <section className="panel empty-state">
+            <h2>Aucun rapport hebdomadaire</h2>
+            <p>Aucun run WEEKLY_ANALYSIS canonique n’est encore disponible.</p>
+          </section>
+        ) : (
+          <section className="learning-report-list" aria-label="Rapports hebdomadaires">
+            {reports.map((report) => (
+              <article className="panel learning-report-card" key={report.analysisOperationKey}>
+                <div className="analytics-card-header">
+                  <div>
+                    <p className="eyebrow">WEEKLY ANALYSIS</p>
+                    <h2>
+                      {new Date(report.analysisWindow.from).toLocaleDateString('fr-FR')} →{' '}
+                      {new Date(report.analysisWindow.to).toLocaleDateString('fr-FR')}
+                    </h2>
+                  </div>
+                  <span className="status-pill">{report.status}</span>
+                </div>
+                <dl className="detail-list analytics-detail-list">
+                  <dt>Fenêtre</dt>
+                  <dd>[from, to) UTC</dd>
+                  <dt>Mesure</dt>
+                  <dd>{report.measurementWindow}</dd>
+                  <dt>Insights</dt>
+                  <dd>{report.insightCount}</dd>
+                </dl>
+                <AppLink
+                  href={`/learning/${report.analysisOperationKey}`}
+                  onNavigate={onNavigate}
+                  className="text-link"
+                >
+                  Ouvrir le rapport
+                </AppLink>
+              </article>
+            ))}
+          </section>
+        )}
+      </>
+    );
+  }
+
+  if (!detail) {
+    return (
+      <section className="panel" aria-busy="true">
+        <p>Chargement du rapport Learning…</p>
+      </section>
+    );
+  }
+
+  const outcomeRows = [
+    ['Visites site', detail.businessOutcomes.websiteVisits],
+    ['Inscriptions', detail.businessOutcomes.signups],
+    ['Activations', detail.businessOutcomes.activations],
+    ['Clients', detail.businessOutcomes.customers],
+  ] as const;
+
+  return (
+    <>
+      <section className="page-heading">
+        <p className="eyebrow">LEARNING · {detail.status}</p>
+        <h1>Rapport hebdomadaire</h1>
+        <p>
+          {new Date(detail.analysisWindow.from).toLocaleString('fr-FR')} →{' '}
+          {new Date(detail.analysisWindow.to).toLocaleString('fr-FR')} · fenêtre half-open UTC ·{' '}
+          {detail.measurementWindow}
+        </p>
+      </section>
+
+      <section className="panel learning-section">
+        <div className="section-heading analytics-section-heading">
+          <div>
+            <p className="eyebrow">1 / 8</p>
+            <h2>Business outcomes</h2>
+          </div>
+          <p className="support-note">Snapshot gelé du run 9E · autorités séparées.</p>
+        </div>
+        <div className="metric-grid analytics-funnel-grid">
+          {outcomeRows.map(([label, value]) => (
+            <article className="metric-card analytics-funnel-card" key={label}>
+              <span>{label}</span>
+              <strong>{learningValue(value.total)}</strong>
+              <small>{value.sourceSystem}</small>
+            </article>
+          ))}
+        </div>
+        <dl className="detail-list analytics-detail-list">
+          <dt>Revenue</dt>
+          <dd>
+            {detail.businessOutcomes.revenueByCurrency.length
+              ? detail.businessOutcomes.revenueByCurrency
+                  .map((row) => `${row.amountMinor} minor units ${row.currency}`)
+                  .join(', ')
+              : 'Indisponible'}{' '}
+            · {detail.businessOutcomes.revenueEvents.sourceSystem}
+          </dd>
+          <dt>DIRECT publication links</dt>
+          <dd>
+            {learningValue(detail.businessOutcomes.attributionSummary.directPublicationLinks)}
+          </dd>
+          <dt>INFERRED signals</dt>
+          <dd>{learningValue(detail.businessOutcomes.attributionSummary.inferredSignals)}</dd>
+          <dt>UNKNOWN signals</dt>
+          <dd>{learningValue(detail.businessOutcomes.attributionSummary.unknownSignals)}</dd>
+        </dl>
+        <p className="support-note">
+          La décomposition DIRECT / INFERRED / UNKNOWN n’est jamais inventée lorsqu’elle n’existe
+          pas dans le snapshot d’attribution gelé.
+        </p>
+      </section>
+
+      <section className="panel learning-section">
+        <div className="section-heading analytics-section-heading">
+          <div>
+            <p className="eyebrow">2 / 8</p>
+            <h2>Funnel</h2>
+          </div>
+        </div>
+        <div className="metric-grid analytics-funnel-grid">
+          {detail.funnel.map((stage) => (
+            <article className="metric-card analytics-funnel-card" key={stage.stage}>
+              <span>{stage.stage}</span>
+              <strong>
+                {learningValue(stage.value)}
+                {stage.value !== null && stage.unit ? ` ${stage.unit}` : ''}
+              </strong>
+              <small>{stage.availability}</small>
+            </article>
+          ))}
+        </div>
+        <p className="support-note">Une étape sans preuve reste Indisponible, jamais zéro.</p>
+      </section>
+
+      <section className="panel learning-section">
+        <div className="section-heading analytics-section-heading">
+          <div>
+            <p className="eyebrow">3 / 8</p>
+            <h2>Platform performance</h2>
+          </div>
+          <p className="support-note">
+            Métriques gelées par plateforme, sans équivalence implicite.
+          </p>
+        </div>
+        {!detail.platformPerformance.length ? (
+          <p className="empty-state">Aucune publication comparable dans ce run.</p>
+        ) : (
+          <div className="analytics-platform-grid">
+            {detail.platformPerformance.map((platform) => (
+              <article className="support-card" key={platform.platform}>
+                <div className="analytics-card-header">
+                  <h3>{platform.platform}</h3>
+                  <span className="status-pill">{platform.publicationCount} publication(s)</span>
+                </div>
+                {platform.metrics.map((metric) => (
+                  <div className="learning-metric" key={`${platform.platform}-${metric.metric}`}>
+                    <strong>{metric.metric}</strong>
+                    <span>
+                      Valeurs{' '}
+                      {metric.observedValues.length
+                        ? metric.observedValues.join(', ')
+                        : 'Indisponible'}
+                    </span>
+                    <small>
+                      sample comparable {metric.comparableSampleSize} · indisponibles{' '}
+                      {metric.unavailableCount}
+                    </small>
+                    <small>sémantique {metric.semanticVersions.join(', ') || 'Indisponible'}</small>
+                    {metric.limitations.map((limit) => (
+                      <small className="analytics-warning" key={limit}>
+                        {limit}
+                      </small>
+                    ))}
+                  </div>
+                ))}
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="panel learning-section">
+        <div className="section-heading analytics-section-heading">
+          <div>
+            <p className="eyebrow">4 / 8</p>
+            <h2>Content / Pattern signals</h2>
+          </div>
+        </div>
+        {detail.contentSignals.length ? (
+          <div className="learning-signal-list">
+            {detail.contentSignals.map((signal) => (
+              <article className="support-card" key={signal.insightId}>
+                <span className="status-pill">{learningConfidence(signal.confidence)}</span>
+                <p>{signal.statement}</p>
+                <p className="support-note">
+                  n={signal.sampleSize} · {signal.measurementWindow}
+                </p>
+                <strong>Limites</strong>
+                <ul>
+                  {signal.limitations.map((limit) => (
+                    <li key={limit}>{limit}</li>
+                  ))}
+                </ul>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="empty-state">Aucun signal Content/Pattern explicite.</p>
+        )}
+        <dl className="detail-list analytics-detail-list">
+          <dt>PatternVersion observés</dt>
+          <dd>{countSummary(detail.contentContext.patternVersionIds)}</dd>
+          <dt>hookType observés</dt>
+          <dd>{countSummary(detail.contentContext.hookTypes)}</dd>
+          <dt>formats observés</dt>
+          <dd>{countSummary(detail.contentContext.primaryFormats)}</dd>
+          <dt>CTA observées</dt>
+          <dd>{countSummary(detail.contentContext.ctaTypes)}</dd>
+        </dl>
+      </section>
+
+      <section className="panel learning-section">
+        <div className="section-heading analytics-section-heading">
+          <div>
+            <p className="eyebrow">5 / 8</p>
+            <h2>Editing signals</h2>
+          </div>
+        </div>
+        {detail.editingSignals.length ? (
+          <div className="learning-signal-list">
+            {detail.editingSignals.map((signal) => (
+              <article className="support-card" key={signal.insightId}>
+                <span className="status-pill">{learningConfidence(signal.confidence)}</span>
+                <p>{signal.statement}</p>
+                <p className="support-note">
+                  profiles {signal.editingProfileVersionIds.join(', ')} · n={signal.sampleSize} ·{' '}
+                  {signal.measurementWindow}
+                </p>
+                <strong>Limites</strong>
+                <ul>
+                  {signal.limitations.map((limit) => (
+                    <li key={limit}>{limit}</li>
+                  ))}
+                </ul>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="empty-state">Aucun signal Editing explicite.</p>
+        )}
+        <dl className="detail-list analytics-detail-list">
+          <dt>EditingProfileVersion observés</dt>
+          <dd>{countSummary(detail.editingContext.editingProfileVersionIds)}</dd>
+          <dt>TemplateVersion observés</dt>
+          <dd>{countSummary(detail.editingContext.templateVersionIds)}</dd>
+          <dt>durées observées</dt>
+          <dd>{countSummary(detail.editingContext.durationsMs)}</dd>
+        </dl>
+      </section>
+
+      <section className="panel learning-section">
+        <div className="section-heading analytics-section-heading">
+          <div>
+            <p className="eyebrow">6 / 8</p>
+            <h2>Experiments</h2>
+          </div>
+          <p className="support-note">Readiness et observations descriptives seulement.</p>
+        </div>
+        {!detail.experiments.length ? (
+          <p className="empty-state">Aucune expérience dans l’évidence gelée.</p>
+        ) : (
+          <div className="analytics-experiment-list">
+            {detail.experiments.map((experiment) => (
+              <article className="support-card" key={experiment.experimentId}>
+                <div className="analytics-card-header">
+                  <h3>{experiment.name}</h3>
+                  <span className="status-pill">{experiment.status}</span>
+                </div>
+                <p>{experiment.hypothesis}</p>
+                <p className="support-note">
+                  primaryMetric {experiment.primaryMetric ?? 'Indisponible'} · readiness{' '}
+                  {experiment.readiness} · {experiment.measurementWindow}
+                </p>
+                {experiment.arms.map((arm) => (
+                  <div className="learning-metric" key={`${experiment.experimentId}-${arm.label}`}>
+                    <strong>Arm {arm.label}</strong>
+                    <span>valeur {learningValue(arm.metricValue)}</span>
+                    <small>
+                      {arm.readiness} · {arm.platform ?? 'plateforme indisponible'} · sémantique{' '}
+                      {arm.metricSemanticsVersion ?? 'Indisponible'}
+                    </small>
+                    {arm.limitations.map((limit) => (
+                      <small key={limit}>{limit}</small>
+                    ))}
+                  </div>
+                ))}
+                <strong>Limites</strong>
+                <ul>
+                  {experiment.limitations.map((limit) => (
+                    <li key={limit}>{limit}</li>
+                  ))}
+                </ul>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="panel learning-section">
+        <div className="section-heading analytics-section-heading">
+          <div>
+            <p className="eyebrow">7 / 8</p>
+            <h2>Anomalies / data quality</h2>
+          </div>
+        </div>
+        <dl className="detail-list analytics-detail-list">
+          <dt>Publications exclues</dt>
+          <dd>{detail.dataQuality.excludedPublicationCount}</dd>
+          <dt>Métriques NULL / indisponibles</dt>
+          <dd>{detail.dataQuality.unavailableMetricCount}</dd>
+        </dl>
+        {detail.dataQuality.issues.length ? (
+          <ul className="analytics-quality-list">
+            {detail.dataQuality.issues.map((issue, index) => (
+              <li key={`${issue.category}-${index}`}>
+                <strong>{issue.category}</strong> · {issue.detail}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="empty-state">Aucune limitation supplémentaire matérialisée.</p>
+        )}
+      </section>
+
+      <section className="panel learning-section">
+        <div className="section-heading analytics-section-heading">
+          <div>
+            <p className="eyebrow">WHY</p>
+            <h2>Insights & evidence</h2>
+          </div>
+        </div>
+        {detail.insights.map((insight) => (
+          <article className="support-card learning-insight-card" key={insight.id}>
+            <span className="status-pill">{learningConfidence(insight.confidence)}</span>
+            <p>{insight.statement}</p>
+            <p className="support-note">
+              n cité={insight.citedSampleSize} · n semaine=
+              {insight.weeklySampleSize ?? 'Indisponible'} · {insight.measurementWindow}
+            </p>
+            <p className="support-note">
+              policy {insight.sourceContext.evidencePolicyVersion ?? 'Indisponible'} · plateformes{' '}
+              {insight.sourceContext.platforms.join(', ') || 'Indisponible'}
+            </p>
+            <p className="support-note">
+              source context {sourceAuthoritySummary(insight.sourceContext.sourceAuthority)}
+            </p>
+            <strong>Limites</strong>
+            <ul>
+              {insight.limitations.map((limit) => (
+                <li key={limit}>{limit}</li>
+              ))}
+            </ul>
+          </article>
+        ))}
+      </section>
+
+      <section className="panel learning-section">
+        <div className="section-heading analytics-section-heading">
+          <div>
+            <p className="eyebrow">8 / 8</p>
+            <h2>Recommendations for next week</h2>
+          </div>
+        </div>
+        {!detail.recommendations.length ? (
+          <p className="empty-state">Aucune Recommendation durable.</p>
+        ) : (
+          <div className="learning-recommendation-list">
+            {detail.recommendations.map((recommendation) => (
+              <article className="support-card" key={recommendation.id}>
+                <div className="analytics-card-header">
+                  <h3>{recommendation.title}</h3>
+                  <span className="status-pill">{recommendation.status}</span>
+                </div>
+                {recommendation.description && <p>{recommendation.description}</p>}
+                {recommendation.recommendedTest && (
+                  <dl className="detail-list analytics-detail-list">
+                    <dt>Hypothèse</dt>
+                    <dd>{recommendation.recommendedTest.hypothesis}</dd>
+                    <dt>Changement</dt>
+                    <dd>{recommendation.recommendedTest.change}</dd>
+                    <dt>Constantes</dt>
+                    <dd>{recommendation.recommendedTest.keepConstant.join(', ') || 'Aucune'}</dd>
+                    <dt>Métrique</dt>
+                    <dd>{recommendation.recommendedTest.primaryMetric}</dd>
+                    <dt>Fenêtre</dt>
+                    <dd>{recommendation.recommendedTest.measurementWindow}</dd>
+                  </dl>
+                )}
+                <div className="learning-actions">
+                  {recommendation.status === 'PROPOSED' && (
+                    <>
+                      <button
+                        className="primary-button"
+                        disabled={busy}
+                        onClick={() => void onTransition(recommendation.id, 'accept')}
+                      >
+                        Accepter
+                      </button>
+                      <button
+                        className="ghost-button"
+                        disabled={busy}
+                        onClick={() => void onTransition(recommendation.id, 'reject')}
+                      >
+                        Rejeter
+                      </button>
+                    </>
+                  )}
+                  {recommendation.status === 'ACCEPTED' && !recommendation.experimentProposal && (
+                    <button
+                      className="primary-button"
+                      disabled={busy}
+                      onClick={() => void onCreateProposal(recommendation.id)}
+                    >
+                      Create experiment proposal
+                    </button>
+                  )}
+                  {recommendation.status === 'ACCEPTED' && (
+                    <button
+                      className="ghost-button"
+                      disabled={busy}
+                      onClick={() => void onTransition(recommendation.id, 'execute')}
+                    >
+                      Marquer exécutée
+                    </button>
+                  )}
+                </div>
+                {recommendation.experimentProposal && (
+                  <p className="support-note">
+                    Experiment DRAFT {recommendation.experimentProposal.experimentId.slice(0, 8)} ·
+                    aucune génération automatique déclenchée.
+                  </p>
+                )}
+              </article>
+            ))}
+          </div>
+        )}
+        <p className="support-note">
+          Accepter ne modifie aucune stratégie. La proposition d’expérience reste une action humaine
+          séparée.
+        </p>
+      </section>
+
+      <AppLink href="/learning" onNavigate={onNavigate} className="text-link">
+        Retour aux rapports Learning
+      </AppLink>
+    </>
+  );
+}
+
 function DeferredView({ pathname }: { pathname: string }) {
   const base = `/${pathname.split('/').filter(Boolean)[0] ?? ''}`;
   const content = deferredTitles[base] ?? {
@@ -3233,6 +3892,8 @@ function App() {
   const [analyticsManual, setAnalyticsManual] = useState<TikTokManualAnalyticsOverview | null>(
     null,
   );
+  const [learningReports, setLearningReports] = useState<LearningReportSummary[]>([]);
+  const [learningDetail, setLearningDetail] = useState<LearningWeeklyReport | null>(null);
   const [packs, setPacks] = useState<Pack[]>([]);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -3275,6 +3936,7 @@ function App() {
       distributionRead,
       analyticsRead,
       analyticsManualRead,
+      learningRead,
       recordingPacks,
       currentProduction,
       currentReview,
@@ -3296,6 +3958,7 @@ function App() {
       call('distribution', csrf),
       call('analytics', csrf),
       call('analytics/manual', csrf),
+      call('learning', csrf),
       call('recording-packs', csrf),
       productionVersionId ? call(`production/${productionVersionId}`, csrf) : Promise.resolve(null),
       reviewRenderId ? call(`review/${reviewRenderId}`, csrf) : Promise.resolve(null),
@@ -3320,6 +3983,7 @@ function App() {
     setDistribution(distributionRead as DistributionOverview);
     setAnalytics(analyticsRead as AnalyticsReadModel);
     setAnalyticsManual(analyticsManualRead as TikTokManualAnalyticsOverview);
+    setLearningReports(learningRead as LearningReportSummary[]);
     setPacks(recordingPacks as Pack[]);
     if (productionVersionId) setProductionDetail(currentProduction as ProductionDetail);
     if (reviewRenderId) setReviewDetail(currentReview as RenderReviewDetail);
@@ -3337,6 +4001,19 @@ function App() {
   useEffect(() => {
     if (csrf) void refresh().catch((caught) => setError(String(caught.message)));
   }, [csrf]);
+
+  useEffect(() => {
+    const learningKey = pathname.match(/^\/learning\/([a-f0-9]{64})$/)?.[1];
+    if (!csrf || !learningKey) {
+      setLearningDetail(null);
+      return;
+    }
+
+    setLearningDetail(null);
+    void call(`learning/${learningKey}`, csrf)
+      .then((value) => setLearningDetail(value as LearningWeeklyReport))
+      .catch((caught) => setError(caught instanceof Error ? caught.message : 'Action impossible.'));
+  }, [csrf, pathname]);
 
   useEffect(() => {
     const conceptVersionId = pathname.match(/^\/concepts\/([0-9a-f-]+)$/)?.[1];
@@ -3554,6 +4231,10 @@ function App() {
                   setTemplates([]);
                   setSettings(null);
                   setDistribution(null);
+                  setAnalytics(null);
+                  setAnalyticsManual(null);
+                  setLearningReports([]);
+                  setLearningDetail(null);
                   setPacks([]);
                 })
               }
@@ -3719,6 +4400,48 @@ function App() {
             <TemplatesView items={templates} />
           ) : pathname === '/settings' ? (
             <SettingsView summary={settings} />
+          ) : pathname === '/learning' || pathname.startsWith('/learning/') ? (
+            <LearningView
+              pathname={pathname}
+              reports={learningReports}
+              detail={learningDetail}
+              busy={busy}
+              onNavigate={navigate}
+              onTransition={async (recommendationId, transition) => {
+                await action(async () => {
+                  await call(
+                    `learning/recommendations/${recommendationId}/${transition}`,
+                    csrf,
+                    {},
+                  );
+                  const learningKey = pathname.match(/^\/learning\/([a-f0-9]{64})$/)?.[1];
+                  if (learningKey) {
+                    setLearningDetail(
+                      (await call(`learning/${learningKey}`, csrf)) as LearningWeeklyReport,
+                    );
+                  }
+                  setLearningReports((await call('learning', csrf)) as LearningReportSummary[]);
+                  setNotice('Décision Learning enregistrée.');
+                });
+              }}
+              onCreateProposal={async (recommendationId) => {
+                await action(async () => {
+                  await call(
+                    `learning/recommendations/${recommendationId}/create-experiment-proposal`,
+                    csrf,
+                    {},
+                  );
+                  const learningKey = pathname.match(/^\/learning\/([a-f0-9]{64})$/)?.[1];
+                  if (learningKey) {
+                    setLearningDetail(
+                      (await call(`learning/${learningKey}`, csrf)) as LearningWeeklyReport,
+                    );
+                  }
+                  setLearningReports((await call('learning', csrf)) as LearningReportSummary[]);
+                  setNotice('Experiment DRAFT créé sans génération automatique.');
+                });
+              }}
+            />
           ) : pathname === '/analytics' ? (
             <AnalyticsView
               model={analytics}

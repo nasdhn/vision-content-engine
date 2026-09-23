@@ -12,6 +12,7 @@ import {
   DistributionOperationsService,
   TikTokManualAnalyticsService,
   VisionAttributionIngestService,
+  LearningDashboardService,
 } from '@vision/application';
 import { S3PrivateStorage } from '@vision/media';
 import { parseConfig } from '@vision/shared';
@@ -40,6 +41,7 @@ async function main() {
     });
     const analyticsRead = new AnalyticsReadService(db);
     const analyticsManual = new TikTokManualAnalyticsService(db);
+    const learning = new LearningDashboardService(db);
     const visionAttribution = config.VCE_VISION_ATTRIBUTION_INGEST_SECRET
       ? new VisionAttributionIngestService(db, {
           secret: config.VCE_VISION_ATTRIBUTION_INGEST_SECRET,
@@ -76,6 +78,7 @@ async function main() {
       distribution,
       analyticsRead,
       analyticsManual,
+      learning,
       ...(visionAttribution ? { visionAttribution } : {}),
     });
 

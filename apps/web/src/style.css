@@ -1555,3 +1555,38 @@ textarea {
     grid-template-columns: 1fr;
   }
 }
+
+.learning-report-list,
+.learning-signal-list,
+.learning-recommendation-list {
+  display: grid;
+  gap: 16px;
+}
+
+.learning-report-card,
+.learning-section,
+.learning-insight-card {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.learning-section {
+  margin-bottom: 18px;
+}
+
+.learning-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+@media (max-width: 560px) {
+  .learning-actions {
+    flex-direction: column;
+  }
+
+  .learning-actions button {
+    width: 100%;
+  }
+}
