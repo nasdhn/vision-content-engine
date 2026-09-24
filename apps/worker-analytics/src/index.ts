@@ -1,3 +1,4 @@
+import { StructuredLogger, observeOperation } from '@vision/observability';
 import { Worker } from 'bullmq';
 import type { WorkerOptions } from 'bullmq';
 import { AnalyticsCollectionJobSchema, ANALYTICS_QUEUE_NAME } from '@vision/analytics';
@@ -36,6 +37,20 @@ export class AnalyticsWorkerOrchestrator {
 
   async process(input: unknown) {
     const job = AnalyticsCollectionJobSchema.parse(input);
+    return observeOperation(
+      new StructuredLogger('worker-analytics'),
+      {
+        workflowRunId: job.workflowRunId,
+        collectionOperationId: job.collectionOperationId,
+        publicationId: job.publicationId,
+        jobAttemptId: job.jobAttemptId,
+        platform: job.platform,
+      },
+      () => this.processJob(job),
+    );
+  }
+
+  private async processJob(job: ReturnType<typeof AnalyticsCollectionJobSchema.parse>) {
     const collector = this.collectors.resolve(job.platform);
     if (collector.isRealProvider && !this.options.realProvidersEnabled) {
       throw new Error('REAL_ANALYTICS_PROVIDERS_DISABLED');
@@ -57,9 +72,13 @@ export function createBullMqAnalyticsWorker(input: {
   redisUrl: string;
   orchestrator: AnalyticsWorkerOrchestrator;
 }) {
-  return new Worker<AnalyticsCollectionJob>(
+  const worker = new Worker<AnalyticsCollectionJob>(
     ANALYTICS_QUEUE_NAME,
     async (job) => input.orchestrator.process(job.data),
     { connection: redisConnectionOptions(input.redisUrl) },
   );
+  worker.on('error', (error: unknown) =>
+    new StructuredLogger('worker-analytics').log('error', 'runtime.failed', { error }),
+  );
+  return worker;
 }

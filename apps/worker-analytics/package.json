@@ -8,6 +8,7 @@
   "dependencies": {
     "@vision/analytics": "workspace:*",
     "@vision/database": "workspace:*",
-    "bullmq": "6.3.8"
+    "bullmq": "6.3.8",
+    "@vision/observability": "workspace:*"
   }
 }

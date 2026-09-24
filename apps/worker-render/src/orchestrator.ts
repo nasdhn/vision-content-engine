@@ -1,3 +1,4 @@
+import { StructuredLogger, observeOperation } from '@vision/observability';
 import { extname, join } from 'node:path';
 import { mkdir, rm, stat } from 'node:fs/promises';
 
@@ -92,15 +93,6 @@ function failureCode(error: unknown) {
   return 'INTERNAL_RENDER_ERROR';
 }
 
-function failureMessage(error: unknown) {
-  if (error instanceof Error) {
-    const cause = (error as Error & { cause?: unknown }).cause;
-    const suffix = cause instanceof Error ? `: ${cause.message}` : '';
-    return `${error.message}${suffix}`.slice(0, 4_000);
-  }
-  return String(error).slice(0, 4_000);
-}
-
 async function reconcileImmutableUpload(input: {
   storage: PrivateStorage;
   objectKey: string;
@@ -162,6 +154,18 @@ export class RenderWorkerOrchestrator {
   }
 
   async execute(input: {
+    renderId: string;
+    renderAttemptId: string;
+    signal?: AbortSignal;
+  }): Promise<RenderWorkerExecutionResult> {
+    return observeOperation(
+      new StructuredLogger('worker-render'),
+      { renderId: input.renderId, renderAttemptId: input.renderAttemptId },
+      () => this.executeJob(input),
+    );
+  }
+
+  private async executeJob(input: {
     renderId: string;
     renderAttemptId: string;
     signal?: AbortSignal;
@@ -360,7 +364,7 @@ export class RenderWorkerOrchestrator {
 
             await unit.failRenderAttempt(input.renderId, input.renderAttemptId, {
               failureCode: failureCode(error),
-              failureMessage: failureMessage(error),
+              failureMessage: failureCode(error),
               ...(technicalQa !== undefined ? { technicalQaJson: technicalQa } : {}),
             });
           })

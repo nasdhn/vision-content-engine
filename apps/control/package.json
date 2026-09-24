@@ -13,6 +13,7 @@
     "@vision/shared": "workspace:*",
     "@vision/analytics": "workspace:*",
     "@vision/application": "workspace:*",
-    "@vision/contracts": "workspace:*"
+    "@vision/contracts": "workspace:*",
+    "@vision/observability": "workspace:*"
   }
 }

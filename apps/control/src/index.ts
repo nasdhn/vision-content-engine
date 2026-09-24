@@ -1,3 +1,4 @@
+import { StructuredLogger, observeOperation } from '@vision/observability';
 import { Queue } from 'bullmq';
 import {
   ANALYTICS_OUTBOX_EVENT_TYPES,
@@ -43,9 +44,22 @@ function redisConnectionOptions(redisUrl: string): QueueOptions['connection'] {
 }
 
 export class BullMqPublishTransport implements PublishJobTransport {
-  constructor(private readonly queue: Queue<PublishQueueJob>) {}
+  constructor(private readonly queue: Queue<PublishQueueJob>) {
+    queue.on('error', (error: unknown) =>
+      new StructuredLogger('control').log('error', 'runtime.failed', { error }),
+    );
+  }
 
   async enqueue(job: PublishQueueJob) {
+    return observeOperation(
+      new StructuredLogger('control'),
+      { outboxEventId: job.outboxEventId, operationId: job.operationId },
+      () => this.enqueueJob(job),
+      'outbox',
+    );
+  }
+
+  private async enqueueJob(job: PublishQueueJob) {
     const options: JobsOptions = {
       jobId: `outbox-${job.outboxEventId}`,
       attempts: 3,
@@ -205,9 +219,22 @@ export interface AnalyticsJobTransport {
 }
 
 export class BullMqAnalyticsTransport implements AnalyticsJobTransport {
-  constructor(private readonly queue: Queue<AnalyticsCollectionJob>) {}
+  constructor(private readonly queue: Queue<AnalyticsCollectionJob>) {
+    queue.on('error', (error: unknown) =>
+      new StructuredLogger('control').log('error', 'runtime.failed', { error }),
+    );
+  }
 
   async enqueue(job: AnalyticsCollectionJob) {
+    return observeOperation(
+      new StructuredLogger('control'),
+      { outboxEventId: job.outboxEventId, collectionOperationId: job.collectionOperationId },
+      () => this.enqueueJob(job),
+      'outbox',
+    );
+  }
+
+  private async enqueueJob(job: AnalyticsCollectionJob) {
     const options: JobsOptions = {
       jobId: `outbox-${job.outboxEventId}`,
       attempts: 3,
@@ -309,9 +336,22 @@ export interface WeeklyAnalysisJobTransport {
 }
 
 export class BullMqWeeklyAnalysisTransport implements WeeklyAnalysisJobTransport {
-  constructor(private readonly queue: Queue<WeeklyAnalysisQueueJob>) {}
+  constructor(private readonly queue: Queue<WeeklyAnalysisQueueJob>) {
+    queue.on('error', (error: unknown) =>
+      new StructuredLogger('control').log('error', 'runtime.failed', { error }),
+    );
+  }
 
   async enqueue(job: WeeklyAnalysisQueueJob) {
+    return observeOperation(
+      new StructuredLogger('control'),
+      { outboxEventId: job.outboxEventId, operationId: job.operationId },
+      () => this.enqueueJob(job),
+      'outbox',
+    );
+  }
+
+  private async enqueueJob(job: WeeklyAnalysisQueueJob) {
     const options: JobsOptions = {
       jobId: `outbox-${job.outboxEventId}`,
       attempts: 3,

@@ -1,3 +1,4 @@
+import { StructuredLogger, observeOperation } from '@vision/observability';
 import { Worker } from 'bullmq';
 import type { WorkerOptions } from 'bullmq';
 import { Persistence } from '@vision/database';
@@ -77,6 +78,18 @@ export class PublishWorkerOrchestrator {
 
   async process(input: unknown) {
     const job = PublishQueueJobSchema.parse(input);
+    return observeOperation(
+      new StructuredLogger('worker-publish'),
+      {
+        operationId: job.operationId,
+        publicationId: job.publicationId,
+        publicationAttemptId: job.kind === 'PUBLISH' ? job.publicationAttemptId : undefined,
+      },
+      () => this.processJob(job),
+    );
+  }
+
+  private async processJob(job: ReturnType<typeof PublishQueueJobSchema.parse>) {
     if (this.options.pauseAllPublishing) return { kind: 'PAUSED' } as const;
     if (job.kind === 'PUBLISH') return this.publish(job);
     return this.reconcile(job);
@@ -105,6 +118,13 @@ export class PublishWorkerOrchestrator {
           responseClass: 'UNKNOWN_SIDE_EFFECT',
           failureCode: 'UNCLASSIFIED_PROVIDER_ERROR',
         } as const);
+      new StructuredLogger('worker-publish').log('warn', 'provider.failed', {
+        operationId: job.operationId,
+        publicationId: job.publicationId,
+        platform: begin.snapshot.platform,
+        errorCode: result.failureCode,
+        error,
+      });
     }
     const delay =
       result.responseClass === 'TRANSIENT_FAILURE' || result.responseClass === 'RATE_LIMITED'
@@ -144,11 +164,15 @@ export function createBullMqPublishWorker(input: {
   redisUrl: string;
   orchestrator: PublishWorkerOrchestrator;
 }) {
-  return new Worker<PublishQueueJob>(
+  const worker = new Worker<PublishQueueJob>(
     PUBLISH_QUEUE_NAME,
     async (job) => input.orchestrator.process(job.data),
     { connection: redisConnectionOptions(input.redisUrl) },
   );
+  worker.on('error', (error: unknown) =>
+    new StructuredLogger('worker-publish').log('error', 'runtime.failed', { error }),
+  );
+  return worker;
 }
 
 export * from './instagram-asset-lease.js';

@@ -1,3 +1,4 @@
+import { StructuredLogger, observeOperation } from '@vision/observability';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -283,6 +284,17 @@ export class CaptureWorkerOrchestrator {
       };
     }
 
+    return observeOperation(
+      new StructuredLogger('worker-capture'),
+      { operationId: job.operationId, workflowRunId: job.workflowRunId, jobAttemptId: job.id },
+      () => this.processJob(job, workerId),
+    );
+  }
+
+  private async processJob(
+    job: ClaimedCaptureJob,
+    workerId: string,
+  ): Promise<CaptureWorkerOutcome> {
     invariant(job.leaseToken, 'STALE_LEASE');
 
     const leaseToken = job.leaseToken;

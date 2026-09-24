@@ -123,6 +123,9 @@ importers:
       '@vision/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@vision/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
       '@vision/publishing':
         specifier: workspace:*
         version: link:../../packages/publishing
@@ -166,6 +169,9 @@ importers:
       '@vision/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@vision/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
       bullmq:
         specifier: 6.3.8
         version: 6.3.8(ioredis@5.11.1)(pg@8.23.0)
@@ -178,6 +184,9 @@ importers:
       '@vision/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@vision/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
       bullmq:
         specifier: 6.3.8
         version: 6.3.8(ioredis@5.11.1)(pg@8.23.0)
@@ -196,6 +205,9 @@ importers:
       '@vision/media':
         specifier: workspace:*
         version: link:../../packages/media
+      '@vision/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
       playwright:
         specifier: 1.63.0
         version: 1.63.0
@@ -211,6 +223,9 @@ importers:
       '@vision/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@vision/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
       '@vision/publishing':
         specifier: workspace:*
         version: link:../../packages/publishing
@@ -244,6 +259,9 @@ importers:
       '@vision/media':
         specifier: workspace:*
         version: link:../../packages/media
+      '@vision/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
       react:
         specifier: 19.3.0
         version: 19.3.0

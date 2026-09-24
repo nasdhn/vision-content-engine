@@ -1,3 +1,4 @@
+import { StructuredLogger, observeOperation } from '@vision/observability';
 import { Worker } from 'bullmq';
 import type { WorkerOptions } from 'bullmq';
 
@@ -58,6 +59,18 @@ export class WeeklyAnalysisWorkerOrchestrator {
 
   async process(rawInput: unknown) {
     const job = WeeklyAnalysisQueueJobSchema.parse(rawInput);
+    return observeOperation(
+      new StructuredLogger('worker-ai'),
+      {
+        operationId: job.operationId,
+        workflowRunId: job.workflowRunId,
+        jobAttemptId: job.jobAttemptId,
+      },
+      () => this.processJob(job),
+    );
+  }
+
+  private async processJob(job: ReturnType<typeof WeeklyAnalysisQueueJobSchema.parse>) {
     const claim = await this.repository.claim(job.jobAttemptId, this.options.workerId);
 
     if (claim.kind !== 'READY') return claim;
@@ -146,7 +159,7 @@ export function createBullMqWeeklyAnalysisWorker(input: {
   orchestrator: WeeklyAnalysisWorkerOrchestrator;
   concurrency?: number;
 }) {
-  return new Worker(
+  const worker = new Worker(
     WEEKLY_ANALYSIS_QUEUE_NAME,
     async (job) => input.orchestrator.process(job.data),
     {
@@ -154,4 +167,8 @@ export function createBullMqWeeklyAnalysisWorker(input: {
       ...(input.concurrency === undefined ? {} : { concurrency: input.concurrency }),
     },
   );
+  worker.on('error', (error: unknown) =>
+    new StructuredLogger('worker-ai').log('error', 'runtime.failed', { error }),
+  );
+  return worker;
 }

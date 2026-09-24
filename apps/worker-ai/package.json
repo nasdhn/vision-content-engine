@@ -10,6 +10,7 @@
     "@vision/contracts": "workspace:*",
     "@vision/database": "workspace:*",
     "@vision/domain": "workspace:*",
-    "bullmq": "6.3.8"
+    "bullmq": "6.3.8",
+    "@vision/observability": "workspace:*"
   }
 }

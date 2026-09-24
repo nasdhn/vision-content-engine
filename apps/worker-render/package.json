@@ -15,7 +15,8 @@
     "@vision/media": "workspace:*",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "remotion": "4.0.526"
+    "remotion": "4.0.526",
+    "@vision/observability": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "19.3.0",

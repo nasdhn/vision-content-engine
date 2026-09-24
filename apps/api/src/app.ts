@@ -1,6 +1,8 @@
 import 'reflect-metadata';
 import { Controller, Get, Inject, Module, ServiceUnavailableException } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import { StructuredLogger } from '@vision/observability';
 import { checkReadiness } from '@vision/observability';
 import type { ReadinessProbes } from '@vision/observability';
 import type {
@@ -80,7 +82,11 @@ class HealthController {
   }
 }
 
-export async function createApi(probes: ReadinessProbes, business?: ApiBusinessOptions) {
+export async function createApi(
+  probes: ReadinessProbes,
+  business?: ApiBusinessOptions,
+  logger = new StructuredLogger('api'),
+) {
   @Module({
     controllers: [
       HealthController,
@@ -212,6 +218,33 @@ export async function createApi(probes: ReadinessProbes, business?: ApiBusinessO
     logger: false,
     abortOnError: false,
     rawBody: true,
+  });
+  app.use((req: IncomingMessage, res: ServerResponse, next: () => void) => {
+    const started = Date.now();
+    res.once('finish', () => {
+      const loginFailed =
+        req.method === 'POST' &&
+        req.url?.split('?')[0]?.replace(/\/$/, '').toLowerCase() === '/api/session' &&
+        res.statusCode >= 400;
+      const authCodes: Record<number, string> = {
+        400: 'AUTH_INVALID_INPUT',
+        401: 'AUTH_FAILED',
+        403: 'ORIGIN_REJECTED',
+        429: 'AUTH_RATE_LIMITED',
+        503: 'AUTH_UNAVAILABLE',
+      };
+      logger.log(
+        res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info',
+        loginFailed ? 'auth.login_failed' : 'api.request_completed',
+        {
+          method: req.method,
+          statusCode: res.statusCode,
+          durationMs: Date.now() - started,
+          ...(loginFailed ? { errorCode: authCodes[res.statusCode] } : {}),
+        },
+      );
+    });
+    next();
   });
   if (business) app.useGlobalFilters(new LocalAuthExceptionFilter(app.getHttpAdapter()));
   return app;

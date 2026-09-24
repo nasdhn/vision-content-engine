@@ -1,3 +1,4 @@
+import { StructuredLogger } from '@vision/observability';
 import 'dotenv/config';
 import { createDatabaseClient } from '@vision/database';
 import {
@@ -105,13 +106,7 @@ async function main() {
 
     await app.listen(config.VCE_API_PORT, config.VCE_API_HOST);
 
-    console.log(
-      JSON.stringify({
-        level: 'info',
-        service: 'api',
-        message: 'Local Vision control API started',
-      }),
-    );
+    new StructuredLogger('api').log('info', 'runtime.started');
   } catch {
     await dependencies.close();
     await db.$disconnect();
@@ -120,12 +115,8 @@ async function main() {
 }
 
 main().catch(() => {
-  console.error(
-    JSON.stringify({
-      level: 'error',
-      service: 'api',
-      errorCode: 'BOOTSTRAP_STARTUP_FAILED',
-    }),
-  );
+  new StructuredLogger('api').log('error', 'runtime.failed', {
+    errorCode: 'BOOTSTRAP_STARTUP_FAILED',
+  });
   process.exitCode = 1;
 });

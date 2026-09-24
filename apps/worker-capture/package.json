@@ -10,6 +10,7 @@
     "@vision/database": "workspace:*",
     "@vision/domain": "workspace:*",
     "@vision/media": "workspace:*",
-    "playwright": "1.63.0"
+    "playwright": "1.63.0",
+    "@vision/observability": "workspace:*"
   }
 }

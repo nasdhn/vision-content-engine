@@ -136,6 +136,8 @@ export class RemotionVideoRenderer implements VideoRenderer {
           serveUrl,
           id: input.template.compositionKey,
           inputProps: server.payload,
+          logLevel: 'error',
+          onBrowserLog: () => undefined,
           ...(process.env.REMOTION_BROWSER_EXECUTABLE
             ? { browserExecutable: process.env.REMOTION_BROWSER_EXECUTABLE }
             : {}),
@@ -162,16 +164,15 @@ export class RemotionVideoRenderer implements VideoRenderer {
           x264Preset: 'medium',
           outputLocation: remotionOutput,
           inputProps: server.payload,
+          logLevel: 'error',
           overwrite: false,
-          logLevel: 'warn',
           concurrency: process.env.RENDER_CONCURRENCY ?? '50%',
           cancelSignal,
           ...(process.env.REMOTION_BROWSER_EXECUTABLE
             ? { browserExecutable: process.env.REMOTION_BROWSER_EXECUTABLE }
             : {}),
-          onBrowserLog: (log) => {
-            const text = `${log.type}: ${log.text}`.slice(0, 1_000);
-            if (logs.length < 100) logs.push(text);
+          onBrowserLog: () => {
+            if (logs.length < 100) logs.push('browser-output-suppressed');
           },
         });
       } catch (error) {
