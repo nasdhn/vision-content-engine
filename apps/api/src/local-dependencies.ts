@@ -51,6 +51,7 @@ export function createLocalDependencies(config: RuntimeConfig, secrets: SecretRe
   };
   return {
     probes,
+    redis,
     storage,
     async close() {
       redis.disconnect();

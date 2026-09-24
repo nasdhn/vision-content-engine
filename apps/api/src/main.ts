@@ -1,3 +1,4 @@
+import { createRuntimeHealthService } from './runtime-health.js';
 import { StructuredLogger } from '@vision/observability';
 import 'dotenv/config';
 import { createDatabaseClient } from '@vision/database';
@@ -33,6 +34,7 @@ async function main() {
   ]);
   const dependencies = createLocalDependencies(config, secrets);
   const db = createDatabaseClient(secrets.resolve('DATABASE_URL'));
+  const runtimeHealth = createRuntimeHealthService(dependencies.redis, dependencies.probes);
 
   try {
     if (!config.VCE_LOCAL_ACCESS_KEY || config.VCE_LOCAL_ACCESS_KEY.length < 32)
@@ -77,6 +79,7 @@ async function main() {
         accessKey: () => secrets.resolve('VCE_LOCAL_ACCESS_KEY'),
         origin: config.VCE_WEB_ORIGIN,
       },
+      runtimeHealth,
       recordings,
       dashboard,
       concepts,

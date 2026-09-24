@@ -20,7 +20,8 @@
     "@vision/database": "workspace:*",
     "@vision/media": "workspace:*",
     "@vision/domain": "workspace:*",
-    "zod": "4.6.5"
+    "zod": "4.6.5",
+    "bullmq": "6.3.8"
   },
   "devDependencies": {
     "@types/pg": "8.23.1"

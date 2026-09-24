@@ -1,3 +1,4 @@
+import { observeWorkerLifecycle, type WorkerProbes } from '@vision/observability';
 import { StructuredLogger, observeOperation } from '@vision/observability';
 import { Worker } from 'bullmq';
 import type { WorkerOptions } from 'bullmq';
@@ -155,6 +156,7 @@ export class WeeklyAnalysisWorkerOrchestrator {
 }
 
 export function createBullMqWeeklyAnalysisWorker(input: {
+  probes: WorkerProbes;
   redisUrl: string;
   orchestrator: WeeklyAnalysisWorkerOrchestrator;
   concurrency?: number;
@@ -170,5 +172,5 @@ export function createBullMqWeeklyAnalysisWorker(input: {
   worker.on('error', (error: unknown) =>
     new StructuredLogger('worker-ai').log('error', 'runtime.failed', { error }),
   );
-  return worker;
+  return observeWorkerLifecycle(worker, 'worker-ai', input.probes);
 }

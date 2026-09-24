@@ -1,7 +1,7 @@
 export type Probe = () => Promise<void>;
 export type ReadinessProbes = Readonly<Record<'postgres' | 'redis' | 'storage', Probe>>;
 
-export async function checkReadiness(probes: ReadinessProbes, timeoutMs = 2000) {
+export async function checkReadiness(probes: Partial<ReadinessProbes>, timeoutMs = 2000) {
   const checks = await Promise.all(
     Object.entries(probes).map(async ([name, probe]) => {
       let timer: ReturnType<typeof setTimeout> | undefined;
@@ -22,7 +22,8 @@ export async function checkReadiness(probes: ReadinessProbes, timeoutMs = 2000) 
     }),
   );
   return {
-    status: checks.every(([, result]) => result === 'up') ? 'ready' : 'not_ready',
+    status:
+      checks.length > 0 && checks.every(([, result]) => result === 'up') ? 'ready' : 'not_ready',
     checks: Object.fromEntries(checks),
   } as const;
 }

@@ -135,6 +135,11 @@ export type LogComponent =
   | 'worker-publish'
   | 'worker-analytics';
 export type LogEvent =
+  | 'worker.started'
+  | 'worker.stopped'
+  | 'heartbeat.failed'
+  | 'queue.health_read_failed'
+  | 'dependency.not_ready'
   | 'runtime.started'
   | 'runtime.failed'
   | 'api.request_completed'
@@ -154,6 +159,12 @@ const components: readonly LogComponent[] = [
   'worker-analytics',
 ];
 const events: readonly LogEvent[] = [
+  'worker.started',
+  'worker.stopped',
+  'heartbeat.failed',
+  'queue.health_read_failed',
+  'dependency.not_ready',
+
   'runtime.started',
   'runtime.failed',
   'api.request_completed',
@@ -166,6 +177,7 @@ const events: readonly LogEvent[] = [
 ];
 const levels: readonly LogLevel[] = ['debug', 'info', 'warn', 'error'];
 const identifiers = [
+  'instanceId',
   'operationId',
   'collectionOperationId',
   'workflowRunId',
