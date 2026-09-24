@@ -15,15 +15,23 @@ import {
   LearningDashboardService,
 } from '@vision/application';
 import { S3PrivateStorage } from '@vision/media';
-import { parseConfig } from '@vision/shared';
+import { EnvironmentSecretResolver, parseConfig } from '@vision/shared';
 
 import { createApi } from './app.js';
 import { createLocalDependencies } from './local-dependencies.js';
 
 async function main() {
   const config = parseConfig(process.env);
-  const dependencies = createLocalDependencies(config);
-  const db = createDatabaseClient(config.DATABASE_URL);
+  const secrets = new EnvironmentSecretResolver(process.env, [
+    'DATABASE_URL',
+    'REDIS_URL',
+    'S3_ACCESS_KEY_ID',
+    'S3_SECRET_ACCESS_KEY',
+    'VCE_LOCAL_ACCESS_KEY',
+    'VCE_VISION_ATTRIBUTION_INGEST_SECRET',
+  ]);
+  const dependencies = createLocalDependencies(config, secrets);
+  const db = createDatabaseClient(secrets.resolve('DATABASE_URL'));
 
   try {
     if (!config.VCE_LOCAL_ACCESS_KEY || config.VCE_LOCAL_ACCESS_KEY.length < 32)
@@ -44,7 +52,7 @@ async function main() {
     const learning = new LearningDashboardService(db);
     const visionAttribution = config.VCE_VISION_ATTRIBUTION_INGEST_SECRET
       ? new VisionAttributionIngestService(db, {
-          secret: config.VCE_VISION_ATTRIBUTION_INGEST_SECRET,
+          secret: () => secrets.resolve('VCE_VISION_ATTRIBUTION_INGEST_SECRET'),
         })
       : undefined;
     const supporting = new SupportingReadService(db, {
@@ -65,7 +73,7 @@ async function main() {
 
     const app = await createApi(dependencies.probes, {
       auth: {
-        accessKey: config.VCE_LOCAL_ACCESS_KEY,
+        accessKey: () => secrets.resolve('VCE_LOCAL_ACCESS_KEY'),
         origin: config.VCE_WEB_ORIGIN,
       },
       recordings,

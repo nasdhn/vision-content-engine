@@ -1,4 +1,5 @@
 import { invariant } from '@vision/domain';
+import { assertNoSecrets } from '@vision/contracts/canonical';
 import { Prisma } from './generated/prisma/client.js';
 export type Transaction = Prisma.TransactionClient;
 export type Actor = Readonly<{ actorType: 'USER' | 'SYSTEM' | 'WORKER' | 'AI'; actorId?: string }>;
@@ -67,6 +68,7 @@ export async function audit(
   });
 }
 export async function emit(tx: Transaction, input: OutboxInput) {
+  assertNoSecrets(input.payloadJson);
   return tx.outboxEvent.create({
     data: {
       eventType: input.eventType,

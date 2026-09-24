@@ -5,6 +5,7 @@ import {
   DeleteObjectCommand,
   DeleteBucketCommand,
 } from '@aws-sdk/client-s3';
+import { EnvironmentSecretResolver, s3CredentialProvider } from '../../shared/src/secrets.js';
 import { S3PrivateStorage } from '../src/storage.js';
 /** Disposable bucket using existing LOCAL credentials. No production endpoints accepted. */
 export async function s3Fixture(env: NodeJS.ProcessEnv) {
@@ -19,7 +20,9 @@ export async function s3Fixture(env: NodeJS.ProcessEnv) {
     region: env.S3_REGION!,
     forcePathStyle: true,
     maxAttempts: 1,
-    credentials: { accessKeyId: env.S3_ACCESS_KEY_ID!, secretAccessKey: env.S3_SECRET_ACCESS_KEY! },
+    credentials: s3CredentialProvider(
+      new EnvironmentSecretResolver(env, ['S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY']),
+    ),
   });
   const bucket = `vce-test-${randomUUID()}`;
   await client.send(new CreateBucketCommand({ Bucket: bucket }));

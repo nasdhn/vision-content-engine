@@ -196,3 +196,19 @@ describe('LocalSessionService security boundary', () => {
     }
   });
 });
+
+it('resolves a rotated local key at login and masks resolver failures', () => {
+  let current = accessKey;
+  const resolve = vi.fn(() => current);
+  const service = new LocalSessionService({ accessKey: resolve, origin });
+  expect(resolve).not.toHaveBeenCalled();
+  const login = (key: string) => service.login(request({ origin }), response(), { accessKey: key });
+  expect(JSON.stringify(login(current))).not.toContain(current);
+  current = randomBytes(32).toString('hex');
+  rejects(() => login(accessKey), 401, 'AUTH_FAILED');
+  expect(JSON.stringify(login(current))).not.toContain(current);
+  resolve.mockImplementation(() => {
+    throw new Error(current);
+  });
+  rejects(() => login(current), 503, 'AUTH_UNAVAILABLE');
+});

@@ -1,3 +1,7 @@
+import {
+  EnvironmentSecretResolver,
+  accountCredentialResolver,
+} from '../../packages/shared/src/secrets.js';
 import { expect, it } from 'vitest';
 import {
   InstagramGraphPublisher,
@@ -69,11 +73,12 @@ function response(body: unknown, status = 200) {
 }
 
 function credentials(): InstagramCredentialResolver {
-  return {
-    async resolve() {
-      return { accessToken: token, expiresAt: '2026-09-23T12:00:00.000Z' };
-    },
-  };
+  return accountCredentialResolver(
+    new EnvironmentSecretResolver({ INSTAGRAM_ACCESS_TOKEN: token }, ['INSTAGRAM_ACCESS_TOKEN']),
+    'INSTAGRAM_ACCESS_TOKEN',
+    '0199f2d2-6ac2-7f64-9ed0-49ce5a9f4746',
+    { expiresAt: '2026-09-23T12:00:00.000Z' },
+  );
 }
 
 function leaseProvider(onIssue?: (ttlSeconds: number) => void): ExactAssetDeliveryLeaseProvider {

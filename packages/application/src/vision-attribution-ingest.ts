@@ -60,11 +60,12 @@ export class VisionAttributionIngestError extends Error {
   constructor(
     readonly code:
       | 'VISION_ATTRIBUTION_AUTH_FAILED'
+      | 'VISION_ATTRIBUTION_SECRET_UNAVAILABLE'
       | 'VISION_ATTRIBUTION_BODY_TOO_LARGE'
       | 'VISION_ATTRIBUTION_INVALID_JSON'
       | 'VISION_ATTRIBUTION_INVALID_EVENT'
       | 'VISION_ATTRIBUTION_RAW_BODY_REQUIRED',
-    readonly statusCode: 400 | 401 | 413,
+    readonly statusCode: 400 | 401 | 413 | 503,
   ) {
     super(code);
     this.name = 'VisionAttributionIngestError';
@@ -77,7 +78,7 @@ export type VisionAttributionHeaders = Readonly<{
 }>;
 
 export type VisionAttributionAuthenticatorOptions = Readonly<{
-  secret: string;
+  secret: string | (() => string);
   replayWindowSeconds?: number;
   maxBodyBytes?: number;
   now?: () => Date;
@@ -121,7 +122,7 @@ export class VisionAttributionAuthenticator {
   private readonly now: () => Date;
 
   constructor(private readonly options: VisionAttributionAuthenticatorOptions) {
-    if (Buffer.byteLength(options.secret, 'utf8') < 32) {
+    if (typeof options.secret === 'string' && Buffer.byteLength(options.secret, 'utf8') < 32) {
       throw new Error('VISION_ATTRIBUTION_SECRET_TOO_SHORT');
     }
     this.replayWindowSeconds =
@@ -154,7 +155,15 @@ export class VisionAttributionAuthenticator {
     if (deltaMs > this.replayWindowSeconds * 1_000) authFailure();
 
     const supplied = parseSignature(headers.signature);
-    const expected = createHmac('sha256', this.options.secret)
+    let secret: string;
+    try {
+      secret =
+        typeof this.options.secret === 'function' ? this.options.secret() : this.options.secret;
+      if (Buffer.byteLength(secret, 'utf8') < 32) throw new Error();
+    } catch {
+      throw new VisionAttributionIngestError('VISION_ATTRIBUTION_SECRET_UNAVAILABLE', 503);
+    }
+    const expected = createHmac('sha256', secret)
       .update(signingPayload(timestampText, rawBody))
       .digest();
     if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) authFailure();

@@ -1,5 +1,5 @@
 import { invariant, parseInstant } from '@vision/domain';
-import { contentHash } from '@vision/contracts/canonical';
+import { assertNoSecrets, contentHash } from '@vision/contracts/canonical';
 import { Prisma } from './generated/prisma/client.js';
 import type { PrismaClient } from './generated/prisma/client.js';
 import { databaseTime, changed } from './transaction.js';
@@ -48,6 +48,7 @@ export type AttemptResult = {
 };
 const actor = { actorType: 'SYSTEM', actorId: 'ai-gateway' } as const;
 const asInputJson = (value: unknown): Prisma.InputJsonValue => {
+  assertNoSecrets(value);
   contentHash(value);
   return value as Prisma.InputJsonValue;
 };
@@ -58,6 +59,7 @@ const jsonObject = (value: Prisma.JsonValue | null) =>
 export class InvocationRepository {
   constructor(private readonly db: PrismaClient) {}
   async begin(input: InvocationStart) {
+    assertNoSecrets(input);
     return this.db.$transaction(async (tx) => {
       const { budget, reservation, policy, capability, knowledgeContext, ...data } = input;
       invariant(
@@ -173,6 +175,7 @@ export class InvocationRepository {
     });
   }
   async finishAttempt(id: string, result: AttemptResult) {
+    assertNoSecrets(result);
     return this.db.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "ModelInvocationAttempt" WHERE id = ${id}::uuid FOR UPDATE`;
       const attempt = await tx.modelInvocationAttempt.findUniqueOrThrow({ where: { id } });

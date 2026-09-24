@@ -3,7 +3,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest';
 
 import { AIProviderGateway } from '../../packages/ai/src/index.js';
 import { AnalystRuntime } from '../../packages/application/src/analyst-runtime.js';
-import { contentHash } from '../../packages/contracts/src/canonical.js';
+import { assertNoSecrets, contentHash } from '../../packages/contracts/src/canonical.js';
 import { InvocationRepository } from '../../packages/database/src/index.js';
 import { postgresFixture } from '../../packages/database/test/support.js';
 import { FakeAIProvider, reply } from '../support/ai-provider.js';
@@ -199,4 +199,14 @@ it('executes ANALYST through the production AI gateway with fake provider and pe
     attemptCount: 1,
   });
   expect(invocation.policyJson).toMatchObject({ capability: 'ANALYST' });
+  const persisted = {
+    invocations: await fixture.client.modelInvocation.findMany(),
+    attempts: await fixture.client.modelInvocationAttempt.findMany(),
+    audits: await fixture.client.auditEvent.findMany(),
+    outbox: await fixture.client.outboxEvent.findMany(),
+  };
+  expect(persisted.attempts.length).toBeGreaterThan(0);
+  expect(persisted.audits.length).toBeGreaterThan(0);
+  expect(persisted.outbox.length).toBeGreaterThan(0);
+  expect(() => assertNoSecrets(persisted)).not.toThrow();
 });

@@ -47,7 +47,8 @@ export function assertNoSecrets(value: unknown): void {
       if (
         /(?:password|secret|authorization|api[_-]?key|access[_-]?token|refresh[_-]?token)/i.test(
           key,
-        )
+        ) ||
+        /^(?:cookies?|storageState|storageStatePath|credentials)$/i.test(key)
       )
         throw new Error('SECRET_IN_CONTEXT');
       assertNoSecrets(item);

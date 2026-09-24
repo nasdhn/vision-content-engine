@@ -4,6 +4,12 @@ import { UmamiImportService } from '../../packages/application/src/umami-import.
 import { postgresFixture } from '../../packages/database/test/support.js';
 import { Persistence } from '../../packages/database/src/index.js';
 import type { createDatabaseClient } from '../../packages/database/src/index.js';
+import { UmamiEventsClient } from '../../packages/analytics/src/umami.js';
+import {
+  EnvironmentSecretResolver,
+  umamiCredentialResolver,
+} from '../../packages/shared/src/secrets.js';
+import { emit } from '../../packages/database/src/transaction.js';
 import type { UmamiEventRow } from '../../packages/analytics/src/umami.js';
 
 let fixture: Awaited<ReturnType<typeof postgresFixture>>;
@@ -300,4 +306,64 @@ it('preserves custom Umami events as marketing observations without counting the
       where: { action: 'Analytics.umamiMarketingObservationImported', subjectId: row.id },
     }),
   ).toBe(1);
+});
+
+it('resolves analytics credentials at the HTTP boundary and keeps persisted events, audits and Outbox secret-free', async () => {
+  const sentinel = ['VERY', 'FAKE', 'ANALYTICS', 'DO_NOT_USE'].join('_');
+  const rows = [umamiEvent(), umamiEvent({ eventName: 'pricing-cta-click' })];
+  let calls = 0;
+  const secrets = new EnvironmentSecretResolver({ UMAMI_BEARER_TOKEN: sentinel }, [
+    'UMAMI_BEARER_TOKEN',
+  ]);
+  const source = new UmamiEventsClient(
+    umamiCredentialResolver(secrets, 'https://stats.example.test/api', rows[0]!.websiteId),
+    {
+      fetchImpl: async (url, options) => {
+        calls++;
+        expect(new Headers(options?.headers).get('authorization')).toBe(`Bearer ${sentinel}`);
+        expect(String(url)).not.toContain(sentinel);
+        return Response.json({ data: rows, count: 2, page: 1, pageSize: 500 });
+      },
+    },
+  );
+  const service = new UmamiImportService(db, source);
+  expect(calls).toBe(0);
+  const summary = await service.importWindow(window);
+  expect(calls).toBe(1);
+  expect(summary).toMatchObject({ websiteVisitsImported: 1, marketingObservationsImported: 1 });
+  const events = await db.attributionEvent.findMany();
+  const audits = await db.auditEvent.findMany();
+  expect(events.length).toBeGreaterThan(0);
+  expect(audits.length).toBeGreaterThan(0);
+  await db.$transaction((tx) =>
+    emit(tx, {
+      eventType: 'Analytics.imported',
+      aggregateType: 'AttributionEvent',
+      aggregateId: events[0]!.id,
+      payloadJson: { id: events[0]!.id },
+    }),
+  );
+  const outbox = await db.outboxEvent.findMany();
+  expect(outbox.length).toBeGreaterThan(0);
+  for (const value of [summary, events, audits, outbox])
+    expect(JSON.stringify(value)).not.toContain(sentinel);
+  await expect(
+    db.$transaction((tx) =>
+      emit(tx, {
+        eventType: 'Analytics.imported',
+        aggregateType: 'AttributionEvent',
+        aggregateId: events[0]!.id,
+        payloadJson: { accessToken: sentinel },
+      }),
+    ),
+  ).rejects.toThrow('SECRET_IN_CONTEXT');
+  const count = await db.attributionEvent.count();
+  await expect(
+    new UmamiImportService(
+      db,
+      client([umamiEvent({ cookies: [{ value: sentinel }] })]),
+    ).importWindow(window),
+  ).rejects.toThrow('SECRET_IN_CONTEXT');
+  expect(await db.attributionEvent.count()).toBe(count);
+  expect(await db.outboxEvent.count()).toBe(outbox.length);
 });

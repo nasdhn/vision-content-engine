@@ -1,3 +1,7 @@
+import {
+  EnvironmentSecretResolver,
+  accountCredentialResolver,
+} from '../../packages/shared/src/secrets.js';
 import { expect, it } from 'vitest';
 import { ProviderPublishError, YouTubeDataPublisher } from '../../packages/publishing/src/index.js';
 import type {
@@ -65,11 +69,12 @@ function snapshot(overrides: Partial<PublicationSnapshot> = {}): PublicationSnap
 }
 
 function credentials(): YouTubeCredentialResolver {
-  return {
-    async resolve() {
-      return { accessToken: token, expiresAt: '2026-09-23T14:00:00.000Z' };
-    },
-  };
+  return accountCredentialResolver(
+    new EnvironmentSecretResolver({ YOUTUBE_ACCESS_TOKEN: token }, ['YOUTUBE_ACCESS_TOKEN']),
+    'YOUTUBE_ACCESS_TOKEN',
+    '0199f2d2-6ac2-7f64-9ed0-49ce5a9f4746',
+    { expiresAt: '2026-09-23T14:00:00.000Z' },
+  );
 }
 
 function chunks(onRead?: (start: number, end: number) => void): ExactAssetChunkSource {

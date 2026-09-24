@@ -19,7 +19,7 @@ import { z } from 'zod';
 export const LOCAL_SESSION = Symbol('local-session');
 
 export type LocalSessionOptions = {
-  accessKey: string;
+  accessKey: string | (() => string);
   origin: string;
   now?: () => number;
 };
@@ -63,7 +63,8 @@ export class LocalSessionService {
   constructor(private readonly options: LocalSessionOptions) {
     const origin = URL.parse(options.origin);
     if (
-      !loginInput.safeParse({ accessKey: options.accessKey }).success ||
+      (typeof options.accessKey !== 'function' &&
+        !loginInput.safeParse({ accessKey: options.accessKey }).success) ||
       !origin ||
       !['http:', 'https:'].includes(origin.protocol) ||
       origin.origin !== options.origin
@@ -75,6 +76,18 @@ export class LocalSessionService {
 
   private requireOrigin(req: IncomingMessage) {
     if (req.headers.origin !== this.options.origin) throw new HttpException('ORIGIN_REJECTED', 403);
+  }
+
+  private accessKey() {
+    try {
+      const accessKey =
+        typeof this.options.accessKey === 'function'
+          ? this.options.accessKey()
+          : this.options.accessKey;
+      return loginInput.parse({ accessKey }).accessKey;
+    } catch {
+      throw new HttpException('AUTH_UNAVAILABLE', 503);
+    }
   }
 
   require(req: IncomingMessage, write = false) {
@@ -117,7 +130,7 @@ export class LocalSessionService {
     const input = loginInput.safeParse(body);
     if (
       !input.success ||
-      !timingSafeEqual(digest(input.data.accessKey), digest(this.options.accessKey))
+      !timingSafeEqual(digest(input.data.accessKey), digest(this.accessKey()))
     ) {
       if (this.failures === 0) this.windowStartedAt = now;
       this.failures += 1;

@@ -1,4 +1,4 @@
-import { mkdtemp, rm, stat } from 'node:fs/promises';
+import { mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test, expect } from '@playwright/test';
@@ -9,6 +9,11 @@ import {
   type CaptureAuthStateProvider,
   type CaptureFixtureManager,
 } from '../../apps/worker-capture/src/index.js';
+
+import {
+  EnvironmentSecretResolver,
+  captureAuthStateProvider,
+} from '../../packages/shared/src/secrets.js';
 
 const captureOrigin = 'http:' + '//127.0.0.1:3201';
 
@@ -142,4 +147,77 @@ test.describe('Phase 4 Product Capture worker', () => {
       });
     }
   });
+});
+
+test('authenticated capture resolves private state late and never exports credential-bearing traces', async () => {
+  test.setTimeout(60_000);
+  const directory = await mkdtemp(join(tmpdir(), 'vce-auth-capture-'));
+  const sentinel = ['VERY', 'FAKE', 'COOKIE', 'DO_NOT_USE'].join('_');
+  try {
+    const statePath = join(directory, 'state.json');
+    await writeFile(
+      statePath,
+      JSON.stringify({
+        cookies: [
+          {
+            name: 'fixture-auth',
+            value: sentinel,
+            domain: '127.0.0.1',
+            path: '/',
+            expires: -1,
+            httpOnly: true,
+            secure: false,
+            sameSite: 'Strict',
+          },
+        ],
+        origins: [],
+      }),
+      { mode: 0o600 },
+    );
+    const { spec } = await new CaptureScenarioRegistry().getByKey('AGENT_QUERY_TO_RESULTS');
+    const authStateProvider = captureAuthStateProvider(
+      new EnvironmentSecretResolver({ CAPTURE_STORAGE_STATE_PATH: statePath }, [
+        'CAPTURE_STORAGE_STATE_PATH',
+      ]),
+      'VISION_CAPTURE_ACCOUNT_V1',
+    );
+    for (const fail of [false, true]) {
+      const scenario = structuredClone(spec);
+      if (fail)
+        scenario.steps.unshift({
+          type: 'ASSERT',
+          assertion: { kind: 'URL_MATCHES', pattern: '**/nonexistent-secret-test' },
+        });
+      const result = await executeCaptureScenario({
+        scenario,
+        input: { query: 'Trouve-moi des entreprises à Lyon' },
+        outputDirectory: join(directory, fail ? 'failure' : 'success'),
+        fixtureManager: new LocalCaptureFixtureManager(),
+        authStateProvider,
+      });
+      expect(result.result).toBe(fail ? 'FAILED' : 'SUCCEEDED');
+      expect(result.files.some((file) => file.role === 'TRACE')).toBe(false);
+      expect(JSON.stringify(result)).not.toContain(sentinel);
+      expect(JSON.stringify(result)).not.toContain(statePath);
+    }
+    const traceScenario = structuredClone(spec);
+    traceScenario.outputs.push({
+      key: 'sensitive-trace',
+      role: 'TRACE',
+      required: true,
+      editorialDescription: 'Trace boundary test',
+    });
+    const rejected = await executeCaptureScenario({
+      scenario: traceScenario,
+      input: { query: 'Trouve-moi des entreprises à Lyon' },
+      outputDirectory: join(directory, 'required-trace'),
+      fixtureManager: new LocalCaptureFixtureManager(),
+      authStateProvider,
+    });
+    expect(rejected.result).toBe('FAILED');
+    expect(rejected.failureCode).toBe('CAPTURE_AUTH_TRACE_FORBIDDEN');
+    expect(rejected.files).toHaveLength(0);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });

@@ -358,6 +358,11 @@ export async function executeCaptureScenario(
     const storageStatePath = await request.authStateProvider.storageStatePath(
       scenario.auth.authProfileKey,
     );
+    invariant(
+      !storageStatePath ||
+        !scenario.outputs.some((output) => output.role === 'TRACE' && output.required),
+      'CAPTURE_AUTH_TRACE_FORBIDDEN',
+    );
 
     browser = await chromium.launch({ headless: true });
 
@@ -381,13 +386,15 @@ export async function executeCaptureScenario(
         : {}),
     });
 
-    await context.tracing.start({
-      screenshots: true,
-      snapshots: true,
-      sources: false,
-    });
+    if (!storageStatePath) {
+      await context.tracing.start({
+        screenshots: true,
+        snapshots: true,
+        sources: false,
+      });
 
-    traceStarted = true;
+      traceStarted = true;
+    }
 
     await context.route('**/*', async (route) => {
       const request = route.request();
@@ -685,7 +692,7 @@ export async function executeCaptureScenario(
 
     const traceOutput = scenario.outputs.find((output) => output.role === 'TRACE');
 
-    if (traceOutput) {
+    if (traceOutput && traceStarted) {
       const tracePath = join(request.outputDirectory, `${safeFilename(traceOutput.key)}.zip`);
 
       await context.tracing.stop({ path: tracePath });
@@ -698,7 +705,7 @@ export async function executeCaptureScenario(
         required: traceOutput.required,
         diagnostic: false,
       });
-    } else {
+    } else if (traceStarted) {
       await context.tracing.stop();
       traceStarted = false;
     }

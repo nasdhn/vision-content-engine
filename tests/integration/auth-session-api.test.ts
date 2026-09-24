@@ -2,6 +2,8 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createApi, type ApiBusinessOptions } from '../../apps/api/src/app.js';
 
+import { EnvironmentSecretResolver } from '../../packages/shared/src/secrets.js';
+
 const accessKey = randomBytes(32).toString('hex');
 const origin = 'http://localhost:5174';
 const id = randomUUID();
@@ -28,7 +30,14 @@ beforeEach(async () => {
   app = await createApi(
     { postgres: async () => {}, redis: async () => {}, storage: async () => {} },
     {
-      auth: { accessKey, origin, now: () => now },
+      auth: {
+        accessKey: () =>
+          new EnvironmentSecretResolver({ VCE_LOCAL_ACCESS_KEY: accessKey }, [
+            'VCE_LOCAL_ACCESS_KEY',
+          ]).resolve('VCE_LOCAL_ACCESS_KEY'),
+        origin,
+        now: () => now,
+      },
       learning: { list: read, transitionRecommendation: write },
       analyticsRead: { overview: read },
       analyticsManual: { submit: write },

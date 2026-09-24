@@ -23,6 +23,7 @@ import type {
   UmamiInferencePolicy,
 } from '@vision/analytics';
 import { invariant } from '@vision/domain';
+import { assertNoSecrets } from '@vision/contracts/canonical';
 import type { Prisma } from './generated/prisma/client.js';
 import { audit, databaseTime, emit, lock } from './transaction.js';
 import type { Actor, Transaction } from './transaction.js';
@@ -45,6 +46,7 @@ export type UmamiImportInput = Readonly<{
 }>;
 
 function json(value: unknown) {
+  assertNoSecrets(value);
   return structuredClone(value) as Prisma.InputJsonValue;
 }
 

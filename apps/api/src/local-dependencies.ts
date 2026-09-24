@@ -1,14 +1,14 @@
 import { HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
 import { Redis } from 'ioredis';
 import pg from 'pg';
-import type { RuntimeConfig } from '@vision/shared';
-import { assertLocalBootstrap } from '@vision/shared';
+import type { RuntimeConfig, SecretResolver } from '@vision/shared';
+import { assertLocalBootstrap, s3CredentialProvider } from '@vision/shared';
 import type { ReadinessProbes } from '@vision/observability';
 
-export function createLocalDependencies(config: RuntimeConfig) {
+export function createLocalDependencies(config: RuntimeConfig, secrets: SecretResolver) {
   assertLocalBootstrap(config);
   const postgres = new pg.Pool({
-    connectionString: config.DATABASE_URL,
+    connectionString: secrets.resolve('DATABASE_URL'),
     max: 2,
     connectionTimeoutMillis: 1500,
     query_timeout: 1500,
@@ -18,7 +18,7 @@ export function createLocalDependencies(config: RuntimeConfig) {
   postgres.on('error', () => {
     /* Reported as down through readiness, without raw errors. */
   });
-  const redis = new Redis(config.REDIS_URL, {
+  const redis = new Redis(secrets.resolve('REDIS_URL'), {
     connectTimeout: 1500,
     commandTimeout: 1500,
     maxRetriesPerRequest: 0,
@@ -33,10 +33,7 @@ export function createLocalDependencies(config: RuntimeConfig) {
     region: config.S3_REGION,
     forcePathStyle: true,
     maxAttempts: 1,
-    credentials: {
-      accessKeyId: config.S3_ACCESS_KEY_ID,
-      secretAccessKey: config.S3_SECRET_ACCESS_KEY,
-    },
+    credentials: s3CredentialProvider(secrets),
     requestHandler: { connectionTimeout: 1500, requestTimeout: 1500 },
   });
   const probes: ReadinessProbes = {

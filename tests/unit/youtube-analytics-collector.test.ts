@@ -11,6 +11,11 @@ import {
   type YouTubeAnalyticsCredentialResolver,
 } from '../../packages/analytics/src/index.js';
 
+import {
+  EnvironmentSecretResolver,
+  accountCredentialResolver,
+} from '../../packages/shared/src/secrets.js';
+
 const NOW = new Date('2026-09-22T18:00:00.000Z');
 
 function snapshot(
@@ -18,7 +23,7 @@ function snapshot(
 ): AnalyticsCollectionSnapshot {
   return {
     publicationId: randomUUID(),
-    platformAccountId: randomUUID(),
+    platformAccountId: '0199f2d2-6ac2-7f64-9ed0-49ce5a9f4746',
     platform: 'YOUTUBE',
     remotePostId: 'dQw4w9WgXcQ',
     publishedAt: '2026-09-19T12:00:00.000Z',
@@ -34,8 +39,14 @@ function credentials(
   overrides: Partial<YouTubeAnalyticsCredential> = {},
 ): YouTubeAnalyticsCredentialResolver {
   return {
-    resolve: vi.fn(async () => ({
-      accessToken: 'unit-test-token',
+    resolve: vi.fn(async (accountId: string) => ({
+      ...(await accountCredentialResolver(
+        new EnvironmentSecretResolver({ YOUTUBE_ACCESS_TOKEN: 'unit-test-token' }, [
+          'YOUTUBE_ACCESS_TOKEN',
+        ]),
+        'YOUTUBE_ACCESS_TOKEN',
+        '0199f2d2-6ac2-7f64-9ed0-49ce5a9f4746',
+      ).resolve(accountId)),
       grantedScopes: [YOUTUBE_ANALYTICS_SCOPE],
       expiresAt: '2026-09-22T20:00:00.000Z',
       ...overrides,

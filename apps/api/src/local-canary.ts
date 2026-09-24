@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { parseConfig, assertLocalBootstrap } from '@vision/shared';
+import {
+  parseConfig,
+  assertLocalBootstrap,
+  EnvironmentSecretResolver,
+  s3CredentialProvider,
+} from '@vision/shared';
 import { createLocalDependencies } from './local-dependencies.js';
 import { checkReadiness } from '@vision/observability';
 
@@ -14,16 +19,19 @@ import {
 export async function checkLocalInfra() {
   const config = parseConfig(process.env);
   assertLocalBootstrap(config);
-  const dependencies = createLocalDependencies(config);
+  const secrets = new EnvironmentSecretResolver(process.env, [
+    'DATABASE_URL',
+    'REDIS_URL',
+    'S3_ACCESS_KEY_ID',
+    'S3_SECRET_ACCESS_KEY',
+  ]);
+  const dependencies = createLocalDependencies(config, secrets);
   const storage = new S3Client({
     endpoint: config.S3_ENDPOINT,
     region: config.S3_REGION,
     forcePathStyle: true,
     maxAttempts: 1,
-    credentials: {
-      accessKeyId: config.S3_ACCESS_KEY_ID,
-      secretAccessKey: config.S3_SECRET_ACCESS_KEY,
-    },
+    credentials: s3CredentialProvider(secrets),
     requestHandler: { connectionTimeout: 1500, requestTimeout: 2000 },
   });
   const key = `bootstrap-canary/${randomUUID()}.txt`;

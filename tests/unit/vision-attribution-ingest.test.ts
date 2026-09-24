@@ -106,3 +106,33 @@ describe('Phase 8E Vision signed attribution authentication', () => {
     );
   });
 });
+
+it('resolves the current HMAC key only when verifying and masks resolver failures', () => {
+  let current = secret;
+  let calls = 0;
+  const auth = new VisionAttributionAuthenticator({
+    secret: () => {
+      calls++;
+      return current;
+    },
+    now: () => now,
+  });
+  const raw = body(event());
+  expect(calls).toBe(0);
+  expect(auth.verify(raw, headers(raw)).externalEventId).toBe('vision_evt_001');
+  current = 'b'.repeat(64);
+  expect(() => auth.verify(raw, headers(raw))).toThrow('VISION_ATTRIBUTION_AUTH_FAILED');
+  expect(
+    auth.verify(raw, {
+      timestamp,
+      signature: signVisionAttributionRequest(current, timestamp, raw),
+    }).externalEventId,
+  ).toBe('vision_evt_001');
+  const failed = new VisionAttributionAuthenticator({
+    secret: () => {
+      throw new Error(current);
+    },
+    now: () => now,
+  });
+  expect(() => failed.verify(raw, headers(raw))).toThrow('VISION_ATTRIBUTION_SECRET_UNAVAILABLE');
+});

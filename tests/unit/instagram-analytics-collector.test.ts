@@ -12,6 +12,11 @@ import {
   type InstagramAnalyticsMetricProfile,
 } from '../../packages/analytics/src/index.js';
 
+import {
+  EnvironmentSecretResolver,
+  accountCredentialResolver,
+} from '../../packages/shared/src/secrets.js';
+
 const NOW = new Date('2026-09-22T18:00:00.000Z');
 
 const PROFILE: InstagramAnalyticsMetricProfile = {
@@ -41,7 +46,7 @@ function snapshot(
 ): AnalyticsCollectionSnapshot {
   return {
     publicationId: randomUUID(),
-    platformAccountId: randomUUID(),
+    platformAccountId: '0199f2d2-6ac2-7f64-9ed0-49ce5a9f4746',
     platform: 'INSTAGRAM',
     remotePostId: '17890000000000001',
     publishedAt: '2026-09-22T12:00:00.000Z',
@@ -57,8 +62,15 @@ function credentials(
   overrides: Partial<InstagramAnalyticsCredential> = {},
 ): InstagramAnalyticsCredentialResolver {
   return {
-    resolve: vi.fn(async () => ({
-      accessToken: 'fixture-instagram-analytics-token',
+    resolve: vi.fn(async (accountId: string) => ({
+      ...(await accountCredentialResolver(
+        new EnvironmentSecretResolver(
+          { INSTAGRAM_ACCESS_TOKEN: 'fixture-instagram-analytics-token' },
+          ['INSTAGRAM_ACCESS_TOKEN'],
+        ),
+        'INSTAGRAM_ACCESS_TOKEN',
+        '0199f2d2-6ac2-7f64-9ed0-49ce5a9f4746',
+      ).resolve(accountId)),
       expiresAt: '2026-09-22T20:00:00.000Z',
       ...overrides,
     })),
