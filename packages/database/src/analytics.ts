@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import {
   AnalyticsObservationSchema,
   MANUAL_TIKTOK_WINDOWS,
@@ -214,7 +213,7 @@ export class AnalyticsRuntime {
       'ANALYTICS_WORKFLOW_REQUIRED',
     );
     if (job.status === 'SUCCEEDED') return { kind: 'ALREADY_DONE', jobAttemptId } as const;
-    invariant(job.status === 'QUEUED' || job.status === 'RUNNING', 'ANALYTICS_JOB_NOT_RUNNABLE');
+    invariant(job.status === 'RUNNING', 'ANALYTICS_JOB_NOT_RUNNING');
     invariant(job.workflowRun.rootEntityType === 'PublicationAnalytics', 'INVALID_ANALYTICS_ROOT');
     const publication = await this.tx.publication.findUniqueOrThrow({
       where: { id: job.workflowRun.rootEntityId },
@@ -243,19 +242,6 @@ export class AnalyticsRuntime {
       job.operationId === payload['collectionOperationId'],
       'COLLECTION_OPERATION_MISMATCH',
     );
-    const now = await databaseTime(this.tx);
-    await this.tx.jobAttempt.update({
-      where: { id: job.id },
-      data: {
-        status: 'RUNNING',
-        startedAt: job.startedAt ?? now,
-        workerId: 'worker-analytics',
-        leaseToken: randomUUID(),
-        leaseAcquiredAt: now,
-        heartbeatAt: now,
-        leaseExpiresAt: new Date(now.getTime() + 60_000),
-      },
-    });
     await this.tx.workflowRun.update({
       where: { id: job.workflowRun.id },
       data: { status: 'RUNNING', currentStep: windowKey },
@@ -274,7 +260,7 @@ export class AnalyticsRuntime {
     return { kind: 'READY', snapshot } as const;
   }
 
-  async completeCollection(jobAttemptId: string, input: unknown) {
+  async persistCollection(jobAttemptId: string, input: unknown) {
     const observation = AnalyticsObservationSchema.parse(input);
     await lock(this.tx, 'JobAttempt', jobAttemptId);
     const job = await this.tx.jobAttempt.findUniqueOrThrow({
@@ -294,19 +280,32 @@ export class AnalyticsRuntime {
       where: { collectionOperationId: job.operationId },
       include: { normalizedSnapshots: true },
     });
-    if (existingRaw) {
-      await this.tx.jobAttempt.updateMany({
-        where: { id: job.id, status: { not: 'SUCCEEDED' } },
-        data: { status: 'SUCCEEDED', finishedAt: await databaseTime(this.tx) },
+    const updateWorkflow = async () => {
+      const remaining = await this.tx.jobAttempt.count({
+        where: {
+          workflowRunId: job.workflowRun!.id,
+          id: { not: job.id },
+          status: { not: 'SUCCEEDED' },
+        },
       });
+      const now = await databaseTime(this.tx);
+      await this.tx.workflowRun.update({
+        where: { id: job.workflowRun!.id },
+        data:
+          remaining === 0
+            ? { status: 'SUCCEEDED', currentStep: 'complete', finishedAt: now }
+            : { status: 'WAITING', currentStep: 'measurement_windows' },
+      });
+    };
+    if (existingRaw) {
+      await updateWorkflow();
       return {
         kind: 'EXISTING',
         rawSnapshotId: existingRaw.id,
         normalizedSnapshotId: existingRaw.normalizedSnapshots[0]?.id ?? null,
       } as const;
     }
-    invariant(job.status === 'RUNNING' || job.status === 'QUEUED', 'ANALYTICS_JOB_NOT_RUNNABLE');
-    const now = await databaseTime(this.tx);
+    invariant(job.status === 'RUNNING', 'ANALYTICS_JOB_NOT_RUNNING');
     const raw = await this.tx.metricSnapshotRaw.create({
       data: {
         publicationId,
@@ -334,20 +333,7 @@ export class AnalyticsRuntime {
         metricSemanticsVersion: observation.metricSemanticsVersion,
       },
     });
-    await this.tx.jobAttempt.update({
-      where: { id: job.id },
-      data: { status: 'SUCCEEDED', finishedAt: now },
-    });
-    const remaining = await this.tx.jobAttempt.count({
-      where: { workflowRunId: job.workflowRun.id, status: { not: 'SUCCEEDED' } },
-    });
-    await this.tx.workflowRun.update({
-      where: { id: job.workflowRun.id },
-      data:
-        remaining === 0
-          ? { status: 'SUCCEEDED', currentStep: 'complete', finishedAt: now }
-          : { status: 'WAITING', currentStep: 'measurement_windows' },
-    });
+    await updateWorkflow();
     await audit(this.tx, this.actor, 'Analytics.snapshotCollected', 'MetricSnapshotRaw', raw.id);
     return {
       kind: 'COLLECTED',

@@ -259,3 +259,125 @@ it('fails closed before a real analytics provider can run', async () => {
   expect(untouchedJob.status).toBe('QUEUED');
   expect(untouchedJob.leaseToken).toBeNull();
 });
+
+it('allows only one concurrent analytics owner to reach the provider', async () => {
+  const { publication } = await publishedYoutube();
+  await new AnalyticsControl(db).planPublication(publication.id);
+  const jobs: AnalyticsCollectionJob[] = [];
+  await new AnalyticsOutboxDispatcher(
+    db,
+    { durationMs: 60_000, heartbeatIntervalMs: 10_000 },
+    { enqueue: async (job) => void jobs.push(job) },
+    'phase10g-analytics-concurrency',
+  ).dispatchOne();
+
+  let release!: () => void;
+  let started!: () => void;
+  const entered = new Promise<void>((resolve) => (started = resolve));
+  const barrier = new Promise<void>((resolve) => (release = resolve));
+  let calls = 0;
+  const collector = {
+    platform: 'YOUTUBE' as const,
+    isRealProvider: false,
+    async collect() {
+      calls += 1;
+      started();
+      await barrier;
+      return {
+        collectedAt: '2026-09-01T01:00:05.000Z',
+        providerSchemaVersion: 'phase10g-v1',
+        rawPayload: { views: 1 },
+        metrics: { ...EMPTY_CANONICAL_METRICS, views: 1n },
+        otherMetrics: null,
+        availability: { status: 'AVAILABLE' as const, unavailableMetrics: [], notes: [] },
+        comparability: { crossPlatformViewsComparable: false, notes: [] },
+        normalizerVersion: 'phase10g-v1',
+        metricSemanticsVersion: 'canonical-metrics-v1',
+      };
+    },
+  };
+  const registry = new StaticAnalyticsCollectorRegistry([collector]);
+  const firstWorker = new AnalyticsWorkerOrchestrator(db, registry, {
+    realProvidersEnabled: false,
+    workerId: 'phase10g-analytics-one',
+    leaseConfig: { durationMs: 60_000, heartbeatIntervalMs: 30_000 },
+  });
+  const secondWorker = new AnalyticsWorkerOrchestrator(db, registry, {
+    realProvidersEnabled: false,
+    workerId: 'phase10g-analytics-two',
+    leaseConfig: { durationMs: 60_000, heartbeatIntervalMs: 30_000 },
+  });
+  const first = firstWorker.process(jobs[0]);
+  await entered;
+  await expect(secondWorker.process(jobs[0])).resolves.toMatchObject({ kind: 'BUSY' });
+  expect(calls).toBe(1);
+  release();
+  await expect(first).resolves.toMatchObject({ kind: 'COLLECTED' });
+});
+
+it('reclaims an expired analytics lease and fences the stale owner from persistence', async () => {
+  const { publication } = await publishedYoutube();
+  await new AnalyticsControl(db).planPublication(publication.id);
+  const jobs: AnalyticsCollectionJob[] = [];
+  await new AnalyticsOutboxDispatcher(
+    db,
+    { durationMs: 60_000, heartbeatIntervalMs: 10_000 },
+    { enqueue: async (job) => void jobs.push(job) },
+    'phase10g-analytics-recovery',
+  ).dispatchOne();
+
+  let releaseFirst!: () => void;
+  let firstStarted!: () => void;
+  const entered = new Promise<void>((resolve) => (firstStarted = resolve));
+  const firstBarrier = new Promise<void>((resolve) => (releaseFirst = resolve));
+  let calls = 0;
+  const collector = {
+    platform: 'YOUTUBE' as const,
+    isRealProvider: false,
+    async collect() {
+      calls += 1;
+      if (calls === 1) {
+        firstStarted();
+        await firstBarrier;
+      }
+      return {
+        collectedAt: '2026-09-01T01:00:05.000Z',
+        providerSchemaVersion: 'phase10g-v1',
+        rawPayload: { views: calls },
+        metrics: { ...EMPTY_CANONICAL_METRICS, views: BigInt(calls) },
+        otherMetrics: null,
+        availability: { status: 'AVAILABLE' as const, unavailableMetrics: [], notes: [] },
+        comparability: { crossPlatformViewsComparable: false, notes: [] },
+        normalizerVersion: 'phase10g-v1',
+        metricSemanticsVersion: 'canonical-metrics-v1',
+      };
+    },
+  };
+  const registry = new StaticAnalyticsCollectorRegistry([collector]);
+  const firstWorker = new AnalyticsWorkerOrchestrator(db, registry, {
+    realProvidersEnabled: false,
+    workerId: 'phase10g-stale-one',
+    leaseConfig: { durationMs: 60_000, heartbeatIntervalMs: 30_000 },
+  });
+  const secondWorker = new AnalyticsWorkerOrchestrator(db, registry, {
+    realProvidersEnabled: false,
+    workerId: 'phase10g-stale-two',
+    leaseConfig: { durationMs: 60_000, heartbeatIntervalMs: 30_000 },
+  });
+
+  const first = firstWorker.process(jobs[0]);
+  await entered;
+  await db.$executeRaw`
+    UPDATE "JobAttempt"
+    SET "leaseAcquiredAt"='2000-01-01T00:00:00Z',
+        "heartbeatAt"='2000-01-01T00:00:01Z',
+        "leaseExpiresAt"='2000-01-01T00:00:02Z'
+    WHERE "id"=${jobs[0]!.jobAttemptId}::uuid
+  `;
+  await expect(secondWorker.process(jobs[0])).resolves.toMatchObject({ kind: 'COLLECTED' });
+  releaseFirst();
+  await expect(first).rejects.toThrow('STALE_LEASE');
+  expect(calls).toBe(2);
+  expect(await db.metricSnapshotRaw.count()).toBe(1);
+  expect(await db.metricSnapshotNormalized.count()).toBe(1);
+});

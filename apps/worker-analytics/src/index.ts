@@ -4,10 +4,22 @@ import { Worker } from 'bullmq';
 import type { WorkerOptions } from 'bullmq';
 import { AnalyticsCollectionJobSchema, ANALYTICS_QUEUE_NAME } from '@vision/analytics';
 import type { AnalyticsCollectionJob, StaticAnalyticsCollectorRegistry } from '@vision/analytics';
-import { Persistence } from '@vision/database';
-import type { PrismaClient } from '@vision/database';
+import { Leases } from '@vision/database';
+import type { AnalyticsRuntime, PrismaClient } from '@vision/database';
 
-export type AnalyticsWorkerOptions = Readonly<{ realProvidersEnabled: boolean }>;
+type AnalyticsLeaseConfig = ConstructorParameters<typeof Leases>[1];
+type PersistedAnalyticsCollection = Awaited<ReturnType<AnalyticsRuntime['persistCollection']>>;
+
+export type AnalyticsWorkerOptions = Readonly<{
+  realProvidersEnabled: boolean;
+  workerId?: string;
+  leaseConfig?: AnalyticsLeaseConfig;
+}>;
+
+export const DEFAULT_ANALYTICS_JOB_LEASE = Object.freeze({
+  durationMs: 60_000,
+  heartbeatIntervalMs: 15_000,
+}) satisfies AnalyticsLeaseConfig;
 
 function redisConnectionOptions(redisUrl: string): WorkerOptions['connection'] {
   const parsed = new URL(redisUrl);
@@ -26,14 +38,18 @@ function redisConnectionOptions(redisUrl: string): WorkerOptions['connection'] {
 }
 
 export class AnalyticsWorkerOrchestrator {
-  private readonly persistence: Persistence;
+  private readonly leases: Leases;
+  private readonly leaseConfig: AnalyticsLeaseConfig;
+  private readonly workerId: string;
 
   constructor(
     client: PrismaClient,
     private readonly collectors: StaticAnalyticsCollectorRegistry,
     private readonly options: AnalyticsWorkerOptions,
   ) {
-    this.persistence = new Persistence(client);
+    this.leaseConfig = options.leaseConfig ?? DEFAULT_ANALYTICS_JOB_LEASE;
+    this.workerId = options.workerId?.trim() || 'worker-analytics';
+    this.leases = new Leases(client, this.leaseConfig, {});
   }
 
   async process(input: unknown) {
@@ -56,16 +72,49 @@ export class AnalyticsWorkerOrchestrator {
     if (collector.isRealProvider && !this.options.realProvidersEnabled) {
       throw new Error('REAL_ANALYTICS_PROVIDERS_DISABLED');
     }
-    const begin = await this.persistence.transaction(
-      { actorType: 'WORKER', actorId: 'worker-analytics' },
-      (unit) => unit.analytics.beginCollection(job.jobAttemptId),
-    );
-    if (begin.kind !== 'READY') return begin;
-    const observation = await collector.collect(begin.snapshot);
-    return this.persistence.transaction(
-      { actorType: 'WORKER', actorId: 'worker-analytics' },
-      (unit) => unit.analytics.completeCollection(job.jobAttemptId, observation),
-    );
+
+    const claim = await this.leases.claimJobById(job.jobAttemptId, this.workerId, 'SAFE_RETRY', {
+      queueName: ANALYTICS_QUEUE_NAME,
+      jobType: `ANALYTICS_COLLECT:${job.adapterKey}:${job.windowKey}`,
+      operationId: job.collectionOperationId,
+      workflowRunId: job.workflowRunId,
+    });
+    if (claim.kind !== 'READY') return claim;
+    const leaseToken = claim.job.leaseToken;
+    if (!leaseToken) throw new Error('ANALYTICS_LEASE_TOKEN_REQUIRED');
+
+    let heartbeatFailure: unknown = null;
+    const timer = setInterval(() => {
+      void this.leases.heartbeatJob(job.jobAttemptId, leaseToken).catch((error: unknown) => {
+        heartbeatFailure ??= error;
+      });
+    }, this.leaseConfig.heartbeatIntervalMs);
+    timer.unref?.();
+
+    try {
+      const begin = await this.leases.withJobLease(job.jobAttemptId, leaseToken, (unit) =>
+        unit.analytics.beginCollection(job.jobAttemptId),
+      );
+      if (begin.kind !== 'READY') return begin;
+
+      const observation = await collector.collect(begin.snapshot);
+      if (heartbeatFailure) throw heartbeatFailure;
+
+      let persisted: PersistedAnalyticsCollection | undefined;
+      await this.leases.finishJob(
+        job.jobAttemptId,
+        leaseToken,
+        'SUCCEEDED',
+        undefined,
+        async (unit) => {
+          persisted = await unit.analytics.persistCollection(job.jobAttemptId, observation);
+        },
+      );
+      if (!persisted) throw new Error('ANALYTICS_PERSISTENCE_MISSING');
+      return persisted;
+    } finally {
+      clearInterval(timer);
+    }
   }
 }
 

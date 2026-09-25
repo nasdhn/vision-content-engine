@@ -824,6 +824,67 @@ it('reclaims outbox after enqueue/mark loss using stable deduplication identity'
   expect(await leases.claimOutbox('three')).toBeNull();
   expect((await db.outboxEvent.findUniqueOrThrow({ where: { id: e.id } })).attemptCount).toBe(2);
 });
+it('rejects outbox finalization after expiry even before another dispatcher takes over', async () => {
+  const event = await db.outboxEvent.create({
+    data: {
+      eventType: 'fixture-expiry',
+      aggregateType: 'fixture',
+      aggregateId: 'fixture-expiry',
+      payloadJson: {},
+      availableAt: new Date('2000-01-01T00:00:00Z'),
+    },
+  });
+  const claim = await leases.claimOutbox('expiry-owner', ['fixture-expiry']);
+  expect(claim?.id).toBe(event.id);
+  await expireOutbox(event.id);
+  await expect(leases.finishOutbox(event.id, claim!.claimToken!, 'DISPATCHED')).rejects.toThrow(
+    'STALE_LEASE',
+  );
+  expect((await db.outboxEvent.findUniqueOrThrow({ where: { id: event.id } })).status).toBe(
+    'DISPATCHING',
+  );
+});
+
+it('claims a specific safe-retry job without permitting concurrent duplicate execution', async () => {
+  const j = await job('SAFE_BY_ID', 'fixture-specific');
+  const identity = {
+    queueName: j.queueName,
+    jobType: j.jobType,
+    operationId: j.operationId,
+    workflowRunId: j.workflowRunId,
+  };
+  await expect(
+    leases.claimJobById(j.id, 'wrong-identity', 'SAFE_RETRY', {
+      ...identity,
+      jobType: 'PUBLISH',
+    }),
+  ).rejects.toThrow('JOB_CLAIM_IDENTITY_MISMATCH');
+  expect((await db.jobAttempt.findUniqueOrThrow({ where: { id: j.id } })).status).toBe('QUEUED');
+
+  const first = await leases.claimJobById(j.id, 'specific-one', 'SAFE_RETRY', identity);
+  expect(first.kind).toBe('READY');
+  expect(
+    await new Leases(second, config, {}).claimJobById(j.id, 'specific-two', 'SAFE_RETRY', identity),
+  ).toMatchObject({
+    kind: 'BUSY',
+  });
+  await expireJob(j.id);
+  const recovered = await new Leases(second, config, {}).claimJobById(
+    j.id,
+    'specific-two',
+    'SAFE_RETRY',
+    identity,
+  );
+  expect(recovered).toMatchObject({ kind: 'READY', recovered: true });
+  await expect(
+    leases.withJobLease(
+      j.id,
+      first.kind === 'READY' ? first.job.leaseToken! : randomUUID(),
+      async () => undefined,
+    ),
+  ).rejects.toThrow('STALE_LEASE');
+});
+
 it('outbox claims are exclusive and respect availableAt', async () => {
   const future = await db.outboxEvent.create({
     data: {

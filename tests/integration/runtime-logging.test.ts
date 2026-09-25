@@ -4,7 +4,7 @@ import { createApi } from '../../apps/api/src/app.js';
 import { StructuredLogger } from '../../packages/observability/src/index.js';
 import { AnalyticsWorkerOrchestrator } from '../../apps/worker-analytics/src/index.js';
 import { StaticAnalyticsCollectorRegistry } from '../../packages/analytics/src/index.js';
-import { Persistence } from '../../packages/database/src/index.js';
+import { Leases } from '../../packages/database/src/index.js';
 import {
   EnvironmentSecretResolver,
   accountCredentialResolver,
@@ -50,12 +50,19 @@ it('logs an API auth failure without request keys, headers, cookies or query', a
   }
 });
 
-it('correlates a worker/provider failure while preserving the original failure and transaction count', async () => {
+it('correlates a worker/provider failure while preserving the original failure across fenced lease boundaries', async () => {
   const output = vi.spyOn(console, 'error').mockImplementation(() => {});
   const failure = Object.assign(new Error(sentinel), { credentials: { accessToken: sentinel } });
-  const transaction = vi
-    .spyOn(Persistence.prototype, 'transaction')
-    .mockResolvedValue({ kind: 'READY', snapshot: {} });
+  const leaseToken = randomUUID();
+  const claimJobById = vi.spyOn(Leases.prototype, 'claimJobById').mockResolvedValue({
+    kind: 'READY',
+    recovered: false,
+    job: { leaseToken },
+  } as never);
+  const withJobLease = vi
+    .spyOn(Leases.prototype, 'withJobLease')
+    .mockResolvedValue({ kind: 'READY', snapshot: {} } as never);
+  const finishJob = vi.spyOn(Leases.prototype, 'finishJob');
   const credentials = accountCredentialResolver(
     new EnvironmentSecretResolver({ YOUTUBE_ACCESS_TOKEN: sentinel }, ['YOUTUBE_ACCESS_TOKEN']),
     'YOUTUBE_ACCESS_TOKEN',
@@ -86,8 +93,17 @@ it('correlates a worker/provider failure while preserving the original failure a
   };
   try {
     await expect(worker.process(job)).rejects.toBe(failure);
+    expect(claimJobById).toHaveBeenCalledTimes(1);
+    expect(claimJobById).toHaveBeenCalledWith(job.jobAttemptId, 'worker-analytics', 'SAFE_RETRY', {
+      queueName: 'vce-analytics',
+      jobType: `ANALYTICS_COLLECT:${job.adapterKey}:${job.windowKey}`,
+      operationId: job.collectionOperationId,
+      workflowRunId: job.workflowRunId,
+    });
+    expect(withJobLease).toHaveBeenCalledTimes(1);
+    expect(withJobLease.mock.calls[0]?.slice(0, 2)).toEqual([job.jobAttemptId, leaseToken]);
     expect(collect).toHaveBeenCalledTimes(1);
-    expect(transaction).toHaveBeenCalledTimes(1);
+    expect(finishJob).not.toHaveBeenCalled();
     const lines = output.mock.calls.map(([line]) => String(line));
     expect(lines.map((line) => JSON.parse(line))).toContainEqual(
       expect.objectContaining({
@@ -102,7 +118,9 @@ it('correlates a worker/provider failure while preserving the original failure a
     );
     expect(lines.join('')).not.toContain(sentinel);
   } finally {
-    transaction.mockRestore();
+    claimJobById.mockRestore();
+    withJobLease.mockRestore();
+    finishJob.mockRestore();
     output.mockRestore();
   }
 });
