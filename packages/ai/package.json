@@ -9,6 +9,7 @@
     "@vision/contracts": "workspace:*",
     "@vision/database": "workspace:*",
     "@vision/domain": "workspace:*",
-    "zod": "4.6.5"
+    "zod": "4.6.5",
+    "@vision/observability": "workspace:*"
   }
 }

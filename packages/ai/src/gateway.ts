@@ -1,7 +1,13 @@
+import { StructuredLogger } from '@vision/observability';
 import { z } from 'zod';
-import { ModelPolicySchema, BrandKnowledgeSnapshotSchema } from '@vision/contracts';
+import {
+  type ModelPolicySchema,
+  BrandKnowledgeSnapshotSchema,
+  CostAmountSchema,
+  RUNTIME_INTEGER_MAX,
+} from '@vision/contracts';
 import { assertNoSecrets, canonicalJson, contentHash, textHash } from '@vision/contracts/canonical';
-import { Prisma } from '@vision/database';
+import { Prisma, parseBudget, boundedModelPolicy } from '@vision/database';
 import type { Budget, InvocationRepository } from '@vision/database';
 import { invariant } from '@vision/domain';
 import { getPrompt } from './prompts.js';
@@ -38,13 +44,10 @@ export type ProviderRequest = {
 };
 const UsageSchema = z
   .object({
-    inputTokens: z.number().int().nonnegative().optional(),
-    outputTokens: z.number().int().nonnegative().optional(),
-    cachedInputTokens: z.number().int().nonnegative().optional(),
-    costAmount: z
-      .string()
-      .regex(/^\d+(?:\.\d{1,8})?$/)
-      .optional(),
+    inputTokens: z.number().int().nonnegative().max(RUNTIME_INTEGER_MAX).optional(),
+    outputTokens: z.number().int().nonnegative().max(RUNTIME_INTEGER_MAX).optional(),
+    cachedInputTokens: z.number().int().nonnegative().max(RUNTIME_INTEGER_MAX).optional(),
+    costAmount: CostAmountSchema.optional(),
     currency: z.string().regex(/^[A-Z]{3}$/),
   })
   .strict();
@@ -96,6 +99,7 @@ export class AIProviderGateway {
     private readonly repository: InvocationRepository,
     private readonly providers: readonly StructuredProvider[],
     private readonly paused: () => boolean,
+    private readonly logger = new StructuredLogger('worker-ai'),
   ) {
     invariant(
       providers.length > 0 && providers.every((p) => p.kind === 'FAKE'),
@@ -106,20 +110,21 @@ export class AIProviderGateway {
     request: InvocationRequest<I>,
     contracts: Validation<I, O>,
     inputPolicy: ModelPolicy,
-    budget: Budget,
+    inputBudget: Budget,
   ) {
     invariant(!this.paused(), 'AI_GENERATION_PAUSED');
     z.string().uuid().parse(request.requestId);
-    const policy = ModelPolicySchema.parse(inputPolicy);
+    let policy: ReturnType<typeof boundedModelPolicy>;
+    let budget: Budget;
+    try {
+      policy = boundedModelPolicy(inputPolicy);
+      budget = parseBudget(inputBudget);
+    } catch (error) {
+      this.logger.log('warn', 'budget.denied', { operationId: request.requestId, error });
+      throw error;
+    }
     assertNoSecrets({ purpose: request.purpose, policy, budget });
     invariant(policy.capability === request.capability, 'CAPABILITY_MISMATCH');
-    invariant(
-      policy.maxInputTokens &&
-        policy.maxOutputTokens &&
-        policy.maxEstimatedCost !== undefined &&
-        policy.maxEstimatedCost >= 0,
-      'BOUNDED_POLICY_REQUIRED',
-    );
     const prompt = getPrompt(request.prompt.key, request.prompt.version);
     invariant(
       prompt.capability === request.capability && prompt.status === 'ACTIVE',
@@ -187,25 +192,31 @@ export class AIProviderGateway {
       outputSchema: z.toJSONSchema(contracts.output),
       ...(policy.reasoningLevel ? { reasoningLevel: policy.reasoningLevel } : {}),
     };
-    await this.repository.begin({
-      id: request.requestId,
-      purpose: request.purpose,
-      capability: request.capability,
-      promptKey: prompt.key,
-      promptVersion: prompt.version,
-      promptContentHash: prompt.contentHash,
-      knowledgeSnapshotId: request.knowledgeSnapshot.id,
-      knowledgeContext: knowledge,
-      inputSchemaVersion: prompt.schemaVersion,
-      outputSchemaVersion: prompt.schemaVersion,
-      inputHash: contentHash(envelope),
-      policy,
-      budget,
-      reservation: String(policy.maxEstimatedCost),
-      ...(policy.preferredProvider ? { requestedProvider: policy.preferredProvider } : {}),
-      ...(policy.preferredModel ? { requestedModel: policy.preferredModel } : {}),
-      ...(policy.reasoningLevel ? { reasoningLevel: policy.reasoningLevel } : {}),
-    });
+    try {
+      await this.repository.begin({
+        id: request.requestId,
+        purpose: request.purpose,
+        capability: request.capability,
+        promptKey: prompt.key,
+        promptVersion: prompt.version,
+        promptContentHash: prompt.contentHash,
+        knowledgeSnapshotId: request.knowledgeSnapshot.id,
+        knowledgeContext: knowledge,
+        inputSchemaVersion: prompt.schemaVersion,
+        outputSchemaVersion: prompt.schemaVersion,
+        inputHash: contentHash(envelope),
+        policy,
+        budget,
+        reservation: new Prisma.Decimal(policy.maxEstimatedCost).toFixed(8),
+        ...(policy.preferredProvider ? { requestedProvider: policy.preferredProvider } : {}),
+        ...(policy.preferredModel ? { requestedModel: policy.preferredModel } : {}),
+        ...(policy.reasoningLevel ? { reasoningLevel: policy.reasoningLevel } : {}),
+      });
+    } catch (error) {
+      this.logger.log('warn', 'budget.denied', { operationId: request.requestId, error });
+      throw error;
+    }
+    this.logger.log('info', 'budget.reserved', { operationId: request.requestId });
     let repair: ProviderRequest['repair'];
     let lastCode = 'ATTEMPTS_EXHAUSTED';
     let terminal: 'FAILED' | 'REJECTED_SCHEMA' = 'FAILED';
@@ -225,7 +236,7 @@ export class AIProviderGateway {
         invariant(
           Number.isSafeInteger(quote.inputTokens) &&
             quote.inputTokens >= 0 &&
-            /^\d+(?:\.\d{1,8})?$/.test(quote.maxCost),
+            CostAmountSchema.safeParse(quote.maxCost).success,
           'INVALID_PROVIDER_ESTIMATE',
         );
       } catch {
@@ -246,9 +257,12 @@ export class AIProviderGateway {
           ...(policy.reasoningLevel ? { reasoningLevel: policy.reasoningLevel } : {}),
         });
       } catch (error) {
+        this.logger.log('warn', 'provider_call.denied', { operationId: request.requestId, error });
         if (
           error instanceof Error &&
-          ['COST_BUDGET_BLOCK', 'ATTEMPTS_EXHAUSTED'].includes(error.message)
+          ['COST_BUDGET_BLOCK', 'ATTEMPTS_EXHAUSTED', 'BUDGET_WINDOW_CLOSED'].includes(
+            error.message,
+          )
         ) {
           lastCode = error.message;
           break;
@@ -268,7 +282,8 @@ export class AIProviderGateway {
         invariant(!usage || usage.currency === budget.currency, 'USAGE_CURRENCY_MISMATCH');
         invariant(
           (usage?.inputTokens ?? 0) <= policy.maxInputTokens &&
-            (usage?.outputTokens ?? 0) <= policy.maxOutputTokens,
+            (usage?.outputTokens ?? 0) <= policy.maxOutputTokens &&
+            (usage?.cachedInputTokens ?? 0) <= policy.maxInputTokens,
           'TOKEN_BUDGET_EXCEEDED',
         );
         invariant(
@@ -345,6 +360,10 @@ export class AIProviderGateway {
           schema: schemaPassed ? 'PASS' : attemptStatus === 'REJECTED_SCHEMA' ? 'FAIL' : 'NOT_RUN',
           ...(code ? { code } : {}),
         },
+      });
+      this.logger.log('info', 'budget.finalized', {
+        operationId: request.requestId,
+        attempt: i + 1,
       });
       if (attemptStatus === 'SUCCEEDED' && output !== undefined) {
         const outputHash = contentHash(output);

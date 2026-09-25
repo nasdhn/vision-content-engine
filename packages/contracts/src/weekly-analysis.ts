@@ -1,3 +1,4 @@
+import { RuntimeBudgetSchema } from './runtime-budget.js';
 import { z } from 'zod';
 
 import { contentHash } from './canonical.js';
@@ -71,16 +72,6 @@ const WeeklyAnalysisKnowledgeSnapshotSchema = z
   })
   .strict();
 
-const WeeklyAnalysisBudgetSchema = z
-  .object({
-    key: z.string().min(1),
-    from: z.string().datetime(),
-    to: z.string().datetime(),
-    limit: z.string().regex(/^\d+(?:\.\d{1,8})?$/),
-    currency: z.string().regex(/^[A-Z]{3}$/),
-  })
-  .strict();
-
 const WeeklyAnalystPolicySchema = ModelPolicySchema.superRefine((value, ctx) => {
   if (value.capability !== 'ANALYST') {
     ctx.addIssue({
@@ -99,7 +90,7 @@ const weeklyPlanShape = {
   contextBuilderVersion: z.literal(WEEKLY_ANALYSIS_CONTEXT_VERSION),
   knowledgeSnapshot: WeeklyAnalysisKnowledgeSnapshotSchema,
   policy: WeeklyAnalystPolicySchema,
-  budget: WeeklyAnalysisBudgetSchema,
+  budget: RuntimeBudgetSchema,
 } as const;
 
 export const WeeklyAnalysisPlanSchema = z.object(weeklyPlanShape).strict();

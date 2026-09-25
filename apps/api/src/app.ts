@@ -1,6 +1,8 @@
 import { OperationsController, RUNTIME_HEALTH } from './operations.js';
 import type { RuntimeHealthService } from './runtime-health.js';
 import 'reflect-metadata';
+import { BudgetOperationsController, BUDGET_OPERATIONS } from './budget-operations.js';
+import type { InvocationBudgetReader } from '@vision/database';
 import { Controller, Get, Inject, Module, ServiceUnavailableException } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -53,6 +55,7 @@ const PROBES = Symbol('bootstrap-readiness-probes');
 
 export type ApiBusinessOptions = {
   auth: LocalSessionOptions;
+  budgetOperations?: Pick<InvocationBudgetReader, 'read'>;
   runtimeHealth?: Pick<RuntimeHealthService, 'read'>;
   recordings?: RecordingPackService;
   dashboard?: DashboardReadService;
@@ -93,6 +96,7 @@ export async function createApi(
   @Module({
     controllers: [
       HealthController,
+      ...(business?.budgetOperations ? [BudgetOperationsController] : []),
       ...(business?.runtimeHealth ? [OperationsController] : []),
       ...(business ? [LocalSessionController] : []),
       ...(business?.recordings ? [RecordingController] : []),
@@ -110,6 +114,9 @@ export async function createApi(
     ],
     providers: [
       { provide: PROBES, useValue: probes },
+      ...(business?.budgetOperations
+        ? [{ provide: BUDGET_OPERATIONS, useValue: business.budgetOperations }]
+        : []),
       ...(business?.runtimeHealth
         ? [{ provide: RUNTIME_HEALTH, useValue: business.runtimeHealth }]
         : []),

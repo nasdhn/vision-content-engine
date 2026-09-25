@@ -46,3 +46,5 @@ export {
 } from './editing-intelligence.js';
 export * from './analyst.js';
 export * from './weekly-analysis.js';
+
+export * from './runtime-budget.js';

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { RUNTIME_INTEGER_MAX } from './runtime-budget.js';
 
 export const CapabilitySchema = z.enum([
   'CREATOR',
@@ -14,14 +15,31 @@ export const ModelPolicySchema = z
     preferredProvider: z.string().optional(),
     preferredModel: z.string().optional(),
     reasoningLevel: z.string().optional(),
-    maxAttempts: z.number().int().positive(),
-    timeoutMs: z.number().int().positive(),
+    maxAttempts: z.number().int().positive().max(RUNTIME_INTEGER_MAX),
+    timeoutMs: z.number().int().positive().max(RUNTIME_INTEGER_MAX),
     fallbackPolicy: z.enum(['NONE', 'SAME_CONTRACT_ALLOWED']),
-    maxInputTokens: z.number().int().positive().optional(),
-    maxOutputTokens: z.number().int().positive().optional(),
-    maxEstimatedCost: z.number().nonnegative().optional(),
+    maxInputTokens: z.number().int().positive().max(RUNTIME_INTEGER_MAX).optional(),
+    maxOutputTokens: z.number().int().positive().max(RUNTIME_INTEGER_MAX).optional(),
+    maxEstimatedCost: z
+      .number()
+      .nonnegative()
+      .max(9_999_999_999)
+      .refine((value) => Number(value.toFixed(8)) === value, {
+        message: 'Cost precision exceeds 8 decimals',
+      })
+      .optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((policy, ctx) => {
+    for (const field of ['maxInputTokens', 'maxOutputTokens'] as const) {
+      if (policy[field] !== undefined && policy[field] * policy.maxAttempts > RUNTIME_INTEGER_MAX)
+        ctx.addIssue({
+          code: 'custom',
+          path: [field],
+          message: 'Aggregate token limit exceeds persisted integer range',
+        });
+    }
+  });
 
 export const PromptArtifactSchema = z
   .object({
@@ -37,7 +55,7 @@ export const PromptArtifactSchema = z
 
 export const ModelInvocationAttemptRecordSchema = z
   .object({
-    attemptNumber: z.number().int().positive(),
+    attemptNumber: z.number().int().positive().max(RUNTIME_INTEGER_MAX),
     provider: z.string().min(1),
     model: z.string().min(1),
     reasoningLevel: z.string().optional(),

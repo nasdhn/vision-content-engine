@@ -4,6 +4,21 @@ const sensitive =
   /password|secret|apikey|accesskey|providedkey|expectedkey|token|accesstoken|refreshtoken|authorization|cookie|session|csrf|signedurl|storagestate|credentials|headers|payload|body|prompt|snapshot|^env$|stderr|stdout/i;
 const reference = /^(?:secretRef|credentialRef|credentialsRef)$/;
 const safeCodes = new Set([
+  'BUDGET_REQUIRED',
+  'INVALID_BUDGET',
+  'INVALID_MODEL_POLICY',
+  'BOUNDED_POLICY_REQUIRED',
+  'INVALID_COST_AMOUNT',
+  'BUDGET_RESERVATION_MISMATCH',
+  'BUDGET_WINDOW_CLOSED',
+  'BUDGET_POLICY_CONFLICT',
+  'BUDGET_LEDGER_INCOMPLETE',
+  'BUDGET_WINDOW_OVERLAP',
+  'INVOCATION_ALREADY_EXISTS',
+  'ATTEMPT_ALREADY_RUNNING',
+  'COST_ACCOUNTING_MISMATCH',
+  'COST_ACCOUNTING_UNDERSTATED',
+
   'UNKNOWN_ERROR',
   'AUTH_FAILED',
   'AUTH_REQUIRED',
@@ -135,6 +150,10 @@ export type LogComponent =
   | 'worker-publish'
   | 'worker-analytics';
 export type LogEvent =
+  | 'budget.reserved'
+  | 'budget.denied'
+  | 'budget.finalized'
+  | 'provider_call.denied'
   | 'worker.started'
   | 'worker.stopped'
   | 'heartbeat.failed'
@@ -159,6 +178,11 @@ const components: readonly LogComponent[] = [
   'worker-analytics',
 ];
 const events: readonly LogEvent[] = [
+  'budget.reserved',
+  'budget.denied',
+  'budget.finalized',
+  'provider_call.denied',
+
   'worker.started',
   'worker.stopped',
   'heartbeat.failed',

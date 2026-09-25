@@ -1,4 +1,5 @@
-import { invariant, parseInstant } from '@vision/domain';
+import { RUNTIME_INTEGER_MAX } from '@vision/contracts';
+import { invariant } from '@vision/domain';
 import { assertNoSecrets, contentHash } from '@vision/contracts/canonical';
 import { Prisma } from './generated/prisma/client.js';
 import type { PrismaClient } from './generated/prisma/client.js';
@@ -6,7 +7,14 @@ import { databaseTime, changed } from './transaction.js';
 import { UnitOfWork } from './persistence.js';
 import { Knowledge } from './knowledge.js';
 
-export type Budget = { key: string; from: string; to: string; limit: string; currency: string };
+import {
+  boundedModelPolicy,
+  costAmount,
+  parseBudget,
+  invocationBudget,
+  type Budget,
+} from './budgets.js';
+export type { Budget } from './budgets.js';
 export type InvocationStart = {
   knowledgeContext: unknown;
   id: string;
@@ -55,20 +63,23 @@ const asInputJson = (value: unknown): Prisma.InputJsonValue => {
 const jsonObject = (value: Prisma.JsonValue | null) =>
   (value ?? {}) as Record<string, Prisma.JsonValue>;
 
+function policyWithoutBudget(policy: Record<string, Prisma.JsonValue>) {
+  const { budget: _budget, ...rest } = policy;
+  void _budget;
+  return rest;
+}
+
 /** Short DB transactions only. No provider call runs inside a database transaction. */
 export class InvocationRepository {
   constructor(private readonly db: PrismaClient) {}
   async begin(input: InvocationStart) {
     assertNoSecrets(input);
+    parseBudget(input.budget);
+    const checkedPolicy = boundedModelPolicy(input.policy);
+    const checkedReservation = costAmount(input.reservation);
+    invariant(checkedReservation.eq(checkedPolicy.maxEstimatedCost), 'BUDGET_RESERVATION_MISMATCH');
     return this.db.$transaction(async (tx) => {
       const { budget, reservation, policy, capability, knowledgeContext, ...data } = input;
-      invariant(
-        new Prisma.Decimal(reservation).gte(0) && new Prisma.Decimal(budget.limit).gte(0),
-        'INVALID_BUDGET',
-      );
-      invariant(/^[A-Z]{3}$/.test(budget.currency) && budget.key.length > 0, 'INVALID_BUDGET');
-      parseInstant(budget.from);
-      parseInstant(budget.to);
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`ai-budget:${budget.key}`}, 0))`;
       const now = await databaseTime(tx);
       invariant(new Date(budget.from) <= now && now < new Date(budget.to), 'BUDGET_WINDOW_CLOSED');
@@ -105,9 +116,16 @@ export class InvocationRepository {
             old.currency === budget.currency && old.limit === budget.limit,
             'BUDGET_POLICY_CONFLICT',
           );
+          const finalizedCost = jsonObject(row.validationJson).budgetConsumed;
           const cost =
-            row.status === 'RUNNING' ? old.reserved : jsonObject(row.validationJson).budgetConsumed;
-          invariant(typeof cost === 'string', 'BUDGET_LEDGER_INCOMPLETE');
+            row.status === 'RUNNING'
+              ? Prisma.Decimal.max(
+                  costAmount(old.reserved, 'BUDGET_LEDGER_INCOMPLETE'),
+                  finalizedCost === undefined
+                    ? 0
+                    : costAmount(finalizedCost, 'BUDGET_LEDGER_INCOMPLETE'),
+                )
+              : costAmount(finalizedCost, 'BUDGET_LEDGER_INCOMPLETE');
           consumed = consumed.add(cost);
         } else {
           invariant(
@@ -141,23 +159,32 @@ export class InvocationRepository {
       estimate: string;
     },
   ) {
+    assertNoSecrets(data);
+    costAmount(data.estimate);
     return this.db.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "ModelInvocation" WHERE id = ${id}::uuid FOR UPDATE`;
       const invocation = await tx.modelInvocation.findUniqueOrThrow({ where: { id } });
       invariant(invocation.status === 'RUNNING', 'INVOCATION_TERMINAL');
       const policy = jsonObject(invocation.policyJson);
-      invariant(invocation.attemptCount < Number(policy.maxAttempts), 'ATTEMPTS_EXHAUSTED');
+      const checkedPolicy = boundedModelPolicy(policyWithoutBudget(policy));
+      const { budget } = invocationBudget(policy.budget);
+      const now = await databaseTime(tx);
+      invariant(new Date(budget.from) <= now && now < new Date(budget.to), 'BUDGET_WINDOW_CLOSED');
+      invariant(invocation.attemptCount < checkedPolicy.maxAttempts, 'ATTEMPTS_EXHAUSTED');
       const attempts = await tx.modelInvocationAttempt.findMany({
         where: { modelInvocationId: id },
         orderBy: { attemptNumber: 'asc' },
       });
       invariant(!attempts.some((a) => a.status === 'RUNNING'), 'ATTEMPT_ALREADY_RUNNING');
       const spent = attempts.reduce(
-        (n, a) => n.add(String(jsonObject(a.validationJson).accountedCost)),
+        (n, a) =>
+          n.add(costAmount(jsonObject(a.validationJson).accountedCost, 'BUDGET_LEDGER_INCOMPLETE')),
         new Prisma.Decimal(0),
       );
       invariant(
-        spent.add(data.estimate).lte(String(jsonObject(policy.budget ?? null).reserved)),
+        spent
+          .add(data.estimate)
+          .lte(costAmount(jsonObject(policy.budget ?? null).reserved, 'BUDGET_LEDGER_INCOMPLETE')),
         'COST_BUDGET_BLOCK',
       );
       const { estimate, ...fields } = data;
@@ -176,10 +203,49 @@ export class InvocationRepository {
   }
   async finishAttempt(id: string, result: AttemptResult) {
     assertNoSecrets(result);
+    costAmount(result.accountedCost);
+    invariant(
+      ['SUCCEEDED', 'FAILED', 'REJECTED_SCHEMA'].includes(result.status),
+      'INVALID_ATTEMPT_RESULT',
+    );
+    for (const count of [result.inputTokens, result.outputTokens, result.cachedInputTokens]) {
+      invariant(
+        count === undefined ||
+          (Number.isSafeInteger(count) && count >= 0 && count <= RUNTIME_INTEGER_MAX),
+        'INVALID_USAGE',
+      );
+    }
+    if (result.costAmount !== undefined) {
+      invariant(costAmount(result.costAmount).eq(result.accountedCost), 'COST_ACCOUNTING_MISMATCH');
+    }
+    const finalizationHash = contentHash(result);
     return this.db.$transaction(async (tx) => {
+      const owner = await tx.modelInvocationAttempt.findUniqueOrThrow({
+        where: { id },
+        select: { modelInvocationId: true },
+      });
+      // Same lock order as invocation completion/authorization. Publish accounting atomically.
+      await tx.$queryRaw`SELECT id FROM "ModelInvocation" WHERE id = ${owner.modelInvocationId}::uuid FOR UPDATE`;
       await tx.$queryRaw`SELECT id FROM "ModelInvocationAttempt" WHERE id = ${id}::uuid FOR UPDATE`;
       const attempt = await tx.modelInvocationAttempt.findUniqueOrThrow({ where: { id } });
-      invariant(attempt.status === 'RUNNING', 'ATTEMPT_TERMINAL');
+      if (attempt.status !== 'RUNNING') {
+        invariant(
+          jsonObject(attempt.validationJson).finalizationHash === finalizationHash,
+          'ATTEMPT_FINALIZATION_CONFLICT',
+        );
+        return attempt;
+      }
+      const invocation = await tx.modelInvocation.findUniqueOrThrow({
+        where: { id: attempt.modelInvocationId },
+      });
+      const { budget } = invocationBudget(jsonObject(invocation.policyJson).budget);
+      invariant(result.costCurrency === budget.currency, 'USAGE_CURRENCY_MISMATCH');
+      const reservedCost = jsonObject(attempt.validationJson).reservedCost;
+      if (result.costAmount === undefined)
+        invariant(
+          costAmount(result.accountedCost).gte(costAmount(reservedCost)),
+          'COST_ACCOUNTING_UNDERSTATED',
+        );
       const now = await databaseTime(tx);
       const { validation, accountedCost, ...data } = result;
       const row = await tx.modelInvocationAttempt.update({
@@ -188,7 +254,29 @@ export class InvocationRepository {
           ...data,
           finishedAt: now,
           latencyMs: Math.max(0, now.getTime() - attempt.startedAt.getTime()),
-          validationJson: { ...validation, accountedCost },
+          validationJson: {
+            ...validation,
+            accountedCost,
+            reservedCost: String(reservedCost),
+            finalizationHash,
+          },
+        },
+      });
+      const finalized = await tx.modelInvocationAttempt.findMany({
+        where: { modelInvocationId: attempt.modelInvocationId, status: { not: 'RUNNING' } },
+        select: { validationJson: true },
+      });
+      const consumed = finalized.reduce(
+        (sum, item) => sum.add(costAmount(jsonObject(item.validationJson).accountedCost)),
+        new Prisma.Decimal(0),
+      );
+      await tx.modelInvocation.update({
+        where: { id: attempt.modelInvocationId },
+        data: {
+          validationJson: {
+            ...jsonObject(invocation.validationJson),
+            budgetConsumed: consumed.toFixed(8),
+          },
         },
       });
       if (result.costAmount !== undefined)
@@ -211,10 +299,22 @@ export class InvocationRepository {
     failureCode?: string,
     checkpoint?: InvocationSuccessCheckpoint,
   ) {
+    const finalizationHash = contentHash({
+      status,
+      outputHash: outputHash ?? null,
+      failureCode: failureCode ?? null,
+      checkpoint: checkpoint ?? null,
+    });
     return this.db.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "ModelInvocation" WHERE id = ${id}::uuid FOR UPDATE`;
       const invocation = await tx.modelInvocation.findUniqueOrThrow({ where: { id } });
-      invariant(invocation.status === 'RUNNING', 'INVOCATION_TERMINAL');
+      if (invocation.status !== 'RUNNING') {
+        invariant(
+          jsonObject(invocation.validationJson).finalizationHash === finalizationHash,
+          'INVOCATION_FINALIZATION_CONFLICT',
+        );
+        return invocation;
+      }
       const attempts = await tx.modelInvocationAttempt.findMany({
         where: { modelInvocationId: id },
         orderBy: { attemptNumber: 'asc' },
@@ -257,6 +357,7 @@ export class InvocationRepository {
             businessRules: status === 'SUCCEEDED' ? 'PASS' : 'NOT_PASSED',
             claims: status === 'SUCCEEDED' ? 'PASS' : 'NOT_PASSED',
             budgetConsumed: consumed,
+            finalizationHash,
           },
         },
       });

@@ -1,7 +1,7 @@
 import { createRuntimeHealthService } from './runtime-health.js';
 import { StructuredLogger } from '@vision/observability';
 import 'dotenv/config';
-import { createDatabaseClient } from '@vision/database';
+import { createDatabaseClient, InvocationBudgetReader } from '@vision/database';
 import {
   AnalyticsReadService,
   ConceptReviewService,
@@ -80,6 +80,7 @@ async function main() {
         origin: config.VCE_WEB_ORIGIN,
       },
       runtimeHealth,
+      budgetOperations: new InvocationBudgetReader(db),
       recordings,
       dashboard,
       concepts,
