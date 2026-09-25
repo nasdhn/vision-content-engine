@@ -1,3 +1,4 @@
+import { CAPACITY_DEFAULTS } from '@vision/media';
 import { createHash } from 'node:crypto';
 import { Persistence } from '@vision/database';
 import type { Actor, PrismaClient } from '@vision/database';
@@ -6,7 +7,7 @@ import type { PrivateStorage } from '@vision/media';
 import { TikTokManualMetadataSchema } from '@vision/publishing';
 
 const allowedStatuses = new Set(['READY_FOR_MANUAL_PUBLISH', 'PUBLISHED']);
-const maxMediaBytes = 512 * 1024 * 1024;
+const maxMediaBytes = CAPACITY_DEFAULTS.maxArtifactBytes;
 
 export type ManualHandoffListItem = {
   publicationId: string;

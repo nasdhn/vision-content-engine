@@ -1,14 +1,9 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, rm, writeFile, mkdir, utimes, symlink, access } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it } from 'vitest';
-import {
-  parseProbe,
-  probeFile,
-  recordingFeedback,
-  cleanAbandonedUploadTemps,
-} from '../../packages/media/src/index.js';
+import { parseProbe, probeFile, recordingFeedback } from '../../packages/media/src/index.js';
 import { wav } from '../fixtures/recordings/support.js';
 const raw = () => ({
   format: { format_name: 'mov,mp4', duration: '2' },
@@ -146,27 +141,5 @@ it('probes a real SDR video fixture and rejects a real HLG-signalled fixture', a
     await expect(probeFile(hlg)).rejects.toThrow('UNSUPPORTED_HDR_COLOR');
   } finally {
     await rm(dir, { recursive: true, force: true });
-  }
-});
-
-it('cleans only expired owned upload temp directories after a crash', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'vce-temp-test-'));
-  const prefix = 'vce-upload-11111111-1111-4111-8111-111111111111-';
-  try {
-    const old = join(root, prefix + 'ABCdef'),
-      fresh = join(root, prefix + 'GHIjkl'),
-      unrelated = join(root, 'unrelated');
-    await mkdir(old);
-    await mkdir(fresh);
-    await mkdir(unrelated);
-    await writeFile(join(old, 'source'), 'incomplete');
-    await utimes(old, new Date('2000-01-01T00:00:00Z'), new Date('2000-01-01T00:00:00Z'));
-    await symlink(unrelated, join(root, prefix + 'MNOpqr'));
-    expect(await cleanAbandonedUploadTemps(root)).toBe(1);
-    await expect(access(old)).rejects.toThrow();
-    await expect(access(fresh)).resolves.toBeUndefined();
-    await expect(access(unrelated)).resolves.toBeUndefined();
-  } finally {
-    await rm(root, { recursive: true, force: true });
   }
 });

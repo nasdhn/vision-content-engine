@@ -1,18 +1,18 @@
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { open, realpath, rm, stat } from 'node:fs/promises';
+import { open, realpath, stat } from 'node:fs/promises';
 import { isAbsolute, relative } from 'node:path';
 
 import { CaptureScenarioVersionSpecSchema } from '@vision/contracts';
 import { Persistence } from '@vision/database';
 import type { Actor, Prisma, PrismaClient, UnitOfWork } from '@vision/database';
-import { mediaType, probeFile } from '@vision/media';
+import { mediaType, probeFile, CapacityGuard, CAPACITY_DEFAULTS } from '@vision/media';
 import type { MediaProbe, PrivateStorage } from '@vision/media';
 import { DomainError, invariant } from '@vision/domain';
 
 import type { CaptureExecutionResult, CaptureLocalOutput } from './executor.js';
 
-export const MAX_CAPTURE_ASSET_BYTES = 512 * 1024 * 1024;
+export const MAX_CAPTURE_ASSET_BYTES = CAPACITY_DEFAULTS.maxArtifactBytes;
 
 type CaptureAssetMetadata = Parameters<UnitOfWork['captures']['finishAsset']>[1];
 
@@ -44,14 +44,17 @@ function ownedPath(outputDirectory: string, filePath: string) {
   });
 }
 
-async function hashLocalFile(path: string) {
+async function hashLocalFile(path: string, capacity: CapacityGuard) {
   const info = await stat(path);
 
   invariant(info.isFile(), 'CAPTURE_OUTPUT_NOT_FILE');
 
   invariant(info.size > 0, 'CAPTURE_OUTPUT_EMPTY');
 
-  invariant(info.size <= MAX_CAPTURE_ASSET_BYTES, 'CAPTURE_OUTPUT_TOO_LARGE');
+  invariant(
+    info.size <= Math.min(MAX_CAPTURE_ASSET_BYTES, capacity.policy.maxArtifactBytes),
+    'CAPTURE_OUTPUT_TOO_LARGE',
+  );
 
   const hash = createHash('sha256');
 
@@ -120,8 +123,9 @@ async function inspectLocalOutput(
   output: CaptureLocalOutput,
   path: string,
   probe: (file: string) => Promise<MediaProbe>,
+  capacity: CapacityGuard,
 ): Promise<LocalInspection> {
-  const local = await hashLocalFile(path);
+  const local = await hashLocalFile(path, capacity);
 
   if (output.role === 'VIDEO') {
     const result = await probe(path);
@@ -198,6 +202,7 @@ export class CaptureAssetStager {
     private readonly db: PrismaClient,
     private readonly storage: PrivateStorage,
     private readonly probe: (file: string) => Promise<MediaProbe> = probeFile,
+    private readonly capacity = new CapacityGuard(),
   ) {
     this.persistence = new Persistence(db);
   }
@@ -288,7 +293,7 @@ export class CaptureAssetStager {
         begunAssetIds.push(created.asset.id);
 
         try {
-          const inspected = await inspectLocalOutput(output, path, this.probe);
+          const inspected = await inspectLocalOutput(output, path, this.probe, this.capacity);
 
           const size = Number(inspected.metadata.sizeBytes);
 
@@ -331,15 +336,7 @@ export class CaptureAssetStager {
         }
       }
 
-      /*
-       * All bytes are now durable and checksum-verified.
-       * Final READY writes remain fenced by the job lease.
-       */
-      await rm(outputDirectory, {
-        recursive: true,
-        force: true,
-      });
-
+      // The creator of the workspace owns cleanup after durable finalization.
       return staged;
     } catch (error) {
       const code = error instanceof DomainError ? error.code : 'CAPTURE_ASSET_STAGE_FAILED';
@@ -357,19 +354,6 @@ export class CaptureAssetStager {
         } catch {
           // Preserve the original stable staging failure.
         }
-      }
-
-      /*
-       * Local Playwright outputs are attempt-scoped and must not
-       * survive a failed ingestion.
-       */
-      try {
-        await rm(outputDirectory, {
-          recursive: true,
-          force: true,
-        });
-      } catch {
-        // Cleanup cannot replace the original staging failure.
       }
 
       throw new DomainError(code);

@@ -434,7 +434,8 @@ it('stages verified private bytes and only makes Capture assets READY during fin
 
   expect(staged).toHaveLength(files.length);
 
-  expect(await exists(directory)).toBe(false);
+  // A stager may inspect caller-owned paths but cannot authorize their deletion.
+  expect(await exists(directory)).toBe(true);
 
   const beforeFinalize = await db.asset.findMany({
     where: {
@@ -491,7 +492,8 @@ it('fails closed when durable read-back bytes do not match the local checksum', 
     stager.stage(worker, run.id, scenario.spec, executionResult(files), directory),
   ).rejects.toThrow('STORED_OBJECT_CHECKSUM_MISMATCH');
 
-  expect(await exists(directory)).toBe(false);
+  // A stager may inspect caller-owned paths but cannot authorize their deletion.
+  expect(await exists(directory)).toBe(true);
 
   const assets = await db.asset.findMany({
     where: {
@@ -532,7 +534,8 @@ it('fails every begun Capture asset when a later output cannot be stored', async
     stager.stage(worker, run.id, scenario.spec, executionResult(files), directory),
   ).rejects.toThrow('CAPTURE_ASSET_STAGE_FAILED');
 
-  expect(await exists(directory)).toBe(false);
+  // A stager may inspect caller-owned paths but cannot authorize their deletion.
+  expect(await exists(directory)).toBe(true);
 
   const assets = await db.asset.findMany({
     where: {

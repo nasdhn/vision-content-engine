@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CAPACITY_DEFAULTS } from './capacity-policy.js';
 
 const boolean = z.enum(['true', 'false']).transform((value) => value === 'true');
 const secret = z
@@ -20,6 +21,24 @@ const url = (protocols: string[]) =>
 
 const environmentSchema = z
   .object({
+    VCE_MIN_LOCAL_FREE_BYTES: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(Number.MAX_SAFE_INTEGER)
+      .default(CAPACITY_DEFAULTS.minimumFreeBytes),
+    VCE_MAX_UPLOAD_BYTES: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(CAPACITY_DEFAULTS.maxUploadBytes)
+      .default(CAPACITY_DEFAULTS.maxUploadBytes),
+    VCE_MAX_ARTIFACT_BYTES: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(CAPACITY_DEFAULTS.maxArtifactBytes)
+      .default(CAPACITY_DEFAULTS.maxArtifactBytes),
     VCE_LOCAL_ACCESS_KEY: secret.optional(),
     VCE_VISION_ATTRIBUTION_INGEST_SECRET: hmacSecret.optional(),
     VCE_WEB_ORIGIN: z.literal('http://localhost:5174').default('http://localhost:5174'),

@@ -1,3 +1,4 @@
+import { CapacityGuard } from '../../packages/media/src/index.js';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { expect, it, vi } from 'vitest';
 import { createApi } from '../../apps/api/src/app.js';
@@ -37,7 +38,12 @@ it('protects the read-only snapshot, projects worker/queue states and keeps fail
   }));
   const lines: string[] = [];
   const logger = new StructuredLogger('api', (line) => lines.push(line));
-  const service = new RuntimeHealthService(probes, store, queues, logger);
+  const capacity = new CapacityGuard(
+    { minimumFreeBytes: 10, maxUploadBytes: 4, maxArtifactBytes: 4 },
+    async () => ({ bavail: 14n, bsize: 1n, blocks: 20n }),
+    logger,
+  );
+  const service = new RuntimeHealthService(probes, store, queues, logger, capacity);
   const read = vi.spyOn(service, 'read');
   const accessKey = randomBytes(32).toString('hex');
   const origin = 'http://localhost:5174';
@@ -65,6 +71,13 @@ it('protects the read-only snapshot, projects worker/queue states and keeps fail
     expect(response.headers.get('cache-control')).toBe('private, no-store');
     const body = await response.json();
     expect(body).toMatchObject({
+      localCapacity: {
+        scope: 'API_TEMP_FILESYSTEM',
+        available: true,
+        localFreeBytes: 14,
+        status: 'HEALTHY',
+        limits: { minimumFreeBytes: 10, maxUploadBytes: 4, maxArtifactBytes: 4 },
+      },
       dependencies: { status: 'ready' },
       workers: [
         { component: 'control', status: 'HEALTHY' },

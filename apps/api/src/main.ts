@@ -16,7 +16,7 @@ import {
   VisionAttributionIngestService,
   LearningDashboardService,
 } from '@vision/application';
-import { S3PrivateStorage } from '@vision/media';
+import { S3PrivateStorage, CapacityGuard } from '@vision/media';
 import { EnvironmentSecretResolver, parseConfig } from '@vision/shared';
 
 import { createApi } from './app.js';
@@ -34,14 +34,23 @@ async function main() {
   ]);
   const dependencies = createLocalDependencies(config, secrets);
   const db = createDatabaseClient(secrets.resolve('DATABASE_URL'));
-  const runtimeHealth = createRuntimeHealthService(dependencies.redis, dependencies.probes);
+  const capacity = new CapacityGuard({
+    minimumFreeBytes: config.VCE_MIN_LOCAL_FREE_BYTES,
+    maxUploadBytes: config.VCE_MAX_UPLOAD_BYTES,
+    maxArtifactBytes: config.VCE_MAX_ARTIFACT_BYTES,
+  });
+  const runtimeHealth = createRuntimeHealthService(
+    dependencies.redis,
+    dependencies.probes,
+    capacity,
+  );
 
   try {
     if (!config.VCE_LOCAL_ACCESS_KEY || config.VCE_LOCAL_ACCESS_KEY.length < 32)
       throw new Error('LOCAL_AUTH_NOT_CONFIGURED');
 
-    const storage = new S3PrivateStorage(dependencies.storage, config.S3_BUCKET);
-    const recordings = new RecordingPackService(db, storage);
+    const storage = new S3PrivateStorage(dependencies.storage, config.S3_BUCKET, capacity);
+    const recordings = new RecordingPackService(db, storage, undefined, capacity);
     const dashboard = new DashboardReadService(db);
     const concepts = new ConceptReviewService(db);
     const production = new ProductionReadService(db);

@@ -1,6 +1,7 @@
 import { StructuredLogger, observeOperation } from '@vision/observability';
 import { extname, join } from 'node:path';
-import { mkdir, rm, stat } from 'node:fs/promises';
+import { mkdir, stat, realpath } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 
 import {
   RenderPayloadBuilder,
@@ -12,6 +13,9 @@ import type { Prisma, PrismaClient } from '@vision/database';
 import { Persistence } from '@vision/database';
 import { invariant } from '@vision/domain';
 import {
+  CapacityGuard,
+  createOwnedTemp,
+  renderWorkingBytes,
   inspectBlackAndSilence,
   materializePrivateObject,
   probeRenderFile,
@@ -57,6 +61,12 @@ function wrapProbe(assetId: string, probe: MediaProbe) {
 function failureCode(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   const stable = new Set([
+    'INSUFFICIENT_LOCAL_CAPACITY',
+    'LOCAL_CAPACITY_UNAVAILABLE',
+    'INVALID_CAPACITY_REQUEST',
+    'ARTIFACT_TOO_LARGE',
+    'INVALID_ARTIFACT_SIZE',
+    'ARTIFACT_SIZE_MISMATCH',
     'INPUT_ASSET_MISSING',
     'INPUT_CHECKSUM_MISMATCH',
     'INPUT_PROBE_FAILED',
@@ -101,6 +111,7 @@ async function reconcileImmutableUpload(input: {
   checksumSha256: string;
   mimeType: string;
   reconciliationPath: string;
+  capacity: CapacityGuard;
 }) {
   try {
     await input.storage.put(input.objectKey, input.sourcePath, input.sizeBytes, input.mimeType);
@@ -112,6 +123,8 @@ async function reconcileImmutableUpload(input: {
         objectKey: input.objectKey,
         targetPath: input.reconciliationPath,
         expectedChecksumSha256: input.checksumSha256,
+        expectedSizeBytes: input.sizeBytes,
+        capacity: input.capacity,
       });
       return;
     } catch {
@@ -143,6 +156,7 @@ export class RenderWorkerOrchestrator {
       workerVersion: string;
       storageProvider: string;
       workRoot: string;
+      capacity?: CapacityGuard;
     }>,
   ) {
     invariant(options.workerId.trim(), 'WORKER_REQUIRED');
@@ -171,12 +185,14 @@ export class RenderWorkerOrchestrator {
     signal?: AbortSignal;
   }): Promise<RenderWorkerExecutionResult> {
     const actor = workerActor(this.options.workerId);
-    const workDir = join(this.options.workRoot, input.renderAttemptId);
-    const inputDir = join(workDir, 'inputs');
+    for (const id of [input.renderId, input.renderAttemptId])
+      invariant(/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(id), 'INVALID_TEMP_OWNER');
+    const capacity =
+      this.options.capacity ??
+      new CapacityGuard(undefined, undefined, new StructuredLogger('worker-render'));
+    let workspace: Awaited<ReturnType<typeof createOwnedTemp>> | undefined;
     let outputAssetId: string | null = null;
     let technicalQa: Prisma.InputJsonValue | undefined;
-
-    await mkdir(inputDir, { recursive: true });
 
     try {
       await this.persistence.transaction(actor, (unit) =>
@@ -199,6 +215,22 @@ export class RenderWorkerOrchestrator {
         },
       });
 
+      const inputSizes = render.inputAssets.map(({ asset }) =>
+        capacity.artifactSize(Number(asset.sizeBytes)),
+      );
+      const requestedBytes = renderWorkingBytes(inputSizes, capacity.policy.maxArtifactBytes);
+      await capacity.require(this.options.workRoot, requestedBytes, input.renderAttemptId);
+      await capacity.require(tmpdir(), requestedBytes, input.renderAttemptId);
+      workspace = await createOwnedTemp(
+        this.options.workRoot,
+        'render',
+        input.renderAttemptId,
+        new StructuredLogger('worker-render'),
+      );
+      const workDir = workspace.path;
+      const inputDir = join(workDir, 'inputs');
+      await mkdir(inputDir, { mode: 0o700 });
+
       const resolvedAssets: RenderPayloadBuildOptions['resolvedAssets'] = [];
       for (const [index, inputAsset] of render.inputAssets.entries()) {
         const asset = inputAsset.asset;
@@ -216,6 +248,8 @@ export class RenderWorkerOrchestrator {
           objectKey: asset.objectKey,
           targetPath: localPath,
           expectedChecksumSha256: asset.checksumSha256,
+          expectedSizeBytes: Number(asset.sizeBytes),
+          capacity,
         });
 
         const kind = resolvedKind(asset.kind);
@@ -241,6 +275,7 @@ export class RenderWorkerOrchestrator {
 
       const rendered = await this.renderer.render(payload, {
         workDir,
+        capacity,
         ...(input.signal ? { signal: input.signal } : {}),
       });
 
@@ -249,7 +284,11 @@ export class RenderWorkerOrchestrator {
         outputStat !== null && outputStat.isFile() && outputStat.size > 0,
         'OUTPUT_MISSING',
       );
-      const outputSizeBytes = outputStat.size;
+      invariant(
+        (await realpath(rendered.outputPath)).startsWith(`${workDir}/`),
+        'OUTPUT_PATH_INVALID',
+      );
+      const outputSizeBytes = await capacity.file(rendered.outputPath);
 
       await this.persistence.transaction(actor, (unit) =>
         unit.enterRenderTechnicalQa(input.renderId, input.renderAttemptId),
@@ -313,6 +352,7 @@ export class RenderWorkerOrchestrator {
         checksumSha256,
         mimeType: 'video/mp4',
         reconciliationPath: join(workDir, 'reconciliation-master.mp4'),
+        capacity,
       });
 
       invariant(outputProbe.video, 'OUTPUT_PROBE_FAILED');
@@ -373,7 +413,7 @@ export class RenderWorkerOrchestrator {
 
       throw error;
     } finally {
-      await rm(workDir, { recursive: true, force: true }).catch(() => undefined);
+      await workspace?.cleanup();
     }
   }
 }

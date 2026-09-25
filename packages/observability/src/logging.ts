@@ -4,6 +4,19 @@ const sensitive =
   /password|secret|apikey|accesskey|providedkey|expectedkey|token|accesstoken|refreshtoken|authorization|cookie|session|csrf|signedurl|storagestate|credentials|headers|payload|body|prompt|snapshot|^env$|stderr|stdout/i;
 const reference = /^(?:secretRef|credentialRef|credentialsRef)$/;
 const safeCodes = new Set([
+  'INSUFFICIENT_LOCAL_CAPACITY',
+  'LOCAL_CAPACITY_UNAVAILABLE',
+  'INVALID_CAPACITY_REQUEST',
+  'INVALID_CAPACITY_POLICY',
+  'ARTIFACT_TOO_LARGE',
+  'INVALID_ARTIFACT_SIZE',
+  'ARTIFACT_NOT_FILE',
+  'ARTIFACT_SIZE_MISMATCH',
+  'INVALID_TEMP_OWNER',
+  'TEMP_ROOT_MISMATCH',
+  'TEMP_OWNER_MISMATCH',
+  'TEMP_CLEANUP_LIMIT',
+
   'BUDGET_REQUIRED',
   'INVALID_BUDGET',
   'INVALID_MODEL_POLICY',
@@ -150,6 +163,11 @@ export type LogComponent =
   | 'worker-publish'
   | 'worker-analytics';
 export type LogEvent =
+  | 'capacity.check_failed'
+  | 'capacity.insufficient'
+  | 'temp.cleanup_completed'
+  | 'temp.cleanup_failed'
+  | 'artifact.too_large'
   | 'budget.reserved'
   | 'budget.denied'
   | 'budget.finalized'
@@ -178,6 +196,12 @@ const components: readonly LogComponent[] = [
   'worker-analytics',
 ];
 const events: readonly LogEvent[] = [
+  'capacity.check_failed',
+  'capacity.insufficient',
+  'temp.cleanup_completed',
+  'temp.cleanup_failed',
+  'artifact.too_large',
+
   'budget.reserved',
   'budget.denied',
   'budget.finalized',
@@ -255,6 +279,9 @@ export type LogFields = Partial<
     | 'method'
     | 'attempt'
     | 'statusCode'
+    | 'requiredBytes'
+    | 'freeBytes'
+    | 'artifactSizeBytes'
     | 'durationMs'
     | 'errorCode'
     | 'error',
@@ -302,7 +329,14 @@ export class StructuredLogger {
         const value = own(fields, key);
         if (typeof value === 'string' && allowed.includes(value)) output[key] = value;
       }
-      for (const key of ['durationMs', 'attempt', 'statusCode']) {
+      for (const key of [
+        'durationMs',
+        'attempt',
+        'statusCode',
+        'requiredBytes',
+        'freeBytes',
+        'artifactSizeBytes',
+      ]) {
         const value = own(fields, key);
         if (typeof value === 'number' && Number.isFinite(value) && value >= 0)
           output[key] = Math.min(value, Number.MAX_SAFE_INTEGER);

@@ -51,3 +51,21 @@ describe('bootstrap configuration safety', () => {
     expect(() => assertLocalBootstrap(parseConfig(configFixture))).not.toThrow();
   });
 });
+
+it('validates finite capacity configuration with conservative local defaults', () => {
+  const defaults = parseConfig(configFixture);
+  expect(defaults.VCE_MIN_LOCAL_FREE_BYTES).toBe(256 * 1024 * 1024);
+  expect(defaults.VCE_MAX_UPLOAD_BYTES).toBe(512 * 1024 * 1024);
+  expect(defaults.VCE_MAX_ARTIFACT_BYTES).toBe(512 * 1024 * 1024);
+  for (const key of [
+    'VCE_MIN_LOCAL_FREE_BYTES',
+    'VCE_MAX_UPLOAD_BYTES',
+    'VCE_MAX_ARTIFACT_BYTES',
+  ]) {
+    for (const value of ['0', '-1', 'NaN', 'Infinity', '1.5', '9007199254740992'])
+      expect(() => parseConfig({ ...configFixture, [key]: value })).toThrow(key);
+  }
+  expect(parseConfig({ ...configFixture, VCE_MAX_UPLOAD_BYTES: '1024' }).VCE_MAX_UPLOAD_BYTES).toBe(
+    1024,
+  );
+});

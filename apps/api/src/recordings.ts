@@ -12,7 +12,7 @@ import {
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { z } from 'zod';
 import { DomainError } from '@vision/domain';
-import type { RecordingPackService } from '@vision/application';
+import { MAX_UPLOAD_BYTES, type RecordingPackService } from '@vision/application';
 
 import { LOCAL_SESSION, type LocalSessionService } from './auth.js';
 
@@ -51,6 +51,13 @@ export class RecordingController {
       id.parse(requestId);
       if (req.headers['content-type'] !== 'application/octet-stream')
         throw new DomainError('BINARY_UPLOAD_REQUIRED');
+      const length = req.headers['content-length'];
+      if (
+        length !== undefined &&
+        (!/^\d+$/.test(length) ||
+          BigInt(length) > BigInt(this.service.maximumUploadBytes ?? MAX_UPLOAD_BYTES))
+      )
+        throw new DomainError('UPLOAD_TOO_LARGE');
 
       const timer = setTimeout(() => req.destroy(), 120_000);
       try {

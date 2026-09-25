@@ -1,3 +1,4 @@
+import { CapacityGuard } from '@vision/media';
 import { createHash } from 'node:crypto';
 import { CreativeQAOutputSchema, TechnicalQaReportSchema } from '@vision/contracts';
 import { Persistence } from '@vision/database';
@@ -345,7 +346,7 @@ export class RenderReviewService {
         asset.sizeBytes !== null && asset.sizeBytes <= BigInt(Number.MAX_SAFE_INTEGER),
         'ASSET_NOT_AVAILABLE',
       );
-      const expectedSize = Number(asset.sizeBytes);
+      const expectedSize = new CapacityGuard().artifactSize(Number(asset.sizeBytes));
       const hash = createHash('sha256');
       const chunks: Uint8Array[] = [];
       let size = 0;

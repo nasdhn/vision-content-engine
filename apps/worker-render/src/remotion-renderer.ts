@@ -1,3 +1,4 @@
+import { tmpdir } from 'node:os';
 import { mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
@@ -10,8 +11,8 @@ import {
   type ValidatedRenderPayload,
   type VideoRenderer,
 } from '@vision/application';
-import { invariant } from '@vision/domain';
-import { ffmpegVersion } from '@vision/media';
+import { invariant, DomainError } from '@vision/domain';
+import { ffmpegVersion, CapacityGuard, renderWorkingBytes } from '@vision/media';
 
 import { startLocalAssetServer } from './asset-server.js';
 import { normalizeHdrToSdr, postprocessSocialMaster, preprocessGreenScreen } from './ffmpeg.js';
@@ -20,23 +21,30 @@ const REMOTION_VERSION = '4.0.526';
 
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 const entryPoint = resolve(moduleDir, 'remotion-entry.tsx');
-let bundlePromise: Promise<string> | null = null;
 
 function codedError(code: string, cause: unknown) {
+  if (
+    cause instanceof DomainError &&
+    ['INSUFFICIENT_LOCAL_CAPACITY', 'LOCAL_CAPACITY_UNAVAILABLE', 'ARTIFACT_TOO_LARGE'].includes(
+      cause.code,
+    )
+  )
+    return cause;
   const error = new Error(code);
   Object.assign(error, { cause });
   return error;
 }
 
-function getBundle() {
-  bundlePromise ??= bundle({
+async function getBundle(workDir: string) {
+  return bundle({
     entryPoint,
+    outDir: join(workDir, 'bundle'),
+    enableCaching: false,
+    publicDir: null,
     onProgress: () => undefined,
   }).catch((error) => {
-    bundlePromise = null;
     throw codedError('REMOTION_RENDER_FAILED', error);
   });
-  return bundlePromise;
 }
 
 function audioExpected(payload: ValidatedRenderPayload) {
@@ -61,10 +69,18 @@ function profileNumber(profile: Readonly<Record<string, unknown>>, key: string, 
 }
 
 export class RemotionVideoRenderer implements VideoRenderer {
+  constructor(private readonly capacity = new CapacityGuard()) {}
   async render(
     input: ValidatedRenderPayload,
-    options: Readonly<{ workDir: string; signal?: AbortSignal }>,
+    options: Readonly<{ workDir: string; signal?: AbortSignal; capacity?: CapacityGuard }>,
   ) {
+    const capacity = options.capacity ?? this.capacity;
+    const sizes = await Promise.all(
+      input.resolvedAssets.map((asset) => capacity.file(asset.localUri)),
+    );
+    const requested = renderWorkingBytes(sizes, capacity.policy.maxArtifactBytes);
+    await capacity.require(options.workDir, requested);
+    await capacity.require(tmpdir(), requested);
     const startedAt = Date.now();
     const logs: string[] = [];
     const preparedDir = join(options.workDir, 'prepared');
@@ -86,6 +102,7 @@ export class RemotionVideoRenderer implements VideoRenderer {
           await normalizeHdrToSdr({
             sourcePath: currentPath,
             outputPath: normalized,
+            capacity,
             ...(options.signal ? { signal: options.signal } : {}),
           });
         } catch (error) {
@@ -110,6 +127,7 @@ export class RemotionVideoRenderer implements VideoRenderer {
             sourcePath: currentPath,
             outputPath: keyed,
             profile: chromaProfile,
+            capacity,
             ...(options.signal ? { signal: options.signal } : {}),
           });
         } catch (error) {
@@ -129,7 +147,7 @@ export class RemotionVideoRenderer implements VideoRenderer {
     });
 
     try {
-      const serveUrl = await getBundle();
+      const serveUrl = await getBundle(options.workDir);
       let composition;
       try {
         composition = await selectComposition({
@@ -181,6 +199,7 @@ export class RemotionVideoRenderer implements VideoRenderer {
         options.signal?.removeEventListener('abort', abort);
       }
 
+      await capacity.file(remotionOutput);
       const audioProfile = profileRecord(
         VIDEO_ENGINE_PROFILES.audio,
         input.provenance.audioProfileKey,
@@ -206,12 +225,14 @@ export class RemotionVideoRenderer implements VideoRenderer {
           ),
           sampleRate: profileNumber(audioProfile, 'sampleRate', 'AUDIO_PROFILE_INVALID'),
           channels: profileNumber(audioProfile, 'channels', 'AUDIO_PROFILE_INVALID'),
+          capacity,
           ...(options.signal ? { signal: options.signal } : {}),
         });
       } catch (error) {
         throw codedError('NORMALIZATION_FAILED', error);
       }
 
+      await capacity.file(finalOutput);
       return {
         outputPath: finalOutput,
         diagnostics: {

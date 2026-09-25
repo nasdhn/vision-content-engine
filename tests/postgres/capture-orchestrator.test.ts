@@ -668,3 +668,40 @@ it('returns IDLE when no claimable capture job remains', async () => {
     status: 'IDLE',
   });
 });
+
+it('denies capture before executor materialization and leaves no running job on low disk', async () => {
+  await queueQueries(['capacity refusal']);
+  const { CapacityGuard } = await import('../../packages/media/src/index.js');
+  const capacity = new CapacityGuard(undefined, async () => ({
+    bavail: 0n,
+    bsize: 1n,
+    blocks: 1n,
+  }));
+  let executed = false;
+  const orchestrator = new CaptureWorkerOrchestrator(
+    db,
+    leases,
+    new CaptureMemoryStorage(),
+    fixtureManager,
+    authStateProvider,
+    registry,
+    {
+      capacity,
+      execute: async (request) => {
+        executed = true;
+        return successExecution(request);
+      },
+      probe: fakeVideoProbe,
+    },
+  );
+  const result = await orchestrator.processOne('capacity-fixture');
+  expect(result).toMatchObject({ status: 'FAILED', failureCode: 'INSUFFICIENT_LOCAL_CAPACITY' });
+  expect(executed).toBe(false);
+  if (result.status !== 'FAILED') throw new Error('EXPECTED_FAILURE');
+  expect(await db.jobAttempt.findUnique({ where: { id: result.jobAttemptId } })).toMatchObject({
+    status: 'FAILED',
+  });
+  expect(await db.captureRun.findUnique({ where: { id: result.captureRunId! } })).toMatchObject({
+    status: 'FAILED',
+  });
+});

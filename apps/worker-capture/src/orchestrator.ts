@@ -1,14 +1,17 @@
 import { StructuredLogger, observeOperation } from '@vision/observability';
-import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
-import { CaptureRequestSpecSchema } from '@vision/contracts';
+import { CaptureRequestSpecSchema, CaptureScenarioVersionSpecSchema } from '@vision/contracts';
 import type { Leases, PrismaClient } from '@vision/database';
 import { Persistence } from '@vision/database';
 import { DomainError, invariant } from '@vision/domain';
-import type { PrivateStorage } from '@vision/media';
+import {
+  CapacityGuard,
+  createOwnedTemp,
+  CAPACITY_SCRATCH_BYTES,
+  type PrivateStorage,
+} from '@vision/media';
 
 import { CaptureAssetStager, finalizeStagedCaptureAssets } from './assets.js';
 import { executeCaptureScenario } from './executor.js';
@@ -43,6 +46,7 @@ type CaptureWorkerOptions = {
   outputRoot?: string;
   execute?: typeof executeCaptureScenario;
   probe?: ConstructorParameters<typeof CaptureAssetStager>[2];
+  capacity?: CapacityGuard;
 };
 
 type CaptureContext = {
@@ -110,6 +114,7 @@ export class CaptureWorkerOrchestrator {
   private readonly heartbeatIntervalMs: number;
   private readonly outputRoot: string;
   private readonly execute: typeof executeCaptureScenario;
+  private readonly capacity: CapacityGuard;
 
   constructor(
     private readonly client: PrismaClient,
@@ -122,7 +127,10 @@ export class CaptureWorkerOrchestrator {
   ) {
     this.persistence = new Persistence(client);
 
-    this.stager = new CaptureAssetStager(client, storage, options.probe);
+    this.capacity =
+      options.capacity ??
+      new CapacityGuard(undefined, undefined, new StructuredLogger('worker-capture'));
+    this.stager = new CaptureAssetStager(client, storage, options.probe, this.capacity);
 
     this.heartbeatIntervalMs = options.heartbeatIntervalMs ?? 10_000;
 
@@ -309,6 +317,7 @@ export class CaptureWorkerOrchestrator {
     let runStarted = false;
 
     let outputDirectory: string | undefined;
+    let workspace: Awaited<ReturnType<typeof createOwnedTemp>> | undefined;
 
     try {
       const context = await this.resolve(job);
@@ -321,7 +330,20 @@ export class CaptureWorkerOrchestrator {
 
       runStarted = true;
 
-      outputDirectory = await mkdtemp(join(this.outputRoot, `vision-capture-${context.runId}-`));
+      const scenario = CaptureScenarioVersionSpecSchema.parse(context.scenario);
+      await this.capacity.require(
+        this.outputRoot,
+        CAPACITY_SCRATCH_BYTES +
+          this.capacity.policy.maxArtifactBytes * (scenario.outputs.length + 3),
+        context.runId,
+      );
+      workspace = await createOwnedTemp(
+        this.outputRoot,
+        'capture',
+        context.runId,
+        new StructuredLogger('worker-capture'),
+      );
+      outputDirectory = workspace.path;
 
       const execution = await this.withHeartbeat(job.id, leaseToken, () =>
         this.execute({
@@ -330,6 +352,7 @@ export class CaptureWorkerOrchestrator {
           outputDirectory: outputDirectory!,
           fixtureManager: this.fixtureManager,
           authStateProvider: this.authStateProvider,
+          capacity: this.capacity,
         }),
       );
 
@@ -409,12 +432,7 @@ export class CaptureWorkerOrchestrator {
         failureCode,
       };
     } finally {
-      if (outputDirectory) {
-        await rm(outputDirectory, {
-          recursive: true,
-          force: true,
-        }).catch(() => undefined);
-      }
+      await workspace?.cleanup();
     }
   }
 }

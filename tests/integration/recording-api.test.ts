@@ -13,6 +13,7 @@ let cookie: string;
 let csrf: string;
 
 const packs = vi.fn(async () => []);
+const upload = vi.fn(async () => ({ accepted: true }));
 const select = vi.fn(async () => ({ ready: false }));
 
 beforeAll(async () => {
@@ -24,7 +25,12 @@ beforeAll(async () => {
     },
     {
       auth: { accessKey, origin },
-      recordings: { packs, select } as unknown as RecordingPackService,
+      recordings: {
+        packs,
+        select,
+        upload,
+        maximumUploadBytes: 4,
+      } as unknown as RecordingPackService,
     },
   );
 
@@ -146,6 +152,23 @@ it('uses the authenticated actor, validates IDs, and hides internal errors', asy
 
   expect(response.status).toBe(409);
   expect(await response.text()).not.toContain('sensitive');
+});
+
+it('rejects oversized declared binary uploads before calling the service', async () => {
+  await login();
+  const response = await fetch(`${base}/api/recording-requests/${randomUUID()}/upload`, {
+    method: 'POST',
+    headers: {
+      Origin: origin,
+      Cookie: cookie,
+      'X-CSRF-Token': csrf,
+      'Content-Type': 'application/octet-stream',
+    },
+    body: '12345',
+  });
+  expect(response.status).toBe(422);
+  expect(await response.text()).toContain('UPLOAD_TOO_LARGE');
+  expect(upload).not.toHaveBeenCalled();
 });
 
 it('revokes the shared session on logout and rate-limits bad login attempts', async () => {

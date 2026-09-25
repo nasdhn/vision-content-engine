@@ -1,3 +1,4 @@
+import { CapacityGuard } from '@vision/media';
 import { mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
@@ -29,7 +30,11 @@ export async function normalizeHdrToSdr(input: {
   sourcePath: string;
   outputPath: string;
   signal?: AbortSignal;
+  capacity?: CapacityGuard;
 }) {
+  const capacity = input.capacity ?? new CapacityGuard();
+  await capacity.file(input.sourcePath);
+  await capacity.require(dirname(input.outputPath), capacity.policy.maxArtifactBytes);
   await mkdir(dirname(input.outputPath), { recursive: true });
 
   const filter = [
@@ -74,6 +79,8 @@ export async function normalizeHdrToSdr(input: {
       '-x264-params',
       X264_BT709_VUI,
       '-an',
+      '-fs',
+      String(capacity.policy.maxArtifactBytes),
       input.outputPath,
     ],
     {
@@ -82,6 +89,7 @@ export async function normalizeHdrToSdr(input: {
     },
   );
 
+  await capacity.file(input.outputPath);
   return input.outputPath;
 }
 
@@ -90,7 +98,11 @@ export async function preprocessGreenScreen(input: {
   outputPath: string;
   profile: ChromaProfile;
   signal?: AbortSignal;
+  capacity?: CapacityGuard;
 }) {
+  const capacity = input.capacity ?? new CapacityGuard();
+  await capacity.file(input.sourcePath);
+  await capacity.require(dirname(input.outputPath), capacity.policy.maxArtifactBytes);
   await mkdir(dirname(input.outputPath), { recursive: true });
 
   const keyColor = string(input.profile.keyColor, 'CHROMA_PROFILE_INVALID').replace('#', '0x');
@@ -126,6 +138,8 @@ export async function preprocessGreenScreen(input: {
       '-auto-alt-ref',
       '0',
       '-an',
+      '-fs',
+      String(capacity.policy.maxArtifactBytes),
       input.outputPath,
     ],
     {
@@ -134,6 +148,7 @@ export async function preprocessGreenScreen(input: {
     },
   );
 
+  await capacity.file(input.outputPath);
   return input.outputPath;
 }
 
@@ -147,7 +162,11 @@ export async function postprocessSocialMaster(input: {
   sampleRate: number;
   channels: number;
   signal?: AbortSignal;
+  capacity?: CapacityGuard;
 }) {
+  const capacity = input.capacity ?? new CapacityGuard();
+  await capacity.file(input.sourcePath);
+  await capacity.require(dirname(input.outputPath), capacity.policy.maxArtifactBytes);
   await mkdir(dirname(input.outputPath), { recursive: true });
 
   const args = [
@@ -204,12 +223,19 @@ export async function postprocessSocialMaster(input: {
     args.push('-an');
   }
 
-  args.push('-movflags', '+faststart', input.outputPath);
+  args.push(
+    '-movflags',
+    '+faststart',
+    '-fs',
+    String(capacity.policy.maxArtifactBytes),
+    input.outputPath,
+  );
 
   await execOwned('ffmpeg', args, {
     timeoutMs: 180_000,
     ...(input.signal ? { signal: input.signal } : {}),
   });
 
+  await capacity.file(input.outputPath);
   return input.outputPath;
 }

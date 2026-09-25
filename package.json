@@ -50,7 +50,8 @@
     "check:phase10c": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm check:secrets && pnpm exec vitest run tests/unit/structured-logging.test.ts tests/integration/runtime-logging.test.ts",
     "test:health:runtime": "tsx tests/runtime/health-bullmq-smoke.ts",
     "check:phase10d": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm check:secrets && pnpm exec vitest run tests/unit/worker-heartbeat.test.ts tests/unit/queue-health.test.ts tests/integration/runtime-health-api.test.ts && pnpm test:health:runtime",
-    "check:phase10e": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm check:secrets && pnpm exec vitest run tests/unit/cost-budgets.test.ts tests/integration/budget-operations-api.test.ts && pnpm exec vitest run --config vitest.postgres.config.ts tests/postgres/cost-budgets.test.ts tests/postgres/ai.test.ts"
+    "check:phase10e": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm check:secrets && pnpm exec vitest run tests/unit/cost-budgets.test.ts tests/integration/budget-operations-api.test.ts && pnpm exec vitest run --config vitest.postgres.config.ts tests/postgres/cost-budgets.test.ts tests/postgres/ai.test.ts",
+    "check:phase10f": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm check:secrets && pnpm exec vitest run tests/unit/storage-capacity.test.ts tests/unit/media-capacity-preflight.test.ts tests/unit/config.test.ts tests/unit/media.test.ts tests/integration/runtime-health-api.test.ts tests/integration/recording-api.test.ts && pnpm exec vitest run --config vitest.postgres.config.ts tests/postgres/storage-capacity.test.ts tests/postgres/capture-orchestrator.test.ts tests/postgres/capture-assets.test.ts tests/postgres/recordings.test.ts && pnpm test:storage"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

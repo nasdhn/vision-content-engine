@@ -1,4 +1,6 @@
-import { mkdir, readFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { CapacityGuard, CAPACITY_SCRATCH_BYTES } from '@vision/media';
+import { mkdir, open, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium, type Browser, type BrowserContext, type Locator, type Page } from 'playwright';
 import { CaptureScenarioVersionSpecSchema } from '@vision/contracts';
@@ -61,6 +63,7 @@ export type CaptureExecutorInput = {
   outputDirectory: string;
   fixtureManager: CaptureFixtureManager;
   authStateProvider: CaptureAuthStateProvider;
+  capacity?: CapacityGuard;
 };
 
 function safeFilename(value: string) {
@@ -205,9 +208,16 @@ function playwrightKey(value: 'ENTER' | 'ESCAPE' | 'TAB'): 'Enter' | 'Escape' | 
 }
 
 async function validatePng(path: string, viewport: boolean, spec: CaptureScenarioSpec) {
-  const bytes = await readFile(path);
-
-  invariant(bytes.length > 100, 'CAPTURE_SCREENSHOT_EMPTY');
+  const info = await stat(path);
+  invariant(info.size > 100, 'CAPTURE_SCREENSHOT_EMPTY');
+  const handle = await open(path, 'r');
+  const bytes = Buffer.alloc(24);
+  try {
+    const read = await handle.read(bytes, 0, 24, 0);
+    invariant(read.bytesRead === 24, 'CAPTURE_SCREENSHOT_INVALID');
+  } finally {
+    await handle.close();
+  }
 
   invariant(
     bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])),
@@ -278,8 +288,15 @@ export async function executeCaptureScenario(
 ): Promise<CaptureExecutionResult> {
   const scenario = CaptureScenarioVersionSpecSchema.parse(request.scenario);
 
+  invariant(scenario.safety.blockDownloads, 'CAPTURE_DOWNLOAD_UNBOUNDED');
   validateScenarioInput(scenario.inputSchema as Record<string, unknown>, request.input);
 
+  const capacity = request.capacity ?? new CapacityGuard();
+  await capacity.require(
+    request.outputDirectory,
+    CAPACITY_SCRATCH_BYTES + capacity.policy.maxArtifactBytes * (scenario.outputs.length + 3),
+  );
+  await capacity.require(tmpdir(), CAPACITY_SCRATCH_BYTES);
   await mkdir(request.outputDirectory, {
     recursive: true,
     mode: 0o700,
@@ -364,7 +381,10 @@ export async function executeCaptureScenario(
       'CAPTURE_AUTH_TRACE_FORBIDDEN',
     );
 
-    browser = await chromium.launch({ headless: true });
+    browser = await chromium.launch({
+      headless: true,
+      downloadsPath: join(request.outputDirectory, 'downloads'),
+    });
 
     context = await browser.newContext({
       viewport: scenario.browser.viewport,
@@ -615,6 +635,7 @@ export async function executeCaptureScenario(
             });
           }
 
+          await capacity.file(path);
           await validatePng(path, step.mode === 'VIEWPORT', scenario);
 
           files.push({
@@ -742,6 +763,7 @@ export async function executeCaptureScenario(
       );
     }
 
+    for (const file of files) await capacity.file(file.path);
     return {
       result: 'SUCCEEDED',
       executedStepCount,

@@ -1,3 +1,5 @@
+import { tmpdir } from 'node:os';
+import { CapacityGuard } from '@vision/media';
 import { QueueKeys } from 'bullmq';
 import type { Redis } from 'ioredis';
 import {
@@ -21,10 +23,11 @@ export class RuntimeHealthService {
     private readonly heartbeats: HeartbeatStore,
     private readonly queues: ReadonlyArray<{ name: RuntimeQueueName; reader: QueueHealthReader }>,
     private readonly logger = new StructuredLogger('api'),
+    private readonly capacity = new CapacityGuard(),
   ) {}
 
   private async snapshot() {
-    const [dependencies, workers, queues] = await Promise.all([
+    const [dependencies, workers, queues, localCapacity] = await Promise.all([
       checkReadiness(this.probes),
       readWorkerHealth(this.heartbeats),
       Promise.all(
@@ -32,9 +35,16 @@ export class RuntimeHealthService {
           readQueueHealth(name, reader, { logger: this.logger }),
         ),
       ),
+      this.capacity.read(tmpdir()),
     ]);
     if (dependencies.status !== 'ready') this.logger.log('warn', 'dependency.not_ready');
-    return { observedAt: new Date().toISOString(), dependencies, workers, queues };
+    return {
+      observedAt: new Date().toISOString(),
+      dependencies,
+      workers,
+      queues,
+      localCapacity: { scope: 'API_TEMP_FILESYSTEM', ...localCapacity },
+    };
   }
 
   read() {
@@ -46,7 +56,11 @@ export class RuntimeHealthService {
   }
 }
 
-export function createRuntimeHealthService(redis: Redis, probes: ReadinessProbes) {
+export function createRuntimeHealthService(
+  redis: Redis,
+  probes: ReadinessProbes,
+  capacity = new CapacityGuard(),
+) {
   const logger = new StructuredLogger('api');
   const queues = RUNTIME_QUEUES.map((name) => ({
     name,
@@ -57,5 +71,6 @@ export function createRuntimeHealthService(redis: Redis, probes: ReadinessProbes
     new RedisHeartbeatStore(async () => redis),
     queues,
     logger,
+    capacity,
   );
 }

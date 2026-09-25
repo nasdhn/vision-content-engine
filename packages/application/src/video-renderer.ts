@@ -1,3 +1,4 @@
+import type { CapacityGuard } from '@vision/media';
 import type { RenderPayloadSchema } from '@vision/contracts';
 import type { z } from 'zod';
 
@@ -22,6 +23,7 @@ export interface VideoRenderer {
     options: Readonly<{
       workDir: string;
       signal?: AbortSignal;
+      capacity?: CapacityGuard;
     }>,
   ): Promise<RendererExecutionResult>;
 }

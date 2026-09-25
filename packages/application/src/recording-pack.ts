@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdtemp, rm, open } from 'node:fs/promises';
+import { open } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { z } from 'zod';
@@ -7,10 +7,17 @@ import { Persistence } from '@vision/database';
 import type { Actor, PrismaClient, Prisma } from '@vision/database';
 import { RecordingRequestSpecSchema, ScriptSegmentSchema } from '@vision/contracts';
 import { assertHuman, invariant, DomainError } from '@vision/domain';
-import { mediaType, probeFile, recordingFeedback, cleanAbandonedUploadTemps } from '@vision/media';
+import {
+  mediaType,
+  probeFile,
+  recordingFeedback,
+  createOwnedTemp,
+  CapacityGuard,
+  CAPACITY_DEFAULTS,
+} from '@vision/media';
 import type { MediaProbe, PrivateStorage } from '@vision/media';
 
-export const MAX_UPLOAD_BYTES = 512 * 1024 * 1024;
+export const MAX_UPLOAD_BYTES = CAPACITY_DEFAULTS.maxUploadBytes;
 export class RecordingPackService {
   private readonly persistence: Persistence;
   private uploading = 0;
@@ -19,8 +26,12 @@ export class RecordingPackService {
     private readonly db: PrismaClient,
     private readonly storage: PrivateStorage,
     private readonly probe: (file: string) => Promise<MediaProbe> = probeFile,
+    private readonly capacity = new CapacityGuard(),
   ) {
     this.persistence = new Persistence(db);
+  }
+  get maximumUploadBytes() {
+    return this.capacity.policy.maxUploadBytes;
   }
   async prepare(actor: Actor, versionId: string) {
     assertHuman(actor);
@@ -110,24 +121,25 @@ export class RecordingPackService {
     invariant(this.uploading < 2, 'UPLOAD_CAPACITY_REACHED');
     if (expectedChecksum) invariant(/^[a-f0-9]{64}$/.test(expectedChecksum), 'INVALID_CHECKSUM');
     this.uploading++;
-    let directory: string | undefined;
+    let workspace: Awaited<ReturnType<typeof createOwnedTemp>> | undefined;
     let assetId: string | undefined;
     try {
+      await this.capacity.require(tmpdir(), this.capacity.policy.maxUploadBytes, requestId);
       const r = await this.db.recordingRequest.findUniqueOrThrow({ where: { id: requestId } });
       const spec = RecordingRequestSpecSchema.parse(r.shotInstructionsJson);
       const asset = await this.persistence.transaction(actor, (u) =>
         u.recordings.beginUpload(requestId, this.storage.bucket),
       );
       assetId = asset.id;
-      directory = await mkdtemp(join(tmpdir(), `vce-upload-${asset.id}-`));
-      const path = join(directory, 'source');
+      workspace = await createOwnedTemp(tmpdir(), 'upload', asset.id);
+      const path = join(workspace.path, 'source');
       const file = await open(path, 'wx', 0o600);
       const hash = createHash('sha256');
       let size = 0;
       try {
         for await (const chunk of bytes) {
           size += chunk.byteLength;
-          invariant(size <= MAX_UPLOAD_BYTES, 'UPLOAD_TOO_LARGE');
+          invariant(size <= this.capacity.policy.maxUploadBytes, 'UPLOAD_TOO_LARGE');
           hash.update(chunk);
           await file.writeFile(chunk);
         }
@@ -169,7 +181,7 @@ export class RecordingPackService {
       throw new DomainError(code);
     } finally {
       this.uploading--;
-      if (directory) await rm(directory, { recursive: true, force: true });
+      await workspace?.cleanup();
     }
   }
   private async verify(key: string, checksum: string, expectedSize: number) {
@@ -236,7 +248,8 @@ export class RecordingPackService {
   /** Conservative recovery: no upload resume or reuse of an ambiguously written key.
    * Original objects remain tracked by FAILED Asset rows for private retention/diagnostics. */
   async recoverInterrupted() {
-    await cleanAbandonedUploadTemps();
+    // Age alone does not prove that another process has stopped writing a temp directory.
+    // Local orphan reconciliation is deferred; retain the existing database recovery semantics.
     const rows = await this.db.asset.findMany({
       where: {
         status: 'UPLOADING',

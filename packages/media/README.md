@@ -19,10 +19,13 @@ reopening affected requests and future readiness atomically. This conservative t
 applies to a failed storage read; upload a replacement after restoring storage availability.
 Historical version/render/input rows are not rewritten.
 
-Temporary ingest files have private permissions and are removed in `finally`. Startup cleanup
-removes only expired, nonsymlink directories in the reserved upload namespace. Interrupted DB
-uploads older than one hour become FAILED; late finalization is refused. Any already written
-original stays linked to the failed Asset for diagnostics/retention, never reused on retry.
+Temporary ingest workspaces have private permissions and are cleaned in `finally` only after
+verifying their operation ownership, root boundary and directory identity. Age alone never
+authorizes deletion; automatic stale-directory cleanup is disabled until inactive ownership can
+be proven. Interrupted DB uploads older than one hour still become FAILED; late finalization is
+refused. Any already written original stays linked to the failed Asset for diagnostics/retention,
+never reused on retry. See [Phase 10F](../../docs/PHASE_10F_STORAGE_CAPACITY.md) for capacity
+limits and cleanup guarantees.
 
 Limits: 512 MiB per original, two concurrent uploads and one preview load per service process;
 HTTP upload timeout 120 seconds, object operation timeout 60 seconds. Preview checks the entire
