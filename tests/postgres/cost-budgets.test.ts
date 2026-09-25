@@ -237,6 +237,181 @@ it('serializes one remaining provider authorization and keeps crash reservations
   });
 });
 
+it('safely closes an interrupted invocation before any provider attempt was authorized', async () => {
+  const b = await setup({ maxEstimatedCost: 1 }, '1');
+  const actor = { actorType: 'USER', actorId: 'budget-recovery-test' } as const;
+  await b.begin();
+  await expect(
+    b.repo.reconcileInterrupted(b.request.requestId, 'SAFE_CLOSE', {
+      actorType: 'SYSTEM',
+      actorId: 'automatic-recovery',
+    }),
+  ).rejects.toThrow('HUMAN_APPROVAL_REQUIRED');
+  expect(await new InvocationBudgetReader(fixture.client).read(b.request.requestId)).toMatchObject({
+    operation: {
+      status: 'RUNNING',
+      recovery: { state: 'NO_PROVIDER_ATTEMPT', allowedModes: ['SAFE_CLOSE'] },
+    },
+    scope: { reserved: '1.00000000', consumed: '0.00000000', remaining: '0.00000000' },
+  });
+  await expect(
+    b.repo.reconcileInterrupted(b.request.requestId, 'CONSERVATIVE_CLOSE', actor),
+  ).rejects.toThrow('AI_RECOVERY_MODE_CONFLICT');
+
+  await expect(
+    b.repo.reconcileInterrupted(b.request.requestId, 'SAFE_CLOSE', actor),
+  ).resolves.toMatchObject({
+    kind: 'CLOSED',
+    status: 'FAILED',
+    failureCode: 'AI_RECOVERY_NO_PROVIDER_ATTEMPT',
+    budgetConsumed: '0.00000000',
+  });
+  expect(await new InvocationBudgetReader(fixture.client).read(b.request.requestId)).toMatchObject({
+    operation: { status: 'FAILED', recovery: { state: 'NOT_REQUIRED' } },
+    scope: { reserved: '0.00000000', consumed: '0.00000000', remaining: '1.00000000' },
+  });
+  await expect(
+    b.repo.reconcileInterrupted(b.request.requestId, 'SAFE_CLOSE', actor),
+  ).resolves.toMatchObject({ kind: 'ALREADY_TERMINAL', status: 'FAILED' });
+  expect(
+    await fixture.client.auditEvent.count({
+      where: { subjectId: b.request.requestId, action: 'ModelInvocation.recovered' },
+    }),
+  ).toBe(1);
+});
+
+it('requires explicit conservative close for an ambiguous running provider attempt', async () => {
+  const b = await setup({ maxAttempts: 2, maxEstimatedCost: 2 }, '2');
+  const actor = { actorType: 'USER', actorId: 'budget-recovery-test' } as const;
+  await b.begin();
+  const attempt = await b.repo.startAttempt(b.request.requestId, {
+    provider: 'deterministic-fixture',
+    model: 'fixture',
+    requestHash: 'a'.repeat(64),
+    estimate: '1',
+  });
+  expect(await new InvocationBudgetReader(fixture.client).read(b.request.requestId)).toMatchObject({
+    operation: {
+      status: 'RUNNING',
+      pendingCallReserved: '1.00000000',
+      recovery: {
+        state: 'AMBIGUOUS_PROVIDER_OUTCOME',
+        allowedModes: ['CONSERVATIVE_CLOSE'],
+        runningAttemptId: attempt.id,
+      },
+    },
+    scope: { reserved: '2.00000000', consumed: '0.00000000' },
+  });
+
+  await expect(
+    b.repo.reconcileInterrupted(b.request.requestId, 'SAFE_CLOSE', actor),
+  ).resolves.toMatchObject({
+    kind: 'RECONCILIATION_REQUIRED',
+    reason: 'RUNNING_PROVIDER_ATTEMPT',
+    runningAttemptId: attempt.id,
+  });
+  expect(
+    await fixture.client.modelInvocationAttempt.findUniqueOrThrow({ where: { id: attempt.id } }),
+  ).toMatchObject({ status: 'RUNNING', costAmount: null, costCurrency: null });
+
+  await expect(
+    new InvocationRepository(second).reconcileInterrupted(
+      b.request.requestId,
+      'CONSERVATIVE_CLOSE',
+      actor,
+    ),
+  ).resolves.toMatchObject({
+    kind: 'CLOSED',
+    status: 'FAILED',
+    failureCode: 'AI_RECOVERY_PROVIDER_OUTCOME_UNKNOWN',
+    budgetConsumed: '1.00000000',
+    conservativelyClosedAttemptId: attempt.id,
+  });
+  expect(
+    await fixture.client.modelInvocationAttempt.findUniqueOrThrow({ where: { id: attempt.id } }),
+  ).toMatchObject({
+    status: 'FAILED',
+    costAmount: null,
+    costCurrency: 'EUR',
+    failureCode: 'AI_PROVIDER_OUTCOME_UNKNOWN',
+    validationJson: {
+      accountedCost: '1.00000000',
+      reservedCost: '1.00000000',
+      recovery: 'CONSERVATIVE_CLOSE',
+    },
+  });
+  expect(await new InvocationBudgetReader(fixture.client).read(b.request.requestId)).toMatchObject({
+    operation: {
+      status: 'FAILED',
+      pendingCallReserved: '0.00000000',
+      unknownCostUpperBound: '1.00000000',
+      recovery: { state: 'NOT_REQUIRED' },
+    },
+    scope: { reserved: '0.00000000', consumed: '1.00000000', remaining: '1.00000000' },
+  });
+  expect(
+    await fixture.client.costEntry.count({ where: { modelInvocationId: b.request.requestId } }),
+  ).toBe(0);
+  await expect(
+    b.repo.finishAttempt(attempt.id, {
+      status: 'SUCCEEDED',
+      costCurrency: 'EUR',
+      costAmount: '1',
+      accountedCost: '1',
+      validation: { schema: 'PASS' },
+    }),
+  ).rejects.toThrow('ATTEMPT_FINALIZATION_CONFLICT');
+});
+
+it('closes a crash after durable attempt accounting without losing known cost', async () => {
+  const b = await setup({ maxEstimatedCost: 2 }, '2');
+  const actor = { actorType: 'USER', actorId: 'budget-recovery-test' } as const;
+  await b.begin();
+  const attempt = await b.repo.startAttempt(b.request.requestId, {
+    provider: 'deterministic-fixture',
+    model: 'fixture',
+    requestHash: 'a'.repeat(64),
+    estimate: '1',
+  });
+  await b.repo.finishAttempt(attempt.id, {
+    status: 'SUCCEEDED',
+    costCurrency: 'EUR',
+    costAmount: '1',
+    accountedCost: '1',
+    validation: { schema: 'PASS' },
+  });
+  expect(await new InvocationBudgetReader(fixture.client).read(b.request.requestId)).toMatchObject({
+    operation: {
+      status: 'RUNNING',
+      accountedCost: '1.00000000',
+      recovery: { state: 'OUTPUT_UNAVAILABLE', allowedModes: ['SAFE_CLOSE'] },
+    },
+    scope: { reserved: '2.00000000', consumed: '0.00000000', remaining: '0.00000000' },
+  });
+  await expect(
+    b.repo.reconcileInterrupted(b.request.requestId, 'CONSERVATIVE_CLOSE', actor),
+  ).rejects.toThrow('AI_RECOVERY_MODE_CONFLICT');
+
+  await expect(
+    b.repo.reconcileInterrupted(b.request.requestId, 'SAFE_CLOSE', actor),
+  ).resolves.toMatchObject({
+    kind: 'CLOSED',
+    status: 'FAILED',
+    failureCode: 'AI_RECOVERY_TERMINAL_ATTEMPTS',
+    budgetConsumed: '1.00000000',
+  });
+  expect(await new InvocationBudgetReader(fixture.client).read(b.request.requestId)).toMatchObject({
+    operation: {
+      status: 'FAILED',
+      accountedCost: '1.00000000',
+      reportedCost: '1.00000000',
+      unknownCostUpperBound: '0.00000000',
+      recovery: { state: 'NOT_REQUIRED' },
+    },
+    scope: { reserved: '0.00000000', consumed: '1.00000000', remaining: '1.00000000' },
+  });
+});
+
 it('makes matching finalization replay idempotent and rejects conflicting refunds', async () => {
   const b = await setup({ maxEstimatedCost: 1 }, '1');
   await b.begin();

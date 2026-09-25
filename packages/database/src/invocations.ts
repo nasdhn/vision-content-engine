@@ -1,9 +1,9 @@
 import { RUNTIME_INTEGER_MAX } from '@vision/contracts';
-import { invariant } from '@vision/domain';
+import { assertHuman, invariant } from '@vision/domain';
 import { assertNoSecrets, contentHash } from '@vision/contracts/canonical';
 import { Prisma } from './generated/prisma/client.js';
 import type { PrismaClient } from './generated/prisma/client.js';
-import { databaseTime, changed } from './transaction.js';
+import { databaseTime, changed, type Actor } from './transaction.js';
 import { UnitOfWork } from './persistence.js';
 import { Knowledge } from './knowledge.js';
 
@@ -41,6 +41,8 @@ export type InvocationSuccessCheckpoint = Readonly<{
   output: unknown;
   metadata: unknown;
 }>;
+
+export type InvocationRecoveryMode = 'SAFE_CLOSE' | 'CONSERVATIVE_CLOSE';
 
 export type AttemptResult = {
   status: 'SUCCEEDED' | 'FAILED' | 'REJECTED_SCHEMA';
@@ -382,6 +384,184 @@ export class InvocationRepository {
       }
       await changed(tx, actor, `ModelInvocation.${status.toLowerCase()}`, 'ModelInvocation', id);
       return row;
+    });
+  }
+  async reconcileInterrupted(id: string, mode: InvocationRecoveryMode, recoveryActor: Actor) {
+    assertNoSecrets({ id, mode, recoveryActor });
+    assertHuman(recoveryActor);
+    invariant(mode === 'SAFE_CLOSE' || mode === 'CONSERVATIVE_CLOSE', 'INVALID_RECOVERY_MODE');
+    return this.db.$transaction(async (tx) => {
+      const locked = await tx.$queryRaw<{ id: string }[]>`
+        SELECT id FROM "ModelInvocation" WHERE id = ${id}::uuid FOR UPDATE
+      `;
+      invariant(locked.length === 1, 'INVOCATION_NOT_FOUND');
+      const invocation = await tx.modelInvocation.findUniqueOrThrow({ where: { id } });
+      if (invocation.status !== 'RUNNING') {
+        return {
+          kind: 'ALREADY_TERMINAL',
+          id,
+          status: invocation.status,
+          failureCode: invocation.failureCode,
+        } as const;
+      }
+
+      await tx.$queryRaw`
+        SELECT id FROM "ModelInvocationAttempt"
+        WHERE "modelInvocationId" = ${id}::uuid
+        ORDER BY "attemptNumber" ASC
+        FOR UPDATE
+      `;
+      let attempts = await tx.modelInvocationAttempt.findMany({
+        where: { modelInvocationId: id },
+        orderBy: { attemptNumber: 'asc' },
+      });
+      invariant(invocation.attemptCount === attempts.length, 'AI_RECOVERY_STATE_CONFLICT');
+      const runningAttempts = attempts.filter((attempt) => attempt.status === 'RUNNING');
+      invariant(runningAttempts.length <= 1, 'AI_RECOVERY_STATE_CONFLICT');
+
+      if (runningAttempts.length === 1 && mode === 'SAFE_CLOSE') {
+        return {
+          kind: 'RECONCILIATION_REQUIRED',
+          id,
+          reason: 'RUNNING_PROVIDER_ATTEMPT',
+          runningAttemptId: runningAttempts[0]!.id,
+        } as const;
+      }
+      invariant(runningAttempts.length === 1 || mode === 'SAFE_CLOSE', 'AI_RECOVERY_MODE_CONFLICT');
+
+      let failureCode: string;
+      let conservativelyClosedAttemptId: string | undefined;
+      if (runningAttempts.length === 1) {
+        const runningAttempt = runningAttempts[0]!;
+        const policy = jsonObject(invocation.policyJson);
+        const { budget } = invocationBudget(policy.budget);
+        const reservedCost = costAmount(
+          jsonObject(runningAttempt.validationJson).reservedCost,
+          'BUDGET_LEDGER_INCOMPLETE',
+        ).toFixed(8);
+        const attemptFailureCode = 'AI_PROVIDER_OUTCOME_UNKNOWN';
+        const attemptFinalization = {
+          status: 'FAILED' as const,
+          costCurrency: budget.currency,
+          accountedCost: reservedCost,
+          failureCode: attemptFailureCode,
+          validation: { recovery: 'CONSERVATIVE_CLOSE' },
+        };
+        const now = await databaseTime(tx);
+        await tx.modelInvocationAttempt.update({
+          where: { id: runningAttempt.id },
+          data: {
+            status: 'FAILED',
+            finishedAt: now,
+            latencyMs: Math.max(0, now.getTime() - runningAttempt.startedAt.getTime()),
+            costCurrency: budget.currency,
+            failureCode: attemptFailureCode,
+            validationJson: {
+              ...jsonObject(runningAttempt.validationJson),
+              accountedCost: reservedCost,
+              reservedCost,
+              recovery: 'CONSERVATIVE_CLOSE',
+              finalizationHash: contentHash(attemptFinalization),
+            },
+          },
+        });
+        conservativelyClosedAttemptId = runningAttempt.id;
+        failureCode = 'AI_RECOVERY_PROVIDER_OUTCOME_UNKNOWN';
+        attempts = await tx.modelInvocationAttempt.findMany({
+          where: { modelInvocationId: id },
+          orderBy: { attemptNumber: 'asc' },
+        });
+      } else {
+        failureCode =
+          attempts.length === 0
+            ? 'AI_RECOVERY_NO_PROVIDER_ATTEMPT'
+            : 'AI_RECOVERY_TERMINAL_ATTEMPTS';
+      }
+
+      invariant(
+        !attempts.some((attempt) => attempt.status === 'RUNNING'),
+        'AI_RECOVERY_STATE_CONFLICT',
+      );
+      const policy = jsonObject(invocation.policyJson);
+      const { budget } = invocationBudget(policy.budget);
+      for (const attempt of attempts) {
+        invariant(attempt.costCurrency === budget.currency, 'AI_RECOVERY_STATE_CONFLICT');
+        costAmount(jsonObject(attempt.validationJson).accountedCost, 'BUDGET_LEDGER_INCOMPLETE');
+      }
+
+      const now = await databaseTime(tx);
+      const sum = (field: 'inputTokens' | 'outputTokens' | 'cachedInputTokens') =>
+        attempts.length > 0 && attempts.every((attempt) => attempt[field] !== null)
+          ? attempts.reduce((total, attempt) => total + attempt[field]!, 0)
+          : null;
+      const knownCost =
+        attempts.length > 0 && attempts.every((attempt) => attempt.costAmount !== null);
+      const amount = knownCost
+        ? attempts.reduce((total, attempt) => total.add(attempt.costAmount!), new Prisma.Decimal(0))
+        : null;
+      const consumed = attempts
+        .reduce(
+          (total, attempt) =>
+            total.add(
+              costAmount(
+                jsonObject(attempt.validationJson).accountedCost,
+                'BUDGET_LEDGER_INCOMPLETE',
+              ),
+            ),
+          new Prisma.Decimal(0),
+        )
+        .toFixed(8);
+      const finalizationHash = contentHash({
+        status: 'FAILED',
+        outputHash: null,
+        failureCode,
+        checkpoint: null,
+      });
+      const row = await tx.modelInvocation.update({
+        where: { id },
+        data: {
+          status: 'FAILED',
+          failureCode,
+          finishedAt: now,
+          latencyMs: Math.max(0, now.getTime() - invocation.startedAt.getTime()),
+          inputTokens: sum('inputTokens'),
+          outputTokens: sum('outputTokens'),
+          cachedInputTokens: sum('cachedInputTokens'),
+          costAmount: amount,
+          costCurrency: amount ? budget.currency : null,
+          validationJson: {
+            schema: jsonObject(attempts.at(-1)?.validationJson ?? null).schema ?? 'NOT_RUN',
+            references: 'NOT_PASSED',
+            businessRules: 'NOT_PASSED',
+            claims: 'NOT_PASSED',
+            budgetConsumed: consumed,
+            recoveryMode: mode,
+            finalizationHash,
+          },
+        },
+      });
+      await changed(tx, recoveryActor, 'ModelInvocation.failed', 'ModelInvocation', id);
+      await tx.auditEvent.create({
+        data: {
+          ...recoveryActor,
+          action: 'ModelInvocation.recovered',
+          subjectType: 'ModelInvocation',
+          subjectId: id,
+          afterJson: {
+            mode,
+            failureCode,
+            ...(conservativelyClosedAttemptId ? { conservativelyClosedAttemptId } : {}),
+          },
+        },
+      });
+      return {
+        kind: 'CLOSED',
+        id,
+        status: row.status,
+        failureCode,
+        budgetConsumed: consumed,
+        ...(conservativelyClosedAttemptId ? { conservativelyClosedAttemptId } : {}),
+      } as const;
     });
   }
 }

@@ -2,6 +2,7 @@ import { invariant } from '@vision/domain';
 import { contentHash } from '@vision/contracts/canonical';
 import { Prisma, type PrismaClient } from './generated/prisma/client.js';
 import { boundedModelPolicy, costAmount, invocationBudget } from './budgets.js';
+import type { InvocationRecoveryMode } from './invocations.js';
 
 const object = (value: Prisma.JsonValue | null) =>
   (value ?? {}) as Record<string, Prisma.JsonValue>;
@@ -21,7 +22,9 @@ export class InvocationBudgetReader {
             status: true,
             policyJson: true,
             attemptCount: true,
-            attempts: { select: { status: true, costAmount: true, validationJson: true } },
+            attempts: {
+              select: { id: true, status: true, costAmount: true, validationJson: true },
+            },
           },
         });
         if (!invocation) return null;
@@ -72,6 +75,25 @@ export class InvocationBudgetReader {
             else reported = reported.add(attempt.costAmount);
           }
         }
+        const runningAttempt = invocation.attempts.find((attempt) => attempt.status === 'RUNNING');
+        const recovery =
+          invocation.status !== 'RUNNING'
+            ? { state: 'NOT_REQUIRED' as const, allowedModes: [] as InvocationRecoveryMode[] }
+            : runningAttempt
+              ? {
+                  state: 'AMBIGUOUS_PROVIDER_OUTCOME' as const,
+                  allowedModes: ['CONSERVATIVE_CLOSE'] as InvocationRecoveryMode[],
+                  runningAttemptId: runningAttempt.id,
+                }
+              : invocation.attempts.length === 0
+                ? {
+                    state: 'NO_PROVIDER_ATTEMPT' as const,
+                    allowedModes: ['SAFE_CLOSE'] as InvocationRecoveryMode[],
+                  }
+                : {
+                    state: 'OUTPUT_UNAVAILABLE' as const,
+                    allowedModes: ['SAFE_CLOSE'] as InvocationRecoveryMode[],
+                  };
         const remaining = (limit: Prisma.Decimal, committed: Prisma.Decimal) =>
           Prisma.Decimal.max(0, limit.sub(committed)).toFixed(8);
         const committed = new Prisma.Decimal(scope.reserved).add(scope.consumed);
@@ -89,6 +111,7 @@ export class InvocationBudgetReader {
             unknownCostUpperBound: unknown.toFixed(8),
             pendingCallReserved: pending.toFixed(8),
             remainingCost: remaining(reservation, accounted.add(pending)),
+            recovery,
           },
           scope: {
             id: contentHash({ key: budget.key, from: budget.from, to: budget.to }),

@@ -1,7 +1,11 @@
 import { createRuntimeHealthService } from './runtime-health.js';
 import { StructuredLogger } from '@vision/observability';
 import 'dotenv/config';
-import { createDatabaseClient, InvocationBudgetReader } from '@vision/database';
+import {
+  createDatabaseClient,
+  InvocationBudgetReader,
+  InvocationRepository,
+} from '@vision/database';
 import {
   AnalyticsReadService,
   ConceptReviewService,
@@ -49,6 +53,8 @@ async function main() {
     if (!config.VCE_LOCAL_ACCESS_KEY || config.VCE_LOCAL_ACCESS_KEY.length < 32)
       throw new Error('LOCAL_AUTH_NOT_CONFIGURED');
 
+    const budgetReader = new InvocationBudgetReader(db);
+    const invocationRepository = new InvocationRepository(db);
     const storage = new S3PrivateStorage(dependencies.storage, config.S3_BUCKET, capacity);
     const recordings = new RecordingPackService(db, storage, undefined, capacity);
     const dashboard = new DashboardReadService(db);
@@ -89,7 +95,11 @@ async function main() {
         origin: config.VCE_WEB_ORIGIN,
       },
       runtimeHealth,
-      budgetOperations: new InvocationBudgetReader(db),
+      budgetOperations: {
+        read: (operationId) => budgetReader.read(operationId),
+        reconcileInterrupted: (operationId, mode, actor) =>
+          invocationRepository.reconcileInterrupted(operationId, mode, actor),
+      },
       recordings,
       dashboard,
       concepts,

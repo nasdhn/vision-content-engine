@@ -13,7 +13,7 @@ export type { RecoveryPolicies } from './leases.js';
 export type { Actor, OutboxInput } from './transaction.js';
 
 export { InvocationRepository } from './invocations.js';
-export type { Budget } from './invocations.js';
+export type { Budget, InvocationRecoveryMode } from './invocations.js';
 export { KnowledgePayloadSchema } from './knowledge.js';
 
 export { Captures } from './captures.js';

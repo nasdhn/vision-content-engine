@@ -1,7 +1,10 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { expect, it, vi } from 'vitest';
 import { createApi } from '../../apps/api/src/app.js';
-import type { InvocationBudgetReader } from '../../packages/database/src/index.js';
+import type {
+  InvocationBudgetReader,
+  InvocationRepository,
+} from '../../packages/database/src/index.js';
 import { StructuredLogger } from '../../packages/observability/src/index.js';
 import { probes } from '../helpers/runtime-health.js';
 
@@ -21,6 +24,7 @@ it('protects budget reads, exposes safe accounting and keeps error responses pri
       unknownCostUpperBound: '0.00000000',
       pendingCallReserved: '0.00000000',
       remainingCost: '1.00000000',
+      recovery: { state: 'NOT_REQUIRED' as const, allowedModes: [] },
     },
     scope: {
       id: 'a'.repeat(64),
@@ -35,12 +39,21 @@ it('protects budget reads, exposes safe accounting and keeps error responses pri
     },
   };
   const read = vi.fn<InvocationBudgetReader['read']>().mockResolvedValue(snapshot);
+  const reconcileInterrupted = vi
+    .fn<InvocationRepository['reconcileInterrupted']>()
+    .mockResolvedValue({
+      kind: 'CLOSED',
+      id,
+      status: 'FAILED',
+      failureCode: 'AI_RECOVERY_NO_PROVIDER_ATTEMPT',
+      budgetConsumed: '0.00000000',
+    });
   const accessKey = randomBytes(32).toString('hex');
   const origin = 'http://localhost:5174';
   const lines: string[] = [];
   const app = await createApi(
     probes,
-    { auth: { accessKey, origin }, budgetOperations: { read } },
+    { auth: { accessKey, origin }, budgetOperations: { read, reconcileInterrupted } },
     new StructuredLogger('api', (line) => lines.push(line)),
   );
   try {
@@ -77,6 +90,106 @@ it('protects budget reads, exposes safe accounting and keeps error responses pri
     expect((await fetch(path, { method: 'POST', headers })).status).toBe(404);
     expect(lines.join('')).not.toContain(sentinel);
     expect(lines.join('')).not.toContain(accessKey);
+  } finally {
+    await app.close();
+  }
+});
+
+it('requires an authenticated CSRF-protected explicit mode for AI invocation recovery', async () => {
+  const id = randomUUID();
+  const read = vi.fn<InvocationBudgetReader['read']>().mockResolvedValue(null);
+  const reconcileInterrupted = vi
+    .fn<InvocationRepository['reconcileInterrupted']>()
+    .mockResolvedValue({
+      kind: 'RECONCILIATION_REQUIRED',
+      id,
+      reason: 'RUNNING_PROVIDER_ATTEMPT',
+      runningAttemptId: randomUUID(),
+    });
+  const accessKey = randomBytes(32).toString('hex');
+  const origin = 'http://localhost:5174';
+  const app = await createApi(probes, {
+    auth: { accessKey, origin },
+    budgetOperations: { read, reconcileInterrupted },
+  });
+  try {
+    await app.listen(0, '127.0.0.1');
+    const base = await app.getUrl();
+    const path = `${base}/api/operations/budgets/${id}/reconcile`;
+    expect((await fetch(path, { method: 'POST' })).status).toBe(401);
+
+    const login = await fetch(`${base}/api/session`, {
+      method: 'POST',
+      headers: { Origin: origin, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accessKey }),
+    });
+    const session = (await login.json()) as { csrf: string };
+    const cookie = login.headers.get('set-cookie')!.split(';')[0]!;
+    const baseHeaders = { Cookie: cookie, Origin: origin, 'Content-Type': 'application/json' };
+    expect(
+      (
+        await fetch(path, {
+          method: 'POST',
+          headers: baseHeaders,
+          body: JSON.stringify({ mode: 'SAFE_CLOSE' }),
+        })
+      ).status,
+    ).toBe(403);
+    expect(reconcileInterrupted).not.toHaveBeenCalled();
+
+    const headers = { ...baseHeaders, 'x-csrf-token': session.csrf };
+    expect(
+      (
+        await fetch(path, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ mode: 'AUTO_RETRY' }),
+        })
+      ).status,
+    ).toBe(400);
+    expect(reconcileInterrupted).not.toHaveBeenCalled();
+
+    const response = await fetch(path, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ mode: 'SAFE_CLOSE' }),
+    });
+    expect(response.status).toBe(409);
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
+    expect(await response.text()).toContain('RECONCILIATION_REQUIRED');
+    expect(reconcileInterrupted).toHaveBeenCalledWith(id, 'SAFE_CLOSE', {
+      actorType: 'USER',
+      actorId: 'local-budget-operator',
+    });
+
+    reconcileInterrupted.mockResolvedValueOnce({
+      kind: 'CLOSED',
+      id,
+      status: 'FAILED',
+      failureCode: 'AI_RECOVERY_PROVIDER_OUTCOME_UNKNOWN',
+      budgetConsumed: '1.00000000',
+      conservativelyClosedAttemptId: randomUUID(),
+    });
+    const closed = await fetch(path, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ mode: 'CONSERVATIVE_CLOSE' }),
+    });
+    expect(closed.status).toBe(201);
+    expect(reconcileInterrupted).toHaveBeenLastCalledWith(id, 'CONSERVATIVE_CLOSE', {
+      actorType: 'USER',
+      actorId: 'local-budget-operator',
+    });
+
+    const sentinel = ['AI', 'RECOVERY', 'PRIVATE', 'SENTINEL'].join('_');
+    reconcileInterrupted.mockRejectedValueOnce(new Error(sentinel));
+    const failure = await fetch(path, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ mode: 'CONSERVATIVE_CLOSE' }),
+    });
+    expect(failure.status).toBe(409);
+    expect(await failure.text()).not.toContain(sentinel);
   } finally {
     await app.close();
   }

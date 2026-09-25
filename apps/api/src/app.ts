@@ -1,8 +1,11 @@
 import { OperationsController, RUNTIME_HEALTH } from './operations.js';
 import type { RuntimeHealthService } from './runtime-health.js';
 import 'reflect-metadata';
-import { BudgetOperationsController, BUDGET_OPERATIONS } from './budget-operations.js';
-import type { InvocationBudgetReader } from '@vision/database';
+import {
+  BudgetOperationsController,
+  BUDGET_OPERATIONS,
+  type BudgetOperationsPort,
+} from './budget-operations.js';
 import { Controller, Get, Inject, Module, ServiceUnavailableException } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -55,7 +58,7 @@ const PROBES = Symbol('bootstrap-readiness-probes');
 
 export type ApiBusinessOptions = {
   auth: LocalSessionOptions;
-  budgetOperations?: Pick<InvocationBudgetReader, 'read'>;
+  budgetOperations?: BudgetOperationsPort;
   runtimeHealth?: Pick<RuntimeHealthService, 'read'>;
   recordings?: RecordingPackService;
   dashboard?: DashboardReadService;
