@@ -12,6 +12,7 @@ import {
   probeFile,
   recordingFeedback,
   createOwnedTemp,
+  recoverOwnedTemps,
   CapacityGuard,
   CAPACITY_DEFAULTS,
 } from '@vision/media';
@@ -27,6 +28,7 @@ export class RecordingPackService {
     private readonly storage: PrivateStorage,
     private readonly probe: (file: string) => Promise<MediaProbe> = probeFile,
     private readonly capacity = new CapacityGuard(),
+    private readonly tempRoot = tmpdir(),
   ) {
     this.persistence = new Persistence(db);
   }
@@ -124,14 +126,14 @@ export class RecordingPackService {
     let workspace: Awaited<ReturnType<typeof createOwnedTemp>> | undefined;
     let assetId: string | undefined;
     try {
-      await this.capacity.require(tmpdir(), this.capacity.policy.maxUploadBytes, requestId);
+      await this.capacity.require(this.tempRoot, this.capacity.policy.maxUploadBytes, requestId);
       const r = await this.db.recordingRequest.findUniqueOrThrow({ where: { id: requestId } });
       const spec = RecordingRequestSpecSchema.parse(r.shotInstructionsJson);
       const asset = await this.persistence.transaction(actor, (u) =>
         u.recordings.beginUpload(requestId, this.storage.bucket),
       );
       assetId = asset.id;
-      workspace = await createOwnedTemp(tmpdir(), 'upload', asset.id);
+      workspace = await createOwnedTemp(this.tempRoot, 'upload', asset.id);
       const path = join(workspace.path, 'source');
       const file = await open(path, 'wx', 0o600);
       const hash = createHash('sha256');
@@ -245,23 +247,23 @@ export class RecordingPackService {
   select(actor: Actor, takeId: string, status: 'SELECTED' | 'REJECTED' | 'UPLOADED') {
     return this.persistence.transaction(actor, (u) => u.recordings.select(takeId, status));
   }
-  /** Conservative recovery: no upload resume or reuse of an ambiguously written key.
-   * Original objects remain tracked by FAILED Asset rows for private retention/diagnostics. */
+  /** Crash cleanup is allowed only after PostgreSQL already proves the upload terminal.
+   * UPLOADING rows are intentionally retained: age alone never proves another process inactive. */
   async recoverInterrupted() {
-    // Age alone does not prove that another process has stopped writing a temp directory.
-    // Local orphan reconciliation is deferred; retain the existing database recovery semantics.
-    const rows = await this.db.asset.findMany({
-      where: {
-        status: 'UPLOADING',
-        sourceType: 'RECORDING',
-        createdAt: { lt: new Date(Date.now() - 3600000) },
+    return recoverOwnedTemps(this.tempRoot, {
+      kinds: ['upload'],
+      isTerminal: async ({ operationId }) => {
+        const asset = await this.db.asset.findUnique({
+          where: { id: operationId },
+          select: { status: true, sourceType: true, sourceEntityType: true },
+        });
+        if (!asset) return false;
+        return (
+          asset.sourceType === 'RECORDING' &&
+          asset.sourceEntityType === 'RecordingRequest' &&
+          ['READY', 'FAILED', 'QUARANTINED', 'ARCHIVED'].includes(asset.status)
+        );
       },
-      take: 100,
     });
-    for (const a of rows)
-      await this.persistence.transaction({ actorType: 'SYSTEM' }, (u) =>
-        u.recordings.failUpload(a.id, 'UPLOAD_INTERRUPTED'),
-      );
-    return rows.length;
   }
 }

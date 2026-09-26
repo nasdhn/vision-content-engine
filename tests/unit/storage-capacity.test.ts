@@ -17,6 +17,7 @@ import { expect, it, vi } from 'vitest';
 import {
   CapacityGuard,
   createOwnedTemp,
+  recoverOwnedTemps,
   boundedBytes,
   materializePrivateObject,
   renderWorkingBytes,
@@ -224,6 +225,53 @@ it('does not sweep either recent or old directories merely by naming/age', async
     await expect(access(old)).resolves.toBeUndefined();
     await expect(access(recent.path)).resolves.toBeUndefined();
     await recent.cleanup();
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+it('recovers only structurally owned terminal upload/capture workspaces and never render workspaces', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'vce-capacity-test-'));
+  try {
+    const activeId = randomUUID();
+    const terminalId = randomUUID();
+    const captureId = randomUUID();
+    const renderId = randomUUID();
+    const active = await createOwnedTemp(root, 'upload', activeId, quiet);
+    const terminal = await createOwnedTemp(root, 'upload', terminalId, quiet);
+    const capture = await createOwnedTemp(root, 'capture', captureId, quiet);
+    const render = await createOwnedTemp(root, 'render', renderId, quiet);
+    const forgedId = randomUUID();
+    const forged = join(root, `vce-upload-${forgedId}-ABCdef`);
+    await mkdir(forged);
+    await writeFile(join(forged, '.vce-ephemeral-owner'), 'not-a-valid-owner');
+    const foreign = join(root, 'foreign');
+    await mkdir(foreign);
+    await writeFile(join(foreign, 'canonical'), 'keep');
+    const symlinkId = randomUUID();
+    const replaced = join(root, `vce-upload-${symlinkId}-ABCdef`);
+    await symlink(foreign, replaced);
+
+    const summary = await recoverOwnedTemps(
+      root,
+      {
+        kinds: ['upload'],
+        isTerminal: async ({ operationId }) =>
+          operationId === terminalId || operationId === forgedId || operationId === symlinkId,
+      },
+      quiet,
+    );
+
+    expect(summary).toEqual({ scanned: 4, deleted: 1, retained: 1, invalid: 2 });
+    await expect(access(terminal.path)).rejects.toThrow();
+    await expect(access(active.path)).resolves.toBeUndefined();
+    await expect(access(capture.path)).resolves.toBeUndefined();
+    await expect(access(render.path)).resolves.toBeUndefined();
+    await expect(access(forged)).resolves.toBeUndefined();
+    await expect(access(join(foreign, 'canonical'))).resolves.toBeUndefined();
+
+    await active.cleanup();
+    await capture.cleanup();
+    await render.cleanup();
   } finally {
     await rm(root, { recursive: true, force: true });
   }

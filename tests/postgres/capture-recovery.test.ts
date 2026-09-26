@@ -1,4 +1,7 @@
 import { randomUUID } from 'node:crypto';
+import { access, mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { afterAll, beforeAll, expect, it } from 'vitest';
 
@@ -8,6 +11,7 @@ import type { createDatabaseClient } from '../../packages/database/src/index.js'
 import { Leases, Persistence } from '../../packages/database/src/index.js';
 import { postgresFixture } from '../../packages/database/test/support.js';
 import { recordingGraph } from '../fixtures/recordings/support.js';
+import { createOwnedTemp } from '../../packages/media/src/index.js';
 
 const human = {
   actorType: 'USER',
@@ -290,4 +294,51 @@ it('does not touch a Capture job whose lease is still valid', async () => {
     status: 'RUNNING',
     finishedAt: null,
   });
+});
+
+it('cleans only quiescent capture workspaces and retains active, ambiguous or unknown owners', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'vce-capture-recovery-'));
+  try {
+    const terminal = await queuedCapture('entreprises à Bordeaux');
+    const active = await queuedCapture('entreprises à Strasbourg');
+    const ambiguous = await queuedCapture('entreprises à Toulouse');
+    await db.captureRun.update({
+      where: { id: terminal.entry.run.id },
+      data: { status: 'SUCCEEDED', finishedAt: new Date() },
+    });
+    await db.captureRun.update({
+      where: { id: active.entry.run.id },
+      data: { status: 'RUNNING', startedAt: new Date('2000-01-01T00:00:00Z') },
+    });
+    await db.captureRun.update({
+      where: { id: ambiguous.entry.run.id },
+      data: {
+        status: 'FAILED',
+        failureCode: 'CAPTURE_RECONCILIATION_REQUIRED',
+        finishedAt: new Date(),
+      },
+    });
+
+    const terminalWorkspace = await createOwnedTemp(root, 'capture', terminal.entry.run.id);
+    const activeWorkspace = await createOwnedTemp(root, 'capture', active.entry.run.id);
+    const ambiguousWorkspace = await createOwnedTemp(root, 'capture', ambiguous.entry.run.id);
+    const unknownWorkspace = await createOwnedTemp(root, 'capture', randomUUID());
+
+    expect(await recovery.recoverQuiescentTemps(root)).toEqual({
+      scanned: 4,
+      deleted: 1,
+      retained: 3,
+      invalid: 0,
+    });
+    await expect(access(terminalWorkspace.path)).rejects.toThrow();
+    await expect(access(activeWorkspace.path)).resolves.toBeUndefined();
+    await expect(access(ambiguousWorkspace.path)).resolves.toBeUndefined();
+    await expect(access(unknownWorkspace.path)).resolves.toBeUndefined();
+
+    await activeWorkspace.cleanup();
+    await ambiguousWorkspace.cleanup();
+    await unknownWorkspace.cleanup();
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });

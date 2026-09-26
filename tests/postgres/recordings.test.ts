@@ -1,8 +1,12 @@
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { createHash, randomUUID } from 'node:crypto';
+import { access, mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { postgresFixture } from '../../packages/database/test/support.js';
 import { Persistence, createDatabaseClient } from '../../packages/database/src/index.js';
 import { RecordingPackService } from '../../packages/application/src/recording-pack.js';
+import { createOwnedTemp } from '../../packages/media/src/index.js';
 import {
   MemoryStorage,
   chunks,
@@ -255,22 +259,45 @@ it('missing original invalidates future readiness without changing historical se
     ready: false,
   });
 });
-it('recovers interrupted uploads conservatively, rejects late completion and retains tracked orphan bytes', async () => {
-  const g = await recordingGraph(db);
-  const a = await p.transaction(human, (u) =>
-    u.recordings.beginUpload(g.request.id, storage.bucket),
-  );
-  storage.objects.set(a.objectKey, wav());
-  await db.asset.update({
-    where: { id: a.id },
-    data: { createdAt: new Date('2000-01-01T00:00:00Z') },
-  });
-  expect(await service.recoverInterrupted()).toBeGreaterThanOrEqual(1);
-  await expect(
-    p.transaction(human, (u) => u.recordings.finishUpload(a.id, {} as never, {})),
-  ).rejects.toThrow('UPLOAD_ALREADY_FINALIZED');
-  expect(storage.objects.has(a.objectKey)).toBe(true);
-  expect((await db.asset.findUniqueOrThrow({ where: { id: a.id } })).status).toBe('FAILED');
+it('never terminalizes an upload by age and only removes its temp workspace after durable terminal state', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'vce-upload-recovery-'));
+  try {
+    const recoveryService = new RecordingPackService(db, storage, undefined, undefined, root);
+    const g = await recordingGraph(db);
+    const a = await p.transaction(human, (u) =>
+      u.recordings.beginUpload(g.request.id, storage.bucket),
+    );
+    storage.objects.set(a.objectKey, wav());
+    const workspace = await createOwnedTemp(root, 'upload', a.id);
+    await db.asset.update({
+      where: { id: a.id },
+      data: { createdAt: new Date('2000-01-01T00:00:00Z') },
+    });
+
+    expect(await recoveryService.recoverInterrupted()).toEqual({
+      scanned: 1,
+      deleted: 0,
+      retained: 1,
+      invalid: 0,
+    });
+    expect((await db.asset.findUniqueOrThrow({ where: { id: a.id } })).status).toBe('UPLOADING');
+    await expect(access(workspace.path)).resolves.toBeUndefined();
+
+    await p.transaction(human, (u) => u.recordings.failUpload(a.id, 'UPLOAD_INTERRUPTED'));
+    expect(await recoveryService.recoverInterrupted()).toEqual({
+      scanned: 1,
+      deleted: 1,
+      retained: 0,
+      invalid: 0,
+    });
+    await expect(access(workspace.path)).rejects.toThrow();
+    await expect(
+      p.transaction(human, (u) => u.recordings.finishUpload(a.id, {} as never, {})),
+    ).rejects.toThrow('UPLOAD_ALREADY_FINALIZED');
+    expect(storage.objects.has(a.objectKey)).toBe(true);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 it('marks canonical capture requirements ready automatically after the matching CaptureRun succeeds', async () => {

@@ -1,6 +1,8 @@
 import type { PrismaClient } from '@vision/database';
 import { Persistence } from '@vision/database';
 import { invariant } from '@vision/domain';
+import { recoverOwnedTemps } from '@vision/media';
+import { StructuredLogger } from '@vision/observability';
 
 export const CAPTURE_RECONCILIATION_FAILURE_CODE = 'CAPTURE_RECONCILIATION_REQUIRED';
 
@@ -61,5 +63,27 @@ export class CaptureRecovery {
     }
 
     return recovered;
+  }
+
+  async recoverQuiescentTemps(root: string, limit = 100) {
+    return recoverOwnedTemps(
+      root,
+      {
+        kinds: ['capture'],
+        limit,
+        isTerminal: async ({ operationId }) => {
+          const run = await this.client.captureRun.findUnique({
+            where: { id: operationId },
+            select: { status: true, failureCode: true },
+          });
+          return Boolean(
+            run &&
+            (run.status === 'SUCCEEDED' ||
+              (run.status === 'FAILED' && run.failureCode !== CAPTURE_RECONCILIATION_FAILURE_CODE)),
+          );
+        },
+      },
+      new StructuredLogger('worker-capture'),
+    );
   }
 }
