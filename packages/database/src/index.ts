@@ -1,7 +1,7 @@
 // Generated types stay behind this database package boundary.
 export { PrismaClient, Prisma } from './generated/prisma/client.js';
 export { createDatabaseClient } from './client.js';
-export { Persistence, UnitOfWork } from './persistence.js';
+export { Persistence, UnitOfWork, RENDER_JOB_QUEUE_NAME, RENDER_JOB_TYPE } from './persistence.js';
 export { Distribution } from './distribution.js';
 export type {
   DistributionSnapshot,

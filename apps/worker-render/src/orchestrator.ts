@@ -10,8 +10,9 @@ import {
   type VideoRenderer,
 } from '@vision/application';
 import type { Prisma, PrismaClient } from '@vision/database';
-import { Persistence } from '@vision/database';
+import { Leases, RENDER_JOB_QUEUE_NAME, RENDER_JOB_TYPE } from '@vision/database';
 import { invariant } from '@vision/domain';
+import type { LeaseConfig } from '@vision/domain';
 import {
   CapacityGuard,
   createOwnedTemp,
@@ -24,7 +25,14 @@ import {
   type PrivateStorage,
 } from '@vision/media';
 
-const workerActor = (workerId: string) => ({ actorType: 'WORKER', actorId: workerId }) as const;
+export const DEFAULT_RENDER_JOB_LEASE = Object.freeze({
+  durationMs: 120_000,
+  heartbeatIntervalMs: 15_000,
+}) satisfies LeaseConfig;
+
+function staleLease(error: unknown) {
+  return error instanceof Error && error.message === 'STALE_LEASE';
+}
 
 function safeExtension(objectKey: string, mimeType: string | null, kind: string) {
   const ext = extname(objectKey).toLowerCase();
@@ -144,8 +152,9 @@ export type RenderWorkerExecutionResult = Readonly<{
 }>;
 
 export class RenderWorkerOrchestrator {
-  private readonly persistence: Persistence;
   private readonly payloadBuilder: RenderPayloadBuilder;
+  private readonly leases: Leases;
+  private readonly leaseConfig: LeaseConfig;
 
   constructor(
     private readonly db: PrismaClient,
@@ -157,14 +166,16 @@ export class RenderWorkerOrchestrator {
       storageProvider: string;
       workRoot: string;
       capacity?: CapacityGuard;
+      leaseConfig?: LeaseConfig;
     }>,
   ) {
     invariant(options.workerId.trim(), 'WORKER_REQUIRED');
     invariant(options.workerVersion.trim(), 'WORKER_VERSION_REQUIRED');
     invariant(options.storageProvider.trim(), 'STORAGE_PROVIDER_REQUIRED');
     invariant(options.workRoot.trim(), 'WORK_ROOT_REQUIRED');
-    this.persistence = new Persistence(db);
     this.payloadBuilder = new RenderPayloadBuilder(db);
+    this.leaseConfig = options.leaseConfig ?? DEFAULT_RENDER_JOB_LEASE;
+    this.leases = new Leases(db, this.leaseConfig, {});
   }
 
   async execute(input: {
@@ -179,23 +190,104 @@ export class RenderWorkerOrchestrator {
     );
   }
 
+  private async completedResult(input: {
+    renderId: string;
+    renderAttemptId: string;
+  }): Promise<RenderWorkerExecutionResult> {
+    const attempt = await this.db.renderAttempt.findUniqueOrThrow({
+      where: { id: input.renderAttemptId },
+    });
+    invariant(attempt.renderId === input.renderId, 'RENDER_ATTEMPT_LINEAGE_MISMATCH');
+    invariant(
+      attempt.status === 'SUCCEEDED' &&
+        attempt.outputAssetId !== null &&
+        attempt.technicalQaJson !== null,
+      'RENDER_JOB_STATE_MISMATCH',
+    );
+    return {
+      renderId: input.renderId,
+      renderAttemptId: input.renderAttemptId,
+      outputAssetId: attempt.outputAssetId,
+      technicalQa: attempt.technicalQaJson,
+      diagnostics: { replayed: true },
+    };
+  }
+
   private async executeJob(input: {
     renderId: string;
     renderAttemptId: string;
     signal?: AbortSignal;
   }): Promise<RenderWorkerExecutionResult> {
-    const actor = workerActor(this.options.workerId);
     for (const id of [input.renderId, input.renderAttemptId])
       invariant(/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(id), 'INVALID_TEMP_OWNER');
+
+    const [renderIdentity, attemptIdentity] = await Promise.all([
+      this.db.render.findUniqueOrThrow({ where: { id: input.renderId } }),
+      this.db.renderAttempt.findUniqueOrThrow({ where: { id: input.renderAttemptId } }),
+    ]);
+    invariant(attemptIdentity.renderId === input.renderId, 'RENDER_ATTEMPT_LINEAGE_MISMATCH');
+    const pairedJob = await this.db.jobAttempt.findUniqueOrThrow({
+      where: {
+        operationId_attemptNumber_jobType: {
+          operationId: renderIdentity.operationId,
+          attemptNumber: attemptIdentity.attemptNumber,
+          jobType: RENDER_JOB_TYPE,
+        },
+      },
+    });
+    const jobAttemptId = pairedJob.id;
+
+    const claim = await this.leases.claimJobById(
+      jobAttemptId,
+      this.options.workerId,
+      'SAFE_RETRY',
+      {
+        queueName: RENDER_JOB_QUEUE_NAME,
+        jobType: RENDER_JOB_TYPE,
+        operationId: renderIdentity.operationId,
+        workflowRunId: null,
+      },
+    );
+    if (claim.kind === 'ALREADY_DONE') return this.completedResult(input);
+    if (claim.kind === 'BUSY') throw new Error('RENDER_JOB_BUSY');
+    if (claim.kind === 'TERMINAL') throw new Error('RENDER_JOB_TERMINAL');
+    if (claim.kind === 'RECOVERY_REQUIRED') throw new Error('RENDER_JOB_RECOVERY_REQUIRED');
+
+    const leaseToken = claim.job.leaseToken;
+    invariant(leaseToken, 'STALE_LEASE');
+
     const capacity =
       this.options.capacity ??
       new CapacityGuard(undefined, undefined, new StructuredLogger('worker-render'));
     let workspace: Awaited<ReturnType<typeof createOwnedTemp>> | undefined;
     let outputAssetId: string | null = null;
     let technicalQa: Prisma.InputJsonValue | undefined;
+    let heartbeatFailure: unknown = null;
+    const leaseAbort = new AbortController();
+    const failHeartbeat = (error: unknown) => {
+      heartbeatFailure ??= error;
+      if (!leaseAbort.signal.aborted) leaseAbort.abort(error);
+    };
+    const heartbeat = async () => {
+      if (heartbeatFailure) throw heartbeatFailure;
+      try {
+        await this.leases.heartbeatJob(jobAttemptId, leaseToken);
+      } catch (error) {
+        failHeartbeat(error);
+        throw error;
+      }
+      if (heartbeatFailure) throw heartbeatFailure;
+    };
+    const timer = setInterval(() => {
+      void this.leases
+        .heartbeatJob(jobAttemptId, leaseToken)
+        .catch((error: unknown) => failHeartbeat(error));
+    }, this.leaseConfig.heartbeatIntervalMs);
+    timer.unref?.();
 
     try {
-      await this.persistence.transaction(actor, (unit) =>
+      await heartbeat();
+      await this.leases.withJobLease(jobAttemptId, leaseToken, (unit) =>
         unit.startRenderAttempt(input.renderId, input.renderAttemptId),
       );
 
@@ -273,11 +365,16 @@ export class RenderWorkerOrchestrator {
         resolvedAssets,
       });
 
+      await heartbeat();
+      const renderSignal = input.signal
+        ? AbortSignal.any([input.signal, leaseAbort.signal])
+        : leaseAbort.signal;
       const rendered = await this.renderer.render(payload, {
         workDir,
         capacity,
-        ...(input.signal ? { signal: input.signal } : {}),
+        signal: renderSignal,
       });
+      await heartbeat();
 
       const outputStat = await stat(rendered.outputPath).catch(() => null);
       invariant(
@@ -290,12 +387,12 @@ export class RenderWorkerOrchestrator {
       );
       const outputSizeBytes = await capacity.file(rendered.outputPath);
 
-      await this.persistence.transaction(actor, (unit) =>
+      await this.leases.withJobLease(jobAttemptId, leaseToken, (unit) =>
         unit.enterRenderTechnicalQa(input.renderId, input.renderAttemptId),
       );
 
       const objectKey = `renders/${input.renderId}/attempts/${attempt.attemptNumber}/master.mp4`;
-      const outputAsset = await this.persistence.transaction(actor, (unit) =>
+      const outputAsset = await this.leases.withJobLease(jobAttemptId, leaseToken, (unit) =>
         unit.reserveRenderOutputAsset(input.renderAttemptId, {
           storageProvider: this.options.storageProvider,
           bucket: this.storage.bucket,
@@ -332,18 +429,10 @@ export class RenderWorkerOrchestrator {
       const qaJson = qa as unknown as Prisma.InputJsonValue;
       technicalQa = qaJson;
 
-      if (qa.result !== 'PASS') {
-        await this.persistence.transaction(actor, async (unit) => {
-          await unit.markRenderOutputAssetFailed(outputAsset.id);
-          await unit.failRenderAttempt(input.renderId, input.renderAttemptId, {
-            failureCode: 'TECHNICAL_QA_FAILED',
-            technicalQaJson: qaJson,
-          });
-        });
-        throw new Error('TECHNICAL_QA_FAILED');
-      }
+      if (qa.result !== 'PASS') throw new Error('TECHNICAL_QA_FAILED');
 
       const checksumSha256 = await sha256File(rendered.outputPath);
+      await heartbeat();
       await reconcileImmutableUpload({
         storage: this.storage,
         objectKey,
@@ -357,28 +446,35 @@ export class RenderWorkerOrchestrator {
 
       invariant(outputProbe.video, 'OUTPUT_PROBE_FAILED');
 
-      await this.persistence.transaction(actor, async (unit) => {
-        await unit.markRenderOutputAssetReady(outputAsset.id, {
-          checksumSha256,
-          sizeBytes: BigInt(outputSizeBytes),
-          width: outputProbe.video!.width,
-          height: outputProbe.video!.height,
-          durationMs: outputProbe.durationMs,
-          fps: outputProbe.video!.fps,
-          ...(outputProbe.audio
-            ? {
-                audioChannels: outputProbe.audio.channels,
-                sampleRate: outputProbe.audio.sampleRate,
-              }
-            : {}),
-        });
-        await unit.succeedRenderAttempt(
-          input.renderId,
-          input.renderAttemptId,
-          outputAsset.id,
-          qaJson,
-        );
-      });
+      await heartbeat();
+      await this.leases.finishJob(
+        jobAttemptId,
+        leaseToken,
+        'SUCCEEDED',
+        undefined,
+        async (unit) => {
+          await unit.markRenderOutputAssetReady(outputAsset.id, {
+            checksumSha256,
+            sizeBytes: BigInt(outputSizeBytes),
+            width: outputProbe.video!.width,
+            height: outputProbe.video!.height,
+            durationMs: outputProbe.durationMs,
+            fps: outputProbe.video!.fps,
+            ...(outputProbe.audio
+              ? {
+                  audioChannels: outputProbe.audio.channels,
+                  sampleRate: outputProbe.audio.sampleRate,
+                }
+              : {}),
+          });
+          await unit.succeedRenderAttempt(
+            input.renderId,
+            input.renderAttemptId,
+            outputAsset.id,
+            qaJson,
+          );
+        },
+      );
 
       return {
         renderId: input.renderId,
@@ -388,31 +484,27 @@ export class RenderWorkerOrchestrator {
         diagnostics: rendered.diagnostics,
       };
     } catch (error) {
-      const attempt = await this.db.renderAttempt.findUnique({
-        where: { id: input.renderAttemptId },
+      if (staleLease(error)) throw error;
+
+      const outputAsset = outputAssetId
+        ? await this.db.asset.findUnique({ where: { id: outputAssetId } })
+        : null;
+      const code = failureCode(error);
+
+      await this.leases.finishJob(jobAttemptId, leaseToken, 'FAILED', code, async (unit) => {
+        if (outputAssetId && outputAsset?.status === 'UPLOADING')
+          await unit.markRenderOutputAssetFailed(outputAssetId);
+        await unit.failRenderAttempt(input.renderId, input.renderAttemptId, {
+          failureCode: code,
+          failureMessage: code,
+          ...(technicalQa !== undefined ? { technicalQaJson: technicalQa } : {}),
+        });
       });
-
-      if (attempt && (attempt.status === 'QUEUED' || attempt.status === 'RUNNING')) {
-        const outputAsset = outputAssetId
-          ? await this.db.asset.findUnique({ where: { id: outputAssetId } })
-          : null;
-
-        await this.persistence
-          .transaction(actor, async (unit) => {
-            if (outputAssetId && outputAsset?.status === 'UPLOADING')
-              await unit.markRenderOutputAssetFailed(outputAssetId);
-
-            await unit.failRenderAttempt(input.renderId, input.renderAttemptId, {
-              failureCode: failureCode(error),
-              failureMessage: failureCode(error),
-              ...(technicalQa !== undefined ? { technicalQaJson: technicalQa } : {}),
-            });
-          })
-          .catch(() => undefined);
-      }
 
       throw error;
     } finally {
+      clearInterval(timer);
+      leaseAbort.abort();
       await workspace?.cleanup();
     }
   }

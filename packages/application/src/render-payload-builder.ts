@@ -68,7 +68,12 @@ export class RenderPayloadBuilder {
     );
 
     invariant(render.editingPlanVersion.editingPlan.status === 'READY', 'EDITING_PLAN_NOT_READY');
-    invariant(render.status === 'QUEUED' || render.status === 'RENDERING', 'RENDER_NOT_ACTIVE');
+    invariant(
+      render.status === 'QUEUED' ||
+        render.status === 'RENDERING' ||
+        render.status === 'TECHNICAL_QA',
+      'RENDER_NOT_ACTIVE',
+    );
 
     const plan = EditingPlanSpecSchema.parse(render.editingPlanVersion.planSpecJson);
     const template = TemplateRuntimeContractSchema.parse(

@@ -591,31 +591,33 @@ it('pins exact RenderInputAssets and compiles a deterministic RenderPayload', as
     ),
   ).rejects.toThrow('ACTIVE_RENDER_ATTEMPT_EXISTS');
 
+  const resolvedAssets = [
+    {
+      assetId: data.productAsset.id,
+      localUri: `/render-work/${renderAttempt.id}/product.mp4`,
+      kind: 'VIDEO' as const,
+      probe: {
+        assetId: data.productAsset.id,
+        container: 'mp4',
+        durationMs: 10_000,
+        video: {
+          codec: 'h264',
+          width: 1080,
+          height: 1920,
+          fps: 30,
+          color: {
+            hdrKind: 'SDR' as const,
+          },
+        },
+        probeVersion: 'fixture-v1',
+      },
+    },
+  ];
+
   const payload = await new RenderPayloadBuilder(db).build({
     renderId: render.id,
     renderAttemptId: renderAttempt.id,
-    resolvedAssets: [
-      {
-        assetId: data.productAsset.id,
-        localUri: `/render-work/${renderAttempt.id}/product.mp4`,
-        kind: 'VIDEO',
-        probe: {
-          assetId: data.productAsset.id,
-          container: 'mp4',
-          durationMs: 10_000,
-          video: {
-            codec: 'h264',
-            width: 1080,
-            height: 1920,
-            fps: 30,
-            color: {
-              hdrKind: 'SDR',
-            },
-          },
-          probeVersion: 'fixture-v1',
-        },
-      },
-    ],
+    resolvedAssets,
   });
 
   expect(renderAttempt).toMatchObject({
@@ -624,6 +626,23 @@ it('pins exact RenderInputAssets and compiles a deterministic RenderPayload', as
     status: 'QUEUED',
     workerVersion: 'render-worker-fixture-v1',
     rendererVersion: 'v1',
+  });
+
+  const renderJob = await db.jobAttempt.findUniqueOrThrow({
+    where: {
+      operationId_attemptNumber_jobType: {
+        operationId: render.operationId,
+        attemptNumber: renderAttempt.attemptNumber,
+        jobType: 'RENDER',
+      },
+    },
+  });
+  expect(renderJob).toMatchObject({
+    queueName: 'render',
+    jobType: 'RENDER',
+    operationId: render.operationId,
+    attemptNumber: renderAttempt.attemptNumber,
+    status: 'QUEUED',
   });
 
   expect(result.output.kind).toBe('PLAN');
@@ -638,6 +657,21 @@ it('pins exact RenderInputAssets and compiles a deterministic RenderPayload', as
     codecProfileKey: 'SOCIAL_H264_AAC_V1',
     audioProfileKey: 'SOCIAL_VOICE_MASTER_V1',
   });
+
+  const renderWorker = { actorType: 'WORKER', actorId: 'render-worker-fixture' } as const;
+  await persistence.transaction(renderWorker, (unit) =>
+    unit.startRenderAttempt(render.id, renderAttempt.id),
+  );
+  await persistence.transaction(renderWorker, (unit) =>
+    unit.enterRenderTechnicalQa(render.id, renderAttempt.id),
+  );
+  await expect(
+    new RenderPayloadBuilder(db).build({
+      renderId: render.id,
+      renderAttemptId: renderAttempt.id,
+      resolvedAssets,
+    }),
+  ).resolves.toEqual(payload);
 });
 
 it('refuses Render intent when a previously selected input Asset is no longer READY', async () => {

@@ -34,6 +34,9 @@ import { Distribution } from './distribution.js';
 import { AnalyticsRuntime } from './analytics.js';
 import { Learning } from './learning.js';
 
+export const RENDER_JOB_QUEUE_NAME = 'render';
+export const RENDER_JOB_TYPE = 'RENDER';
+
 export class UnitOfWork {
   readonly recordings: Recordings;
   readonly captures: Captures;
@@ -771,16 +774,27 @@ export class UnitOfWork {
       },
     });
 
+    const attemptNumber = (latest._max.attemptNumber ?? 0) + 1;
     const attempt = await this.tx.renderAttempt.create({
       data: {
         renderId,
-        attemptNumber: (latest._max.attemptNumber ?? 0) + 1,
+        attemptNumber,
         workerVersion,
         rendererVersion: render.editingPlanVersion.templateVersion.rendererVersion,
       },
     });
 
+    const job = await this.tx.jobAttempt.create({
+      data: {
+        queueName: RENDER_JOB_QUEUE_NAME,
+        jobType: RENDER_JOB_TYPE,
+        operationId: render.operationId,
+        attemptNumber,
+      },
+    });
+
     await changed(this.tx, this.actor, 'RenderAttempt.created', 'RenderAttempt', attempt.id);
+    await changed(this.tx, this.actor, 'JobAttempt.queued', 'JobAttempt', job.id);
 
     return attempt;
   }
@@ -800,7 +814,11 @@ export class UnitOfWork {
 
     invariant(attempt.renderId === renderId, 'RENDER_ATTEMPT_LINEAGE_MISMATCH');
 
-    if (render.status === 'RENDERING' && attempt.status === 'RUNNING') return attempt;
+    if (
+      (render.status === 'RENDERING' || render.status === 'TECHNICAL_QA') &&
+      attempt.status === 'RUNNING'
+    )
+      return attempt;
 
     invariant(render.status === 'QUEUED', 'RENDER_NOT_QUEUEABLE');
     invariant(attempt.status === 'QUEUED', 'RENDER_ATTEMPT_NOT_QUEUEABLE');

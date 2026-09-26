@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { postgresFixture } from '../../packages/database/test/support.js';
+import { Persistence } from '../../packages/database/src/index.js';
 import { CapacityGuard } from '../../packages/media/src/index.js';
 import { StructuredLogger } from '../../packages/observability/src/index.js';
 import { RecordingPackService } from '../../packages/application/src/recording-pack.js';
@@ -94,15 +95,19 @@ async function renderGraph() {
   const render = await db.render.create({
     data: { editingPlanVersionId: version.id, status: 'QUEUED' },
   });
-  const attempt = await db.renderAttempt.create({
-    data: {
-      renderId: render.id,
-      attemptNumber: 1,
-      workerVersion: 'capacity-fixture',
-      rendererVersion: 'v1',
+  const attempt = await new Persistence(db).transaction(human, (unit) =>
+    unit.createRenderAttempt(render.id, 'capacity-fixture'),
+  );
+  const job = await db.jobAttempt.findUniqueOrThrow({
+    where: {
+      operationId_attemptNumber_jobType: {
+        operationId: render.operationId,
+        attemptNumber: attempt.attemptNumber,
+        jobType: 'RENDER',
+      },
     },
   });
-  return { renderId: render.id, renderAttemptId: attempt.id };
+  return { renderId: render.id, renderAttemptId: attempt.id, jobAttemptId: job.id };
 }
 it('denies a render before materialization/renderer and finalizes the attempt as failed', async () => {
   const ids = await renderGraph();
@@ -129,6 +134,9 @@ it('denies a render before materialization/renderer and finalizes the attempt as
     expect(await readdir(root)).toEqual([]);
     expect(
       await fixture.client.renderAttempt.findUnique({ where: { id: ids.renderAttemptId } }),
+    ).toMatchObject({ status: 'FAILED', failureCode: 'INSUFFICIENT_LOCAL_CAPACITY' });
+    expect(
+      await fixture.client.jobAttempt.findUnique({ where: { id: ids.jobAttemptId } }),
     ).toMatchObject({ status: 'FAILED', failureCode: 'INSUFFICIENT_LOCAL_CAPACITY' });
     await expect(worker.execute({ ...ids, renderAttemptId: '../../foreign' })).rejects.toThrow();
     expect(await readdir(root)).toEqual([]);
@@ -171,6 +179,9 @@ it.each(['ARTIFACT_TOO_LARGE', 'FFMPEG_FAILED'])(
       expect(storage.objects.size).toBe(1);
       expect(
         await fixture.client.renderAttempt.findUnique({ where: { id: ids.renderAttemptId } }),
+      ).toMatchObject({ status: 'FAILED', failureCode: failure });
+      expect(
+        await fixture.client.jobAttempt.findUnique({ where: { id: ids.jobAttemptId } }),
       ).toMatchObject({ status: 'FAILED', failureCode: failure });
     } finally {
       build.mockRestore();
