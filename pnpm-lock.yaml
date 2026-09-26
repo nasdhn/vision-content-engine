@@ -160,6 +160,9 @@ importers:
 
   apps/worker-ai:
     dependencies:
+      '@vision/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
       '@vision/application':
         specifier: workspace:*
         version: link:../../packages/application
@@ -175,6 +178,9 @@ importers:
       '@vision/observability':
         specifier: workspace:*
         version: link:../../packages/observability
+      '@vision/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       bullmq:
         specifier: 6.3.8
         version: 6.3.8(ioredis@5.11.1)(pg@8.23.0)

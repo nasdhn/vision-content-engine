@@ -1,6 +1,6 @@
 # Phase 11A — Generation Progressive Activation
 
-**Status:** 11A-3 real canary passed; controlled generation runtime activation pending.
+**Status:** 11A-4A runtime composition candidate; 11A-3 real canary passed.
 
 Phase 11 activates capabilities progressively. Generation is the first
 capability in the frozen Phase 11 order.
@@ -286,3 +286,88 @@ Therefore:
 - 11A-3 real canary: **DONE**;
 - normal generation runtime activation: **PENDING**;
 - capture activation: **NOT STARTED**.
+
+## 11A-4A — fail-closed normal generation composition
+
+11A-4A introduces the normal generation composition root in `worker-ai`
+without yet introducing a generation planner, queue consumer or user-facing
+trigger.
+
+The composition is:
+
+```text
+GroqStructuredProvider
+        ↓
+AIProviderGateway
+        ↓
+AIContentService
+```
+
+`createAIGenerationRuntime()` is side-effect free at construction time:
+
+- it does not resolve `GROQ_API_KEY`;
+- it does not contact Groq;
+- it does not access PostgreSQL.
+
+The Groq credential remains a runtime-only lazy capability supplied through
+the existing `SecretResolver`.
+
+The gateway receives live predicates for:
+
+- `PAUSE_AI_GENERATION`;
+- `isRealProviderActivationEnabled(config)`.
+
+Registering the real adapter therefore does not itself authorize execution.
+
+The default LOCAL configuration remains protected first by
+`AI_GENERATION_PAUSED`.
+
+A separate non-LOCAL, unpaused configuration with
+`VCE_REAL_PROVIDERS_ENABLED=false` is rejected with
+`REAL_PROVIDERS_DISABLED`.
+
+Both safety barriers are verified before:
+
+- durable ModelInvocation reservation;
+- PostgreSQL access;
+- Groq credential resolution;
+- provider networking.
+
+Construction with an explicitly enabled non-LOCAL configuration is also
+verified to remain lazy: merely composing the runtime performs no database,
+secret or network access.
+
+11A-4A adds no:
+
+- provider call;
+- provider cost;
+- database schema or migration;
+- JobAttempt;
+- WorkflowRun;
+- BullMQ queue;
+- API route;
+- capture activation;
+- render activation;
+- distribution activation.
+
+### Remaining 11A-4B boundary
+
+Normal asynchronous Creator execution is still pending.
+
+The existing repository already defines and tests the canonical durable AI
+execution identity:
+
+- queue name `ai`;
+- job type `AI`;
+- recovery policy `SAFE_RETRY`;
+- JobAttempt lease fencing;
+- atomic AIContentService result persistence with job completion.
+
+The frozen workflow specification requires a new immutable BriefVersion
+snapshot before each concept-generation request.
+
+11A-4B must introduce the smallest durable planner/worker path that
+reconstructs Creator options from canonical PostgreSQL state and executes the
+existing AIContentService under the `ai` job lease.
+
+11A-4B must not make queue transport canonical and must not activate Capture.

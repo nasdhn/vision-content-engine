@@ -177,3 +177,5 @@ export function createBullMqWeeklyAnalysisWorker(input: {
   );
   return observeWorkerLifecycle(worker, 'worker-ai', input.probes);
 }
+
+export * from './generation-runtime.js';

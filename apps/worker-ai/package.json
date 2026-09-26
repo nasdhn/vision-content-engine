@@ -6,11 +6,13 @@
   "license": "UNLICENSED",
   "exports": "./src/index.ts",
   "dependencies": {
+    "@vision/ai": "workspace:*",
     "@vision/application": "workspace:*",
     "@vision/contracts": "workspace:*",
     "@vision/database": "workspace:*",
     "@vision/domain": "workspace:*",
-    "bullmq": "6.3.8",
-    "@vision/observability": "workspace:*"
+    "@vision/observability": "workspace:*",
+    "@vision/shared": "workspace:*",
+    "bullmq": "6.3.8"
   }
 }
