@@ -165,3 +165,70 @@ It must require:
 8. immediate re-pause after completion.
 
 11A-3 must never be part of normal CI or ordinary release smoke.
+
+## 11A-3 — explicit low-cost canary harness
+
+11A-3 uses a dedicated operational harness:
+
+- `pnpm canary:ai:groq --dry-run`
+- `pnpm canary:ai:groq --execute`
+
+Dry-run is the default and performs no provider network call.
+
+Real execution requires both:
+
+- `AI_CANARY_CONFIRM=EXECUTE_ONE_GROQ_CALL`;
+- `GROQ_API_KEY` supplied by the current shell.
+
+The harness rejects `GROQ_API_KEY` if it is stored in the local `.env`.
+The repository and persistent `.env` remain fail-closed:
+
+- `VCE_ENV=LOCAL`;
+- `VCE_REAL_PROVIDERS_ENABLED=false`;
+- `PAUSE_AI_GENERATION=true`.
+
+For the isolated process only, the execution harness constructs a reviewed
+ephemeral `STAGING_CAPTURE` runtime configuration with:
+
+- real providers enabled;
+- AI generation unpaused.
+
+No persistent configuration is changed.
+
+The canary is pinned to:
+
+- provider `groq`;
+- model `openai/gpt-oss-120b`;
+- reasoning `low`;
+- one provider attempt;
+- 20,000 maximum input tokens;
+- 1,024 maximum output tokens;
+- 30 second gateway timeout;
+- `$0.01 USD` absolute reservation/budget ceiling;
+- no fallback provider.
+
+Before execution, the provider's conservative estimator must remain within the
+same hard USD ceiling.
+
+The canary uses the isolated active KnowledgeSnapshot key
+`phase11-ai-canary`.
+
+The real call traverses `AIProviderGateway` and the normal
+`InvocationRepository` lifecycle so that provider, model, token usage, attempt
+status and actual cost are durably accounted.
+
+The harness invokes the Creator contract directly and does not call
+`AIContentService`, therefore the canary must not create Concept or
+ConceptVersion business records.
+
+A successful real canary requires:
+
+- exactly one ModelInvocationAttempt;
+- the pinned Groq provider/model;
+- a successful ModelInvocation;
+- actual USD usage below the hard ceiling;
+- exactly one AI CostEntry;
+- zero linked ConceptVersion rows.
+
+The real `--execute` command is never part of normal CI, normal release smoke,
+or broad regression.
