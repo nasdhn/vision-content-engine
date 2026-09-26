@@ -57,7 +57,8 @@
     "check:phase10h": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm check:secrets && pnpm exec vitest run tests/unit/backup-restore.test.ts",
     "check:phase10i": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm check:secrets && pnpm exec vitest run tests/unit/config.test.ts && pnpm exec vitest run --config vitest.postgres.config.ts tests/postgres/distribution-runtime.test.ts tests/postgres/analytics-runtime.test.ts tests/postgres/capture-orchestrator.test.ts tests/postgres/render-recovery.test.ts tests/postgres/weekly-analysis.test.ts",
     "test:release-smoke": "tsx scripts/release-smoke.ts",
-    "check:phase10j": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm check:secrets && pnpm exec vitest run tests/unit/config.test.ts && pnpm test:health:runtime && pnpm test:distribution:runtime && pnpm test:analytics:runtime && pnpm test:learning:runtime && pnpm test:release-smoke"
+    "check:phase10j": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm check:secrets && pnpm exec vitest run tests/unit/config.test.ts && pnpm test:health:runtime && pnpm test:distribution:runtime && pnpm test:analytics:runtime && pnpm test:learning:runtime && pnpm test:release-smoke",
+    "check:phase10": "pnpm check:phase9 && pnpm check:phase10j"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
