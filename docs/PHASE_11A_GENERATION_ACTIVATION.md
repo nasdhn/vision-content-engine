@@ -1,6 +1,6 @@
 # Phase 11A — Generation Progressive Activation
 
-**Status:** 11A-2 implementation candidate.
+**Status:** 11A-3 real canary passed; controlled generation runtime activation pending.
 
 Phase 11 activates capabilities progressively. Generation is the first
 capability in the frozen Phase 11 order.
@@ -232,3 +232,57 @@ A successful real canary requires:
 
 The real `--execute` command is never part of normal CI, normal release smoke,
 or broad regression.
+
+## 11A-3 real canary evidence — 2026-09-26
+
+The first real Groq generation canary completed successfully from harness
+baseline commit:
+
+`c1d6c78a830dcc3899d755d7c1ee34bba8f2e5e3`
+
+Durable execution evidence:
+
+- ModelInvocation:
+  `d21caffa-93bc-47cf-a4ba-60f655a47ca7`;
+- invocation status: `SUCCEEDED`;
+- invocation attempt count: `1`;
+- attempt status: `SUCCEEDED`;
+- provider: `groq`;
+- model: `openai/gpt-oss-120b`;
+- reasoning level: `low`;
+- actual input tokens: `1839`;
+- actual output tokens: `369`;
+- cached input tokens: `0`;
+- actual provider cost: `$0.00049725 USD`;
+- durable CostEntry: `$0.00049725 USD`;
+- hard canary budget ceiling: `$0.01 USD`;
+- linked ConceptVersion rows: `0`.
+
+The conservative pre-call adapter estimate for the exact harness request was
+`$0.00229320 USD`, remaining below the `$0.01 USD` hard ceiling before the
+provider was invoked.
+
+The real execution used exactly one provider attempt and no fallback.
+
+After execution:
+
+- `GROQ_API_KEY` was removed from the canary shell;
+- no Groq credential was written to `.env`;
+- persistent `.env` remained `LOCAL`, AI-paused and real-provider-disabled;
+- repository HEAD and worktree remained unchanged by the provider call.
+
+This evidence establishes that the reviewed Groq adapter, real-provider gate,
+AIProviderGateway, InvocationRepository, token accounting and durable cost
+accounting operate successfully against one real provider request.
+
+It does **not** establish normal application generation activation.
+
+The dedicated canary harness invokes the Creator contract directly. The normal
+API/worker composition still does not register Groq as the generation provider
+for ordinary Creator / Creative Director execution.
+
+Therefore:
+
+- 11A-3 real canary: **DONE**;
+- normal generation runtime activation: **PENDING**;
+- capture activation: **NOT STARTED**.
