@@ -9,6 +9,7 @@ export const SECRET_IDS = [
   'S3_SECRET_ACCESS_KEY',
   'VCE_LOCAL_ACCESS_KEY',
   'VCE_VISION_ATTRIBUTION_INGEST_SECRET',
+  'GROQ_API_KEY',
   'INSTAGRAM_ACCESS_TOKEN',
   'YOUTUBE_ACCESS_TOKEN',
   'UMAMI_BEARER_TOKEN',
@@ -64,6 +65,10 @@ function required(secrets: SecretResolver, id: SecretId) {
   } catch {
     throw new Error('REQUIRED_SECRET_UNAVAILABLE');
   }
+}
+
+export function groqApiKeyProvider(secrets: SecretResolver) {
+  return () => required(secrets, 'GROQ_API_KEY');
 }
 
 export function accountCredentialResolver(

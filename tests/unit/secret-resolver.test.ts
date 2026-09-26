@@ -7,6 +7,7 @@ import {
   EnvironmentSecretResolver,
   accountCredentialResolver,
   captureAuthStateProvider,
+  groqApiKeyProvider,
   s3CredentialProvider,
   umamiCredentialResolver,
 } from '../../packages/shared/src/secrets.js';
@@ -67,13 +68,15 @@ describe('Phase 10B secret boundary', () => {
         'website-1',
       );
       const storage = s3CredentialProvider(resolver);
+      const groq = groqApiKeyProvider(resolver);
       expect(resolve).not.toHaveBeenCalled();
       await expect(account.resolve('other-account')).rejects.toThrow('CREDENTIAL_ACCOUNT_MISMATCH');
       expect(resolve).not.toHaveBeenCalled();
       expect((await account.resolve('account-1')).accessToken).toBe(sentinel);
       expect(umami.resolve().bearerToken).toBe(sentinel);
       expect((await storage()).secretAccessKey).toBe(sentinel);
-      expect(resolve.mock.calls).toHaveLength(4);
+      expect(groq()).toBe(sentinel);
+      expect(resolve.mock.calls).toHaveLength(5);
       expect(log).not.toHaveBeenCalled();
       expect(error).not.toHaveBeenCalled();
     } finally {
@@ -92,6 +95,7 @@ describe('Phase 10B secret boundary', () => {
       accountCredentialResolver(resolver, 'INSTAGRAM_ACCESS_TOKEN', 'account').resolve('account'),
     ).rejects.toThrow('REQUIRED_SECRET_UNAVAILABLE');
     await expect(s3CredentialProvider(resolver)()).rejects.toThrow('REQUIRED_SECRET_UNAVAILABLE');
+    expect(() => groqApiKeyProvider(resolver)()).toThrow('REQUIRED_SECRET_UNAVAILABLE');
     expect(() => umamiCredentialResolver(resolver, 'endpoint', 'site').resolve()).toThrow(
       'REQUIRED_SECRET_UNAVAILABLE',
     );
