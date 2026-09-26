@@ -20,6 +20,7 @@ import {
 } from '../../packages/database/src/index.js';
 import { postgresFixture } from '../../packages/database/test/support.js';
 import { WeeklyAnalysisWorkerOrchestrator } from '../../apps/worker-ai/src/index.js';
+import { WeeklyAnalysisOutboxDispatcher } from '../../apps/control/src/index.js';
 import { recordingGraph } from '../fixtures/recordings/support.js';
 import { FakeAIProvider, reply } from '../support/ai-provider.js';
 
@@ -474,4 +475,56 @@ it('fails hard-validation output without persisting Insight or Recommendation', 
       where: { action: 'ModelInvocation.applied', subjectId: planned.operationId },
     }),
   ).toBe(0);
+});
+
+it('pauses weekly AI before outbox claim, JobAttempt claim or ModelInvocation creation', async () => {
+  const knowledgeSnapshot = await knowledge();
+  const repository = new WeeklyAnalysisRepository(fixture.client, leaseConfig);
+  const planned = await repository.plan(
+    planInput(knowledgeSnapshot, '2026-11-02T00:00:00.000Z', '2026-11-09T00:00:00.000Z'),
+  );
+  const job = await queuedJob(planned.jobAttemptId);
+  const dispatched: unknown[] = [];
+  const dispatcher = new WeeklyAnalysisOutboxDispatcher(
+    fixture.client,
+    leaseConfig,
+    {
+      enqueue: async (candidate) => {
+        dispatched.push(candidate);
+      },
+    },
+    'phase10i-weekly-dispatcher',
+  );
+
+  await expect(dispatcher.dispatchOne(true)).resolves.toEqual({ kind: 'PAUSED' });
+  expect(dispatched).toHaveLength(0);
+  expect(
+    await fixture.client.outboxEvent.findUniqueOrThrow({ where: { id: job.outboxEventId } }),
+  ).toMatchObject({
+    status: 'PENDING',
+    claimOwner: null,
+    claimToken: null,
+  });
+
+  const provider = FakeAIProvider.scripted([reply(analystOutput(randomUUID()))]);
+  const runtime = new AnalystRuntime(
+    new AIProviderGateway(new InvocationRepository(fixture.client), [provider], () => false),
+  );
+  const worker = new WeeklyAnalysisWorkerOrchestrator(fixture.client, runtime, {
+    workerId: 'phase10i-weekly-paused',
+    leaseConfig,
+    paused: () => true,
+  });
+
+  await expect(worker.process(job)).resolves.toEqual({ kind: 'PAUSED' });
+  expect(
+    await fixture.client.jobAttempt.findUniqueOrThrow({ where: { id: planned.jobAttemptId } }),
+  ).toMatchObject({
+    status: 'QUEUED',
+    workerId: null,
+    leaseToken: null,
+  });
+  expect(await fixture.client.modelInvocation.count({ where: { id: planned.operationId } })).toBe(
+    0,
+  );
 });

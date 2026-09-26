@@ -647,6 +647,66 @@ it('leaves canonical state unfinished for RECONCILE when the lease is lost durin
   ).toBe(0);
 });
 
+it('pauses capture before durable claim, browser execution or canonical transition', async () => {
+  const { queued } = await queueQueries(['phase10i capture pause']);
+  const target = queued[0]!;
+  let executed = false;
+
+  const orchestrator = new CaptureWorkerOrchestrator(
+    db,
+    leases,
+    new CaptureMemoryStorage(),
+    fixtureManager,
+    authStateProvider,
+    registry,
+    {
+      paused: () => true,
+      execute: async (request) => {
+        executed = true;
+        return successExecution(request);
+      },
+      probe: fakeVideoProbe,
+    },
+  );
+
+  await expect(orchestrator.processOne('phase10i-capture-paused')).resolves.toEqual({
+    status: 'PAUSED',
+  });
+  expect(executed).toBe(false);
+  expect(await db.jobAttempt.findUniqueOrThrow({ where: { id: target.job.id } })).toMatchObject({
+    status: 'QUEUED',
+    workerId: null,
+    leaseToken: null,
+  });
+  expect(await db.captureRun.findUniqueOrThrow({ where: { id: target.run.id } })).toMatchObject({
+    status: 'PENDING',
+    startedAt: null,
+    finishedAt: null,
+  });
+
+  // Prove resume semantics and leave this shared PostgreSQL fixture quiescent
+  // for the pre-existing IDLE assertion that follows.
+  const resumed = new CaptureWorkerOrchestrator(
+    db,
+    leases,
+    new CaptureMemoryStorage(),
+    fixtureManager,
+    authStateProvider,
+    registry,
+    {
+      execute: successExecution,
+      probe: fakeVideoProbe,
+      heartbeatIntervalMs: 1000,
+    },
+  );
+
+  await expect(resumed.processOne('phase10i-capture-resumed')).resolves.toMatchObject({
+    status: 'SUCCEEDED',
+    jobAttemptId: target.job.id,
+    captureRunId: target.run.id,
+  });
+});
+
 it('returns IDLE when no claimable capture job remains', async () => {
   const storage = new CaptureMemoryStorage();
 

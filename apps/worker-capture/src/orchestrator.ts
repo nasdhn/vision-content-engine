@@ -28,6 +28,9 @@ export type CaptureWorkerOutcome =
       status: 'IDLE';
     }
   | {
+      status: 'PAUSED';
+    }
+  | {
       status: 'SUCCEEDED';
       jobAttemptId: string;
       captureRunId: string;
@@ -47,6 +50,7 @@ type CaptureWorkerOptions = {
   execute?: typeof executeCaptureScenario;
   probe?: ConstructorParameters<typeof CaptureAssetStager>[2];
   capacity?: CapacityGuard;
+  paused?: () => boolean;
 };
 
 type CaptureContext = {
@@ -115,6 +119,7 @@ export class CaptureWorkerOrchestrator {
   private readonly outputRoot: string;
   private readonly execute: typeof executeCaptureScenario;
   private readonly capacity: CapacityGuard;
+  private readonly paused: () => boolean;
 
   constructor(
     private readonly client: PrismaClient,
@@ -142,6 +147,7 @@ export class CaptureWorkerOrchestrator {
     this.outputRoot = options.outputRoot ?? tmpdir();
 
     this.execute = options.execute ?? executeCaptureScenario;
+    this.paused = options.paused ?? (() => false);
   }
 
   private async resolve(job: ClaimedCaptureJob): Promise<CaptureContext> {
@@ -283,6 +289,12 @@ export class CaptureWorkerOrchestrator {
 
   async processOne(workerId: string): Promise<CaptureWorkerOutcome> {
     invariant(workerId.trim().length > 0, 'OWNER_REQUIRED');
+
+    if (this.paused()) {
+      return {
+        status: 'PAUSED',
+      };
+    }
 
     const job = await this.leases.claimJob('capture', workerId);
 

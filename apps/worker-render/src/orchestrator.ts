@@ -151,6 +151,12 @@ export type RenderWorkerExecutionResult = Readonly<{
   diagnostics: unknown;
 }>;
 
+export type RenderWorkerOutcome =
+  | RenderWorkerExecutionResult
+  | Readonly<{
+      kind: 'PAUSED';
+    }>;
+
 export class RenderWorkerOrchestrator {
   private readonly payloadBuilder: RenderPayloadBuilder;
   private readonly leases: Leases;
@@ -167,6 +173,7 @@ export class RenderWorkerOrchestrator {
       workRoot: string;
       capacity?: CapacityGuard;
       leaseConfig?: LeaseConfig;
+      paused?: () => boolean;
     }>,
   ) {
     invariant(options.workerId.trim(), 'WORKER_REQUIRED');
@@ -182,7 +189,7 @@ export class RenderWorkerOrchestrator {
     renderId: string;
     renderAttemptId: string;
     signal?: AbortSignal;
-  }): Promise<RenderWorkerExecutionResult> {
+  }): Promise<RenderWorkerOutcome> {
     return observeOperation(
       new StructuredLogger('worker-render'),
       { renderId: input.renderId, renderAttemptId: input.renderAttemptId },
@@ -217,7 +224,9 @@ export class RenderWorkerOrchestrator {
     renderId: string;
     renderAttemptId: string;
     signal?: AbortSignal;
-  }): Promise<RenderWorkerExecutionResult> {
+  }): Promise<RenderWorkerOutcome> {
+    if (this.options.paused?.()) return { kind: 'PAUSED' } as const;
+
     for (const id of [input.renderId, input.renderAttemptId])
       invariant(/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(id), 'INVALID_TEMP_OWNER');
 

@@ -54,7 +54,8 @@
     "check:phase10f": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm check:secrets && pnpm exec vitest run tests/unit/storage-capacity.test.ts tests/unit/media-capacity-preflight.test.ts tests/unit/config.test.ts tests/unit/media.test.ts tests/integration/runtime-health-api.test.ts tests/integration/recording-api.test.ts && pnpm exec vitest run --config vitest.postgres.config.ts tests/postgres/storage-capacity.test.ts tests/postgres/capture-orchestrator.test.ts tests/postgres/capture-assets.test.ts tests/postgres/recordings.test.ts && pnpm test:storage",
     "ops:backup": "pnpm --filter @vision/api exec tsx src/ops/backup.ts",
     "ops:restore-drill": "pnpm --filter @vision/api exec tsx src/ops/restore-drill.ts",
-    "check:phase10h": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm check:secrets && pnpm exec vitest run tests/unit/backup-restore.test.ts"
+    "check:phase10h": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm check:secrets && pnpm exec vitest run tests/unit/backup-restore.test.ts",
+    "check:phase10i": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm check:secrets && pnpm exec vitest run tests/unit/config.test.ts && pnpm exec vitest run --config vitest.postgres.config.ts tests/postgres/distribution-runtime.test.ts tests/postgres/analytics-runtime.test.ts tests/postgres/capture-orchestrator.test.ts tests/postgres/render-recovery.test.ts tests/postgres/weekly-analysis.test.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

@@ -14,6 +14,7 @@ export type AnalyticsWorkerOptions = Readonly<{
   realProvidersEnabled: boolean;
   workerId?: string;
   leaseConfig?: AnalyticsLeaseConfig;
+  paused?: () => boolean;
 }>;
 
 export const DEFAULT_ANALYTICS_JOB_LEASE = Object.freeze({
@@ -68,6 +69,8 @@ export class AnalyticsWorkerOrchestrator {
   }
 
   private async processJob(job: ReturnType<typeof AnalyticsCollectionJobSchema.parse>) {
+    if (this.options.paused?.()) return { kind: 'PAUSED' } as const;
+
     const collector = this.collectors.resolve(job.platform);
     if (collector.isRealProvider && !this.options.realProvidersEnabled) {
       throw new Error('REAL_ANALYTICS_PROVIDERS_DISABLED');

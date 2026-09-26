@@ -148,6 +148,49 @@ it('fails closed before claim mutation when the paired Render job identity is in
   }
 });
 
+it('pauses Render before durable claim, renderer execution or canonical transition', async () => {
+  const { render, attempt, job } = await renderGraph();
+  const root = await mkdtemp(join(tmpdir(), 'vce-render-pause-test-'));
+  let renderCalls = 0;
+
+  try {
+    const orchestrator = new RenderWorkerOrchestrator(
+      fixture.client,
+      new MemoryStorage(),
+      {
+        render: async () => {
+          renderCalls += 1;
+          throw new Error('SHOULD_NOT_RUN');
+        },
+      },
+      {
+        workerId: 'phase10i-render-paused',
+        workerVersion: 'render-recovery-v1',
+        storageProvider: 'S3',
+        workRoot: root,
+        capacity: new CapacityGuard(policy, async () => healthyStats, quiet),
+        paused: () => true,
+      },
+    );
+
+    await expect(
+      orchestrator.execute({ renderId: render.id, renderAttemptId: attempt.id }),
+    ).resolves.toEqual({ kind: 'PAUSED' });
+    expect(renderCalls).toBe(0);
+    expect(
+      await fixture.client.jobAttempt.findUniqueOrThrow({ where: { id: job.id } }),
+    ).toMatchObject({ status: 'QUEUED', workerId: null, leaseToken: null });
+    expect(
+      await fixture.client.renderAttempt.findUniqueOrThrow({ where: { id: attempt.id } }),
+    ).toMatchObject({ status: 'QUEUED' });
+    expect(
+      await fixture.client.render.findUniqueOrThrow({ where: { id: render.id } }),
+    ).toMatchObject({ status: 'QUEUED' });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 it('rejects concurrent execution of the same RenderAttempt while its durable lease is live', async () => {
   const { render, attempt, job } = await renderGraph();
   const root = await mkdtemp(join(tmpdir(), 'vce-render-fencing-test-'));

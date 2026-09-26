@@ -145,6 +145,14 @@ it('dispatches a secret-free job and duplicate worker delivery cannot duplicate 
     },
     'phase8-dispatcher',
   );
+  await expect(dispatcher.dispatchOne(true)).resolves.toEqual({ kind: 'PAUSED' });
+  expect(jobs).toHaveLength(0);
+  expect(
+    await db.outboxEvent.count({
+      where: { eventType: 'Analytics.collection.requested', status: 'PENDING' },
+    }),
+  ).toBe(6);
+
   const dispatched = await dispatcher.dispatchOne();
   expect(dispatched.kind).toBe('DISPATCHED');
   expect(jobs).toHaveLength(1);
@@ -258,6 +266,49 @@ it('fails closed before a real analytics provider can run', async () => {
   });
   expect(untouchedJob.status).toBe('QUEUED');
   expect(untouchedJob.leaseToken).toBeNull();
+});
+
+it('pauses analytics before provider execution or durable JobAttempt claim', async () => {
+  const { publication } = await publishedYoutube();
+  await new AnalyticsControl(db).planPublication(publication.id);
+  const jobs: AnalyticsCollectionJob[] = [];
+  await new AnalyticsOutboxDispatcher(
+    db,
+    { durationMs: 60_000, heartbeatIntervalMs: 10_000 },
+    { enqueue: async (job) => void jobs.push(job) },
+    'phase10i-analytics-dispatcher',
+  ).dispatchOne();
+
+  let calls = 0;
+  const collector = {
+    platform: 'YOUTUBE' as const,
+    isRealProvider: false,
+    async collect() {
+      calls += 1;
+      throw new Error('SHOULD_NOT_RUN');
+    },
+  };
+  const worker = new AnalyticsWorkerOrchestrator(
+    db,
+    new StaticAnalyticsCollectorRegistry([collector]),
+    {
+      realProvidersEnabled: false,
+      workerId: 'phase10i-analytics-paused',
+      paused: () => true,
+    },
+  );
+
+  await expect(worker.process(jobs[0])).resolves.toEqual({ kind: 'PAUSED' });
+  expect(calls).toBe(0);
+  expect(
+    await db.jobAttempt.findUniqueOrThrow({ where: { id: jobs[0]!.jobAttemptId } }),
+  ).toMatchObject({
+    status: 'QUEUED',
+    workerId: null,
+    leaseToken: null,
+  });
+  expect(await db.metricSnapshotRaw.count()).toBe(0);
+  expect(await db.metricSnapshotNormalized.count()).toBe(0);
 });
 
 it('allows only one concurrent analytics owner to reach the provider', async () => {

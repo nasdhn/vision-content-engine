@@ -34,6 +34,7 @@ function redisConnectionOptions(redisUrl: string): WorkerOptions['connection'] {
 export type WeeklyAnalysisWorkerOptions = Readonly<{
   workerId: string;
   leaseConfig?: LeaseConfig;
+  paused?: () => boolean;
 }>;
 
 function terminalCode(error: unknown) {
@@ -72,6 +73,8 @@ export class WeeklyAnalysisWorkerOrchestrator {
   }
 
   private async processJob(job: ReturnType<typeof WeeklyAnalysisQueueJobSchema.parse>) {
+    if (this.options.paused?.()) return { kind: 'PAUSED' } as const;
+
     const claim = await this.repository.claim(job.jobAttemptId, this.options.workerId);
 
     if (claim.kind !== 'READY') return claim;

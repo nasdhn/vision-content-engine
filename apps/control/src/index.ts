@@ -125,6 +125,10 @@ export class DistributionOutboxDispatcher {
       return { kind: 'RETRY_AFTER_LEASE', outboxEventId: event.id } as const;
     }
   }
+
+  dispatchOneFromConfig(config: RuntimeConfig) {
+    return this.dispatchOne(config.PAUSE_ALL_PUBLISHING);
+  }
 }
 
 export class DistributionControl {
@@ -275,7 +279,8 @@ export class AnalyticsOutboxDispatcher {
     this.leases = new Leases(client, leaseConfig, {});
   }
 
-  async dispatchOne() {
+  async dispatchOne(pauseAnalyticsCollection = false) {
+    if (pauseAnalyticsCollection) return { kind: 'PAUSED' } as const;
     const event = await this.leases.claimOutbox(this.owner, ANALYTICS_OUTBOX_EVENT_TYPES);
     if (!event) return { kind: 'NONE' } as const;
     const token = event.claimToken;
@@ -298,6 +303,10 @@ export class AnalyticsOutboxDispatcher {
       }
       return { kind: 'RETRY_AFTER_LEASE', outboxEventId: event.id } as const;
     }
+  }
+
+  dispatchOneFromConfig(config: RuntimeConfig) {
+    return this.dispatchOne(config.PAUSE_ANALYTICS_COLLECTION);
   }
 }
 
@@ -392,7 +401,8 @@ export class WeeklyAnalysisOutboxDispatcher {
     this.leases = new Leases(client, leaseConfig, {});
   }
 
-  async dispatchOne() {
+  async dispatchOne(pauseAiGeneration = false) {
+    if (pauseAiGeneration) return { kind: 'PAUSED' } as const;
     const event = await this.leases.claimOutbox(this.owner, WEEKLY_ANALYSIS_OUTBOX_EVENT_TYPES);
     if (!event) return { kind: 'NONE' } as const;
     const token = event.claimToken;
@@ -422,6 +432,10 @@ export class WeeklyAnalysisOutboxDispatcher {
       }
       return { kind: 'RETRY_AFTER_LEASE', outboxEventId: event.id } as const;
     }
+  }
+
+  dispatchOneFromConfig(config: RuntimeConfig) {
+    return this.dispatchOne(config.PAUSE_AI_GENERATION);
   }
 }
 
