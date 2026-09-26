@@ -72,13 +72,6 @@ describe('Phase 10 closure contract', () => {
     expect(config.PAUSE_CAPTURE).toBe(true);
     expect(config.PAUSE_RENDERING).toBe(true);
     expect(config.PAUSE_ANALYTICS_COLLECTION).toBe(true);
-
-    expect(() =>
-      parseConfig({
-        ...configFixture,
-        VCE_REAL_PROVIDERS_ENABLED: 'true',
-      }),
-    ).toThrow();
   });
 
   it('keeps release smoke fail-closed and limited to operational canaries', () => {

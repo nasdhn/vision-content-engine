@@ -141,15 +141,25 @@ describe('Phase 10B secret boundary', () => {
     ).not.toThrow();
   });
 
-  it('keeps the AI gateway fake-only instead of inventing a live credential path', () => {
+  it('registers a REAL AI provider without resolving or calling a live credential path', () => {
+    const provider = {
+      kind: 'REAL' as const,
+      provider: 'phase11-registration-fixture',
+      model: 'fixture-v1',
+      estimate: vi.fn(() => ({
+        inputTokens: 0,
+        maxCost: '0',
+        currency: 'EUR',
+      })),
+      generate: vi.fn(),
+    } satisfies StructuredProvider;
+
     expect(
-      () =>
-        new AIProviderGateway(
-          {} as InvocationRepository,
-          [{ kind: 'REAL' } as unknown as StructuredProvider],
-          () => false,
-        ),
-    ).toThrow('REAL_PROVIDERS_DISABLED');
+      () => new AIProviderGateway({} as InvocationRepository, [provider], () => false),
+    ).not.toThrow();
+
+    expect(provider.estimate).not.toHaveBeenCalled();
+    expect(provider.generate).not.toHaveBeenCalled();
   });
 });
 

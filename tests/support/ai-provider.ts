@@ -30,6 +30,35 @@ export class FakeAIProvider implements StructuredProvider {
     return new FakeAIProvider((input) => queue.execute(input), model);
   }
 }
+
+export class SimulatedRealAIProvider implements StructuredProvider {
+  readonly kind = 'REAL' as const;
+  readonly provider = 'simulated-real';
+  readonly calls: ProviderRequest[] = [];
+
+  constructor(
+    private readonly outcome: (
+      input: ProviderRequest,
+      signal: AbortSignal,
+    ) => Promise<ProviderReply>,
+    readonly model = 'simulated-real-v1',
+    readonly maxCost = '0.1',
+  ) {}
+
+  estimate(request: ProviderRequest) {
+    return {
+      inputTokens: fakeInputTokens(request),
+      maxCost: this.maxCost,
+      currency: 'EUR',
+    };
+  }
+
+  async generate(input: ProviderRequest, signal: AbortSignal) {
+    this.calls.push(structuredClone(input));
+    return this.outcome(input, signal);
+  }
+}
+
 export const reply = (output: unknown): ProviderReply => ({
   body: JSON.stringify(output),
   usage: {

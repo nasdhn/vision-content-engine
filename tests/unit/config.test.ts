@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { parseConfig, assertLocalBootstrap } from '../../packages/shared/src/index.js';
+import {
+  parseConfig,
+  assertLocalBootstrap,
+  isRealProviderActivationEnabled,
+} from '../../packages/shared/src/index.js';
 import { configFixture } from '../support/config.js';
 
 describe('bootstrap configuration safety', () => {
@@ -38,16 +42,42 @@ describe('bootstrap configuration safety', () => {
       parseConfig({ ...configFixture, DATABASE_URL: 'invalid-sensitive-value' }),
     ).toThrow('Invalid runtime configuration fields: DATABASE_URL');
   });
-  it('prevents real providers and nonlocal runtime activation during Phase 0', () => {
-    expect(() => parseConfig({ ...configFixture, VCE_REAL_PROVIDERS_ENABLED: 'true' })).toThrow();
+  it('keeps LOCAL fake-only while permitting explicit nonlocal Phase 11 activation', () => {
+    const localReal = parseConfig({
+      ...configFixture,
+      VCE_REAL_PROVIDERS_ENABLED: 'true',
+    });
+
+    expect(localReal.VCE_REAL_PROVIDERS_ENABLED).toBe('true');
+    expect(isRealProviderActivationEnabled(localReal)).toBe(false);
+    expect(() => assertLocalBootstrap(localReal)).toThrow();
+
+    const productionReal = parseConfig({
+      ...configFixture,
+      VCE_ENV: 'PRODUCTION',
+      VCE_REAL_PROVIDERS_ENABLED: 'true',
+    });
+
+    expect(isRealProviderActivationEnabled(productionReal)).toBe(true);
+
+    expect(() =>
+      parseConfig({
+        ...configFixture,
+        VCE_ENV: 'PRODUCTION',
+        VCE_REAL_PROVIDERS_ENABLED: 'TRUE',
+      }),
+    ).toThrow('VCE_REAL_PROVIDERS_ENABLED');
+
     expect(() =>
       assertLocalBootstrap(parseConfig({ ...configFixture, VCE_ENV: 'PRODUCTION' })),
     ).toThrow();
+
     expect(() =>
       assertLocalBootstrap(
         parseConfig({ ...configFixture, S3_ENDPOINT: 'https://storage.example.test' }),
       ),
     ).toThrow();
+
     expect(() => assertLocalBootstrap(parseConfig(configFixture))).not.toThrow();
   });
 });

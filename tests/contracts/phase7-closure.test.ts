@@ -22,11 +22,14 @@ describe('Phase 7 closure contract', () => {
     );
   });
 
-  it('keeps real providers impossible to activate from the Phase 7 runtime configuration', () => {
+  it('preserves safe provider defaults while leaving live activation to Phase 11', () => {
     expect(runtimeConfig).toContain(
-      "VCE_REAL_PROVIDERS_ENABLED: z.literal('false').default('false')",
+      "VCE_REAL_PROVIDERS_ENABLED: z.enum(['false', 'true']).default('false')",
     );
+    expect(runtimeConfig).toContain('isRealProviderActivationEnabled');
     expect(runtimeConfig).toContain('PAUSE_ALL_PUBLISHING: boolean.default(true)');
+    expect(activationChecklist).toContain('VCE_REAL_PROVIDERS_ENABLED=false by default');
+    expect(activationChecklist).toContain('Missing any gate fails closed.');
   });
 
   it('records closure and keeps live activation plus Analytics in later phases', () => {

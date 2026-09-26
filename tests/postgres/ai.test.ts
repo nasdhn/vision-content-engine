@@ -18,7 +18,7 @@ import {
   CreativeDirectorInputSchema,
 } from '../../packages/contracts/src/index.js';
 import { contentHash } from '../../packages/contracts/src/canonical.js';
-import { FakeAIProvider, reply } from '../support/ai-provider.js';
+import { FakeAIProvider, SimulatedRealAIProvider, reply } from '../support/ai-provider.js';
 import knowledgeFixture from '../fixtures/phase2/knowledge.json' with { type: 'json' };
 import outputFixture from '../fixtures/phase2/creator-output.json' with { type: 'json' };
 import directorFixture from '../fixtures/phase2/director-output.json' with { type: 'json' };
@@ -67,11 +67,20 @@ function generated(request: ProviderRequest, hook?: string) {
   return output;
 }
 function service(
-  providers = [new FakeAIProvider(async (request) => reply(generated(request)))],
+  providers: readonly (FakeAIProvider | SimulatedRealAIProvider)[] = [
+    new FakeAIProvider(async (request) => reply(generated(request))),
+  ],
   paused = () => false,
   client = db,
+  realProvidersEnabled = () => false,
 ) {
-  const gateway = new AIProviderGateway(new InvocationRepository(client), providers, paused);
+  const gateway = new AIProviderGateway(
+    new InvocationRepository(client),
+    providers,
+    paused,
+    undefined,
+    realProvidersEnabled,
+  );
   return { service: new AIContentService(client, gateway), gateway, providers };
 }
 async function setup() {
@@ -423,6 +432,43 @@ it('serializes competing durable budget reservations across clients', async () =
   await first;
   expect(await db.modelInvocation.count()).toBe(1);
 });
+it('fails closed before durable invocation writes when a REAL provider is disabled', async () => {
+  const b = await setup();
+  const provider = new SimulatedRealAIProvider(async (request) => reply(generated(request)));
+
+  await expect(
+    service([provider]).service.createConcepts(b.options, policy, budget),
+  ).rejects.toThrow('REAL_PROVIDERS_DISABLED');
+
+  expect(provider.calls).toHaveLength(0);
+  expect(await db.modelInvocation.count()).toBe(0);
+});
+
+it('runs a simulated REAL provider only behind the explicit activation gate', async () => {
+  const b = await setup();
+  const provider = new SimulatedRealAIProvider(async (request) => reply(generated(request)));
+
+  const result = await service(
+    [provider],
+    () => false,
+    db,
+    () => true,
+  ).service.createConcepts(b.options, policy, budget);
+
+  expect(result.versions).toHaveLength(1);
+  expect(provider.calls).toHaveLength(1);
+
+  const attempt = await db.modelInvocationAttempt.findFirstOrThrow();
+
+  expect(attempt).toMatchObject({
+    provider: 'simulated-real',
+    model: 'simulated-real-v1',
+    status: 'SUCCEEDED',
+  });
+
+  expect(await db.costEntry.count()).toBe(1);
+});
+
 it('honors pause before execution and between repair attempts', async () => {
   const b = await setup();
   await expect(

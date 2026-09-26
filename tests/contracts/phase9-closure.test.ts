@@ -21,7 +21,7 @@ import {
   WEEKLY_ANALYSIS_JOB_TYPE,
   WeeklyAnalysisQueueJobSchema,
 } from '../../packages/contracts/src/weekly-analysis.js';
-import { parseConfig } from '../../packages/shared/src/config.js';
+import { isRealProviderActivationEnabled, parseConfig } from '../../packages/shared/src/config.js';
 import { collectionWindowsFor } from '../../packages/analytics/src/index.js';
 import { assertSchedulingCapabilities } from '../../packages/publishing/src/index.js';
 import { configFixture } from '../support/config.js';
@@ -177,12 +177,21 @@ describe('Phase 9 closure contract', () => {
     expect(LearningDashboardService.prototype.createExperimentProposal).toBeTypeOf('function');
   });
 
-  it('rejects real provider activation and keeps publishing paused by default', () => {
+  it('keeps real provider activation off by default and publishing paused', () => {
     expect(contract.realProvidersEnabled).toBe(false);
+
     const config = parseConfig(configFixture);
     expect(config.VCE_REAL_PROVIDERS_ENABLED).toBe('false');
     expect(config.PAUSE_ALL_PUBLISHING).toBe(true);
-    expect(() => parseConfig({ ...configFixture, VCE_REAL_PROVIDERS_ENABLED: 'true' })).toThrow();
+    expect(isRealProviderActivationEnabled(config)).toBe(false);
+
+    const localWithExplicitFlag = parseConfig({
+      ...configFixture,
+      VCE_REAL_PROVIDERS_ENABLED: 'true',
+    });
+
+    expect(localWithExplicitFlag.VCE_REAL_PROVIDERS_ENABLED).toBe('true');
+    expect(isRealProviderActivationEnabled(localWithExplicitFlag)).toBe(false);
   });
 
   it('keeps TikTok publishing and analytics manual', () => {

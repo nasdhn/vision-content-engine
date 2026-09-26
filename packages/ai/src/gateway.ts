@@ -53,7 +53,7 @@ const UsageSchema = z
   .strict();
 export type ProviderReply = { body: string; usage?: z.infer<typeof UsageSchema> };
 export interface StructuredProvider {
-  readonly kind: 'FAKE';
+  readonly kind: 'FAKE' | 'REAL';
   readonly provider: string;
   readonly model: string;
   estimate(request: ProviderRequest): { inputTokens: number; maxCost: string; currency: string };
@@ -93,18 +93,16 @@ async function deadline(provider: StructuredProvider, request: ProviderRequest, 
     if (timer) clearTimeout(timer);
   }
 }
-/** No real adapters in Phase 2. Every execution still traverses the production validation/DB path. */
+/** Real adapters may be registered in Phase 11 but remain fail-closed by default. */
 export class AIProviderGateway {
   constructor(
     private readonly repository: InvocationRepository,
     private readonly providers: readonly StructuredProvider[],
     private readonly paused: () => boolean,
     private readonly logger = new StructuredLogger('worker-ai'),
+    private readonly realProvidersEnabled: () => boolean = () => false,
   ) {
-    invariant(
-      providers.length > 0 && providers.every((p) => p.kind === 'FAKE'),
-      'REAL_PROVIDERS_DISABLED',
-    );
+    invariant(providers.length > 0, 'PROVIDER_REQUIRED');
   }
   async generateStructured<I, O>(
     request: InvocationRequest<I>,
@@ -160,14 +158,35 @@ export class AIProviderGateway {
       'KNOWLEDGE_CONTEXT_MISMATCH',
     );
 
-    const choices = this.providers.filter(
+    const matchingProviders = this.providers.filter(
       (p) =>
         (!policy.preferredProvider || p.provider === policy.preferredProvider) &&
         (!policy.preferredModel || p.model === policy.preferredModel),
     );
+    invariant(matchingProviders.length > 0, 'PREFERRED_PROVIDER_UNAVAILABLE');
+
+    const realProvidersEnabledAtSelection = this.realProvidersEnabled();
+
+    if (
+      !realProvidersEnabledAtSelection &&
+      matchingProviders.every((provider) => provider.kind === 'REAL')
+    ) {
+      invariant(false, 'REAL_PROVIDERS_DISABLED');
+    }
+
+    const eligibleProviders = this.providers.filter(
+      (provider) => provider.kind === 'FAKE' || realProvidersEnabledAtSelection,
+    );
+    const choices = eligibleProviders.filter(
+      (p) =>
+        (!policy.preferredProvider || p.provider === policy.preferredProvider) &&
+        (!policy.preferredModel || p.model === policy.preferredModel),
+    );
+
     invariant(choices.length > 0, 'PREFERRED_PROVIDER_UNAVAILABLE');
+
     const primary = choices[0]!;
-    const fallback = this.providers.filter((p) => p !== primary);
+    const fallback = eligibleProviders.filter((p) => p !== primary);
     const envelope: ProviderRequest['envelope'] = {
       requestId: request.requestId,
       capability: request.capability,
@@ -230,6 +249,12 @@ export class AIProviderGateway {
         lastCode = 'AI_GENERATION_PAUSED';
         break;
       }
+
+      if (provider.kind === 'REAL' && !this.realProvidersEnabled()) {
+        lastCode = 'REAL_PROVIDERS_DISABLED';
+        break;
+      }
+
       let quote: ReturnType<StructuredProvider['estimate']>;
       try {
         quote = provider.estimate(structuredClone(call));

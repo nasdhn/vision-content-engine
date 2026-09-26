@@ -29,11 +29,13 @@ Phase 8 intentionally keeps:
 VCE_REAL_PROVIDERS_ENABLED=false
 ```
 
-The accepted runtime parser still fails closed if `true` is supplied.
+Phase 11A-1 introduces a reviewed shared configuration path for explicit real-provider
+activation in non-LOCAL environments. The default remains `false`, LOCAL remains fake-provider
+only, and this configuration change does not authorize live analytics collection.
 
 Before any live provider collection:
 
-- [ ] introduce a separate reviewed activation change rather than bypassing the parser;
+- [ ] use the reviewed non-LOCAL activation path rather than bypassing the canonical configuration gate;
 - [ ] activate one provider/account at a time;
 - [ ] keep queue payloads secret-free;
 - [ ] run a no-side-effect readiness/capability check first;

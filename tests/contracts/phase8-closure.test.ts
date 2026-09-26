@@ -25,10 +25,13 @@ describe('Phase 8 closure contract', () => {
     );
   });
 
-  it('keeps real providers impossible to activate from the Phase 8 runtime configuration', () => {
+  it('preserves default-disabled providers while leaving analytics activation to Phase 11', () => {
     expect(runtimeConfig).toContain(
-      "VCE_REAL_PROVIDERS_ENABLED: z.literal('false').default('false')",
+      "VCE_REAL_PROVIDERS_ENABLED: z.enum(['false', 'true']).default('false')",
     );
+    expect(runtimeConfig).toContain('isRealProviderActivationEnabled');
+    expect(activationChecklist).toContain('VCE_REAL_PROVIDERS_ENABLED=false');
+    expect(activationChecklist).toContain('does not authorize live analytics collection');
   });
 
   it('records Phase 8 closure while keeping live activation and learning in later boundaries', () => {

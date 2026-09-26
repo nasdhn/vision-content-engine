@@ -25,15 +25,17 @@ Phase 7 intentionally keeps:
 
 ```text
 PAUSE_ALL_PUBLISHING=true by default
-VCE_REAL_PROVIDERS_ENABLED constrained to false
+VCE_REAL_PROVIDERS_ENABLED=false by default
 ```
 
-Therefore Phase 11 requires a reviewed code/configuration change before real providers can be
-enabled. Do not bypass the parser or patch runtime objects in memory.
+Phase 11A-1 introduces the reviewed shared configuration path that can represent explicit
+real-provider activation in a non-LOCAL environment. The default remains disabled and LOCAL remains
+fake-provider only. This configuration path alone does not authorize Distribution activation.
+Do not bypass the canonical activation helper or patch runtime objects in memory.
 
 Before the first live call:
 
-- [ ] introduce the explicit reviewed Phase 11 configuration path that can permit real providers;
+- [ ] confirm the target non-LOCAL runtime explicitly enables the reviewed real-provider configuration path;
 - [ ] keep `PAUSE_ALL_PUBLISHING=true` while credentials/accounts are connected and checked;
 - [ ] verify the specific provider/account capability gate;
 - [ ] run a no-side-effect readiness check;

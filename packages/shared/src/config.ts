@@ -57,7 +57,7 @@ const environmentSchema = z
     PAUSE_CAPTURE: boolean.default(true),
     PAUSE_RENDERING: boolean.default(true),
     PAUSE_ANALYTICS_COLLECTION: boolean.default(true),
-    VCE_REAL_PROVIDERS_ENABLED: z.literal('false').default('false'),
+    VCE_REAL_PROVIDERS_ENABLED: z.enum(['false', 'true']).default('false'),
   })
   .strict();
 
@@ -80,11 +80,21 @@ export function parseConfig(
   return Object.freeze(result.data);
 }
 
+/**
+ * Canonical Phase 11 activation decision.
+ *
+ * The explicit flag alone is insufficient: LOCAL remains fake-provider only.
+ */
+export function isRealProviderActivationEnabled(config: RuntimeConfig): boolean {
+  return config.VCE_ENV !== 'LOCAL' && config.VCE_REAL_PROVIDERS_ENABLED === 'true';
+}
+
 /** Phase 0 has no production auth or remote providers; only loopback dependencies are allowed. */
 export function assertLocalBootstrap(config: RuntimeConfig): void {
   const endpoints = [config.DATABASE_URL, config.REDIS_URL, config.S3_ENDPOINT];
   if (
     config.VCE_ENV !== 'LOCAL' ||
+    config.VCE_REAL_PROVIDERS_ENABLED !== 'false' ||
     endpoints.some(
       (endpoint) => !['127.0.0.1', 'localhost', '[::1]'].includes(new URL(endpoint).hostname),
     )
