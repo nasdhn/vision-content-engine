@@ -62,7 +62,8 @@
     "check:phase11a1": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm check:secrets && pnpm exec vitest run tests/unit/config.test.ts tests/unit/secret-resolver.test.ts tests/contracts/phase7-closure.test.ts tests/contracts/phase8-closure.test.ts tests/contracts/phase9-closure.test.ts tests/contracts/phase10-closure.test.ts && pnpm exec vitest run --config vitest.postgres.config.ts tests/postgres/ai.test.ts && pnpm test:release-smoke",
     "check:phase11a2": "pnpm check:phase11a1 && pnpm exec vitest run tests/unit/groq-provider.test.ts",
     "canary:ai:groq": "tsx scripts/phase11a3-groq-canary.ts",
-    "check:phase11a4a": "pnpm check:phase11a2 && pnpm exec vitest run tests/unit/worker-ai-generation-runtime.test.ts"
+    "check:phase11a4a": "pnpm check:phase11a2 && pnpm exec vitest run tests/unit/worker-ai-generation-runtime.test.ts",
+    "check:phase11a4b": "pnpm check:phase11a4a && pnpm exec vitest run tests/unit/concept-generation-worker-runtime.test.ts tests/contracts/phase11a4b-closure.test.ts && pnpm exec vitest run --config vitest.postgres.config.ts tests/postgres/concept-generation.test.ts tests/postgres/concept-generation-worker.test.ts tests/postgres/persistence.test.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

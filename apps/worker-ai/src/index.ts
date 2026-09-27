@@ -179,3 +179,5 @@ export function createBullMqWeeklyAnalysisWorker(input: {
 }
 
 export * from './generation-runtime.js';
+export * from './concept-generation-worker.js';
+export * from './concept-generation-runtime.js';

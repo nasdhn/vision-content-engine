@@ -1,6 +1,6 @@
 # Phase 11A — Generation Progressive Activation
 
-**Status:** 11A-4A runtime composition candidate; 11A-3 real canary passed.
+**Status:** 11A-4B durable asynchronous Creator path complete; normal runtime remains fail-closed by default.
 
 Phase 11 activates capabilities progressively. Generation is the first
 capability in the frozen Phase 11 order.
@@ -371,3 +371,134 @@ reconstructs Creator options from canonical PostgreSQL state and executes the
 existing AIContentService under the `ai` job lease.
 
 11A-4B must not make queue transport canonical and must not activate Capture.
+
+## 11A-4B — durable asynchronous Creator execution
+
+11A-4B completes the durable asynchronous Creator path while preserving
+the fail-closed provider boundary established by 11A-1 through 11A-4A.
+
+### Durable planning
+
+`ConceptGenerationRepository.plan()` creates the canonical generation
+request atomically in PostgreSQL.
+
+A new request:
+
+- requires an eligible `READY` or `ACTIVE` Brief;
+- creates the immutable `BriefVersion` snapshot before generation;
+- creates a `CONCEPT_GENERATION` WorkflowRun;
+- creates the canonical `ai` / `AI` JobAttempt;
+- stores the technical request binding separately from the immutable
+  business BriefVersion payload;
+- transitions the mutable Brief to `GENERATING`.
+
+Repeated identical planning is idempotent. Reusing the same request ID
+with different request content is rejected.
+
+Queue transport is not canonical. PostgreSQL durable state remains the
+source of truth.
+
+### Validated-output checkpoint
+
+Successful Creator provider output is checkpointed when the
+ModelInvocation becomes `SUCCEEDED`, before ConceptVersion application.
+
+The checkpoint contains:
+
+- the validated Creator output;
+- output hash;
+- request ID;
+- BriefVersion ID;
+- KnowledgeSnapshot ID;
+- metadata hash.
+
+Checkpoint integrity is verified again before recovery application.
+
+This closes the failure window where an external provider request has
+already succeeded and incurred cost but the worker loses its job lease
+before ConceptVersion persistence.
+
+### Checkpoint-first recovery
+
+`ConceptGenerationWorkerOrchestrator.processOne(workerId)` claims the
+canonical `ai` job through the existing lease API.
+
+For every claimed job it checks durable state in this order:
+
+1. recover a valid output checkpoint if one exists;
+2. reject an existing invocation whose safe recovery state is not
+   available;
+3. only otherwise execute Creator through `AIContentService`.
+
+An expired `SAFE_RETRY` AI job can therefore be reclaimed and completed
+from the already-paid checkpoint without a second provider request,
+second ModelInvocationAttempt or second cost.
+
+### Atomic business completion
+
+Successful application executes under the current fenced job lease.
+
+The transaction atomically:
+
+- consumes the successful ModelInvocation output;
+- creates and submits ConceptVersion candidates;
+- completes the JobAttempt as `SUCCEEDED`;
+- transitions the WorkflowRun from `RUNNING` to `WAITING`;
+- sets workflow step `concept_review`;
+- transitions the Brief from `GENERATING` to `ACTIVE`.
+
+The WorkflowRun intentionally waits at the human concept-review gate.
+
+If the lifecycle callback fails, content application and job completion
+roll back together while the already-successful ModelInvocation and its
+checkpoint remain durable for recovery.
+
+Terminal generation failure atomically:
+
+- completes the JobAttempt as `FAILED`;
+- transitions the WorkflowRun to `FAILED`;
+- restores the Brief from `GENERATING` to `READY`.
+
+### Polled worker runtime
+
+`startConceptGenerationWorkerRuntime()` reuses the existing
+`startPolledWorkerRuntime()` lifecycle under component `worker-ai`.
+
+The runtime:
+
+- publishes the normal worker heartbeat/readiness record;
+- exposes the orchestrator `processOne()` operation;
+- rejects new work after shutdown starts;
+- drains in-flight work before removing the heartbeat.
+
+This does not introduce another canonical queue payload or another
+execution state store.
+
+### Safety boundary
+
+11A-4B introduces no:
+
+- Prisma schema or migration;
+- provider SDK;
+- credential;
+- automatic API/user trigger;
+- Capture activation;
+- Render activation;
+- Distribution activation.
+
+Persistent defaults remain:
+
+- `VCE_ENV=LOCAL`;
+- `VCE_REAL_PROVIDERS_ENABLED=false`;
+- `PAUSE_AI_GENERATION=true`.
+
+No real provider call is required by the 11A-4B implementation,
+regression or closure gates.
+
+Therefore:
+
+- 11A-3 real canary: **DONE**;
+- 11A-4A generation composition: **DONE**;
+- 11A-4B durable asynchronous Creator path: **DONE**;
+- normal real-provider execution by default: **DISABLED**;
+- Capture activation: **NOT STARTED**.

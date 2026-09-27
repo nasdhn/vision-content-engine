@@ -3,6 +3,7 @@ import type {
   PrismaClient,
   Prisma,
   WorkflowStatus,
+  BriefStatus,
   RenderStatus,
 } from './generated/prisma/client.js';
 import { audit, changed, databaseTime, emit, lock } from './transaction.js';
@@ -79,6 +80,19 @@ export class UnitOfWork {
     await changed(this.tx, this.actor, 'Brief.created', 'Brief', row.id);
     return row;
   }
+  async transitionBrief(id: string, expected: BriefStatus, next: BriefStatus) {
+    await lock(this.tx, 'Brief', id);
+    const row = await this.tx.brief.findUniqueOrThrow({ where: { id } });
+    invariant(row.status === expected, 'STALE_STATE');
+    assertTransition('brief', expected, next);
+    const result = await this.tx.brief.update({
+      where: { id },
+      data: { status: next },
+    });
+    await changed(this.tx, this.actor, `Brief.${next.toLowerCase()}`, 'Brief', id);
+    return result;
+  }
+
   async createConcept(briefId: string) {
     const row = await this.tx.concept.create({ data: { briefId } });
     await changed(this.tx, this.actor, 'Concept.created', 'Concept', row.id);

@@ -1,6 +1,8 @@
 import { readFile, readdir } from 'node:fs/promises';
 import { z } from 'zod';
 import {
+  ConceptGenerationCheckpointMetadataSchema,
+  ConceptGenerationOutputCheckpointSchema,
   CreatorInputSchema,
   CreatorOutputSchema,
   CreativeDirectorInputSchema,
@@ -14,7 +16,7 @@ import type { AIProviderGateway } from '@vision/ai';
 import type { ModelPolicy } from '@vision/ai';
 import { validateCreator, validateDirector } from '@vision/ai';
 import { invariant } from '@vision/domain';
-import { assertNoSecrets, textHash, normalize } from '@vision/contracts/canonical';
+import { assertNoSecrets, contentHash, textHash, normalize } from '@vision/contracts/canonical';
 import { selectPatterns } from './pattern-selector.js';
 import type { SelectionContext, SelectionPolicy } from './pattern-selector.js';
 
@@ -41,7 +43,12 @@ export type DirectorOptions = {
   productionCapabilities: DirectorInput['productionCapabilities'];
   constraints: DirectorInput['constraints'];
 };
-export type JobExecution = { leases: Leases; jobId: string; leaseToken: string };
+export type JobExecution = {
+  leases: Leases;
+  jobId: string;
+  leaseToken: string;
+  onSuccess?: (unit: UnitOfWork) => Promise<void>;
+};
 const aiActor = { actorType: 'AI', actorId: 'validated-ai-application' } as const;
 const record = (value: unknown) => JsonRecordSchema.parse(value ?? {});
 // Curated BriefVersion metadata, never a model-provided exemption. Exact duplicate hooks still fail.
@@ -75,6 +82,7 @@ export class AIContentService {
       undefined,
       async (unit) => {
         result = await work(unit);
+        await execution.onSuccess?.(unit);
       },
     );
     return result as T;
@@ -283,6 +291,164 @@ export class AIContentService {
       patternDefinitions: definitions,
     };
   }
+  private async persistCreatorOutput(
+    options: CreatorOptions,
+    modelInvocationId: string,
+    rawOutput: unknown,
+    execution?: JobExecution,
+  ) {
+    const output = CreatorOutputSchema.parse(rawOutput);
+
+    const brief = await this.db.briefVersion.findUniqueOrThrow({
+      where: {
+        id: options.briefVersionId,
+      },
+    });
+
+    const variantData = record(brief.payloadJson).deliberateVariant;
+
+    const deliberateVariant =
+      variantData === undefined ? undefined : VariantSchema.parse(variantData);
+
+    if (deliberateVariant) {
+      await this.db.conceptVersion.findUniqueOrThrow({
+        where: {
+          id: deliberateVariant.conceptVersionId,
+        },
+      });
+    }
+
+    const selectedPatternVersionIds = [
+      ...new Set(output.concepts.map((candidate) => candidate.selectedPatternVersionId)),
+    ];
+
+    const patternVersions = await this.db.patternVersion.findMany({
+      where: {
+        id: {
+          in: selectedPatternVersionIds,
+        },
+      },
+    });
+
+    invariant(
+      patternVersions.length === selectedPatternVersionIds.length,
+      'CREATOR_PATTERN_VERSION_NOT_FOUND',
+    );
+
+    const hookShapes = new Map(
+      patternVersions.map((version) => [
+        version.id,
+        PatternVersionSpecSchema.parse(record(version.sourceMetadataJson).artifact).structure.hook
+          .shape,
+      ]),
+    );
+
+    return this.commit(async (unit) => {
+      await unit.consumeInvocation(modelInvocationId, output);
+
+      await unit.rejectRepeatedHooks(output.concepts.map((candidate) => candidate.hook));
+
+      const saved = [];
+
+      for (const candidate of output.concepts) {
+        const concept = await unit.createConcept(brief.briefId);
+
+        if (candidate.ideaId) {
+          await unit.linkConceptIdea(concept.id, candidate.ideaId);
+        }
+
+        const hookShape = hookShapes.get(candidate.selectedPatternVersionId);
+
+        invariant(hookShape !== undefined, 'CREATOR_PATTERN_VERSION_NOT_FOUND');
+
+        const version = await unit.versions.conceptVersion({
+          conceptId: concept.id,
+          briefVersionId: options.briefVersionId,
+          title: candidate.title,
+          angle: candidate.angle,
+          hook: candidate.hook,
+          audience: candidate.audience,
+          objective: candidate.objective,
+          hypothesis: candidate.hypothesis,
+          selectedPatternVersionId: candidate.selectedPatternVersionId,
+          rationale: JSON.stringify({
+            ...candidate.rationale,
+            formatRecommendation: candidate.formatRecommendation,
+            ...(deliberateVariant
+              ? {
+                  deliberateVariant,
+                }
+              : {}),
+            selectionDimensions: {
+              audience: candidate.audience,
+              topic: options.selection.topic,
+              angle: candidate.angle,
+              hookShape,
+              proofType: options.selection.proofType,
+              primaryFormat: candidate.formatRecommendation.primaryFormat,
+              platforms: options.generationConstraints.targetPlatforms,
+            },
+          }),
+          creatorType: 'AI',
+          creatorModelInvocationId: modelInvocationId,
+        });
+
+        await unit.preserveClaimEvidence(
+          'Concept',
+          concept.id,
+          version.id,
+          candidate.factualClaims,
+          options.knowledgeSnapshotId,
+          modelInvocationId,
+        );
+
+        await unit.submitConcept(version.id);
+
+        saved.push(version);
+      }
+
+      return saved;
+    }, execution);
+  }
+
+  async applyCreatorCheckpoint(
+    options: CreatorOptions,
+    rawCheckpoint: unknown,
+    execution: JobExecution,
+  ) {
+    const checkpoint = ConceptGenerationOutputCheckpointSchema.parse(rawCheckpoint);
+
+    invariant(
+      checkpoint.metadata.requestId === options.requestId &&
+        checkpoint.metadata.briefVersionId === options.briefVersionId &&
+        checkpoint.metadata.knowledgeSnapshotId === options.knowledgeSnapshotId,
+      'CONCEPT_GENERATION_CHECKPOINT_METADATA_MISMATCH',
+    );
+
+    invariant(
+      contentHash(checkpoint.output) === checkpoint.outputHash,
+      'CONCEPT_GENERATION_CHECKPOINT_OUTPUT_MISMATCH',
+    );
+
+    invariant(
+      contentHash(checkpoint.metadata) === checkpoint.metadataHash,
+      'CONCEPT_GENERATION_CHECKPOINT_METADATA_MISMATCH',
+    );
+
+    const versions = await this.persistCreatorOutput(
+      options,
+      checkpoint.metadata.requestId,
+      checkpoint.output,
+      execution,
+    );
+
+    return {
+      modelInvocationId: checkpoint.metadata.requestId,
+      output: checkpoint.output,
+      versions,
+    };
+  }
+
   async createConcepts(
     options: CreatorOptions,
     policy: ModelPolicy,
@@ -298,6 +464,13 @@ export class AIContentService {
         purpose: 'creator.concepts',
         prompt: { key: 'creator', version: '1.0.0' },
         knowledgeSnapshot: context.input.brandKnowledge,
+        successCheckpointMetadata: ConceptGenerationCheckpointMetadataSchema.parse({
+          schemaVersion: 'v1',
+          kind: 'CONCEPT_GENERATION',
+          requestId: options.requestId,
+          briefVersionId: options.briefVersionId,
+          knowledgeSnapshotId: options.knowledgeSnapshotId,
+        }),
         input: context.input,
       },
       {
@@ -325,57 +498,18 @@ export class AIContentService {
       policy,
       budget,
     );
-    const versions = await this.commit(async (u) => {
-      await u.consumeInvocation(result.modelInvocationId, result.output);
-      await u.rejectRepeatedHooks(result.output.concepts.map((c) => c.hook));
-      const saved = [];
-      for (const candidate of result.output.concepts) {
-        const concept = await u.createConcept(context.briefId);
-        if (candidate.ideaId) await u.linkConceptIdea(concept.id, candidate.ideaId);
-        const version = await u.versions.conceptVersion({
-          conceptId: concept.id,
-          briefVersionId: options.briefVersionId,
-          title: candidate.title,
-          angle: candidate.angle,
-          hook: candidate.hook,
-          audience: candidate.audience,
-          objective: candidate.objective,
-          hypothesis: candidate.hypothesis,
-          selectedPatternVersionId: candidate.selectedPatternVersionId,
-          rationale: JSON.stringify({
-            ...candidate.rationale,
-            formatRecommendation: candidate.formatRecommendation,
-            ...(context.deliberateVariant ? { deliberateVariant: context.deliberateVariant } : {}),
-            selectionDimensions: {
-              audience: candidate.audience,
-              topic: options.selection.topic,
-              angle: candidate.angle,
-              hookShape:
-                context.input.patternCandidates.find(
-                  (p) => p.patternVersionId === candidate.selectedPatternVersionId,
-                )!.hookStructure.shape ?? '',
-              proofType: options.selection.proofType,
-              primaryFormat: candidate.formatRecommendation.primaryFormat,
-              platforms: context.input.generationConstraints.targetPlatforms,
-            },
-          }),
-          creatorType: 'AI',
-          creatorModelInvocationId: result.modelInvocationId,
-        });
-        await u.preserveClaimEvidence(
-          'Concept',
-          concept.id,
-          version.id,
-          candidate.factualClaims,
-          options.knowledgeSnapshotId,
-          result.modelInvocationId,
-        );
-        await u.submitConcept(version.id);
-        saved.push(version);
-      }
-      return saved;
-    }, execution);
-    return { ...result, versions, selection: context.selection };
+    const versions = await this.persistCreatorOutput(
+      options,
+      result.modelInvocationId,
+      result.output,
+      execution,
+    );
+
+    return {
+      ...result,
+      versions,
+      selection: context.selection,
+    };
   }
   async directorContext(options: DirectorOptions) {
     const version = await this.db.conceptVersion.findUniqueOrThrow({

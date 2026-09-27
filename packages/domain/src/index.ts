@@ -46,6 +46,14 @@ export const transitions = {
     REJECTED: ['READY_TO_RECORD', 'CANCELLED'],
     CANCELLED: [],
   },
+  brief: {
+    DRAFT: ['READY', 'ARCHIVED'],
+    READY: ['DRAFT', 'GENERATING', 'ARCHIVED'],
+    GENERATING: ['ACTIVE', 'READY'],
+    ACTIVE: ['GENERATING', 'COMPLETED', 'ARCHIVED'],
+    COMPLETED: ['ACTIVE', 'ARCHIVED'],
+    ARCHIVED: [],
+  },
   workflow: {
     PENDING: ['RUNNING', 'CANCELLED'],
     RUNNING: ['WAITING', 'SUCCEEDED', 'FAILED', 'CANCELLED'],

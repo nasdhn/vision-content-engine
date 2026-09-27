@@ -1,6 +1,7 @@
 export * from './shared.js';
 export * from './creative-qa.js';
 export * from './creator.js';
+export * from './concept-generation.js';
 export * from './creative-director.js';
 export * from './gateway-and-prompts.js';
 export * from './pattern.js';

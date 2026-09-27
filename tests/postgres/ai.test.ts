@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
 import { postgresFixture } from '../../packages/database/test/support.js';
 import {
+  ConceptGenerationRepository,
   Persistence,
   InvocationRepository,
   createDatabaseClient,
@@ -283,6 +284,22 @@ it('creates unapproved candidate versions and exact invocation/attempt/audit/out
     promptKey: 'creator',
   });
   expect(invocation.outputHash).toBe(contentHash(result.output));
+
+  const checkpoint = await new ConceptGenerationRepository(db).outputCheckpointForRequest(
+    b.options.requestId,
+  );
+
+  expect(checkpoint).toMatchObject({
+    outputHash: contentHash(result.output),
+    output: result.output,
+    metadata: {
+      schemaVersion: 'v1',
+      kind: 'CONCEPT_GENERATION',
+      requestId: b.options.requestId,
+      briefVersionId: b.brief.id,
+      knowledgeSnapshotId: b.knowledge.id,
+    },
+  });
   expect(invocation.attempts[0]).toMatchObject({
     provider: 'deterministic-fixture',
     model: 'fixture-v1',
@@ -864,4 +881,265 @@ it('commits successful AI worker results atomically with JobAttempt completion',
   );
   expect(await db.conceptVersion.count()).toBe(1);
   expect(await db.outboxEvent.count({ where: { eventType: 'JobAttempt.succeeded' } })).toBe(1);
+});
+
+it('recovers checkpointed Creator output after lease loss without a second provider call or cost', async () => {
+  const b = await setup();
+
+  const leases = new Leases(
+    db,
+    {
+      durationMs: 60_000,
+      heartbeatIntervalMs: 10_000,
+    },
+    {
+      AI: 'SAFE_RETRY',
+    },
+  );
+
+  const job = await persistence.transaction(human, (unit) =>
+    unit.enqueueJob({
+      queueName: 'ai',
+      jobType: 'AI',
+      operationId: b.options.requestId,
+      attemptNumber: 1,
+    }),
+  );
+
+  const firstClaim = await leases.claimJob('ai', 'checkpoint-worker-one');
+
+  expect(firstClaim).not.toBeNull();
+  expect(firstClaim!.id).toBe(job.id);
+  expect(firstClaim!.leaseToken).not.toBeNull();
+
+  const provider = new FakeAIProvider(async (request) => {
+    await db.$executeRaw`
+        UPDATE "JobAttempt"
+        SET "leaseAcquiredAt" = '2000-01-01T00:00:00Z',
+            "heartbeatAt" = '2000-01-01T00:00:01Z',
+            "leaseExpiresAt" = '2000-01-01T00:00:02Z'
+        WHERE id = ${job.id}::uuid
+      `;
+
+    return reply(generated(request));
+  });
+
+  const application = service([provider]);
+
+  await expect(
+    application.service.createConcepts(b.options, policy, budget, {
+      leases,
+      jobId: job.id,
+      leaseToken: firstClaim!.leaseToken!,
+    }),
+  ).rejects.toThrow('STALE_LEASE');
+
+  expect(provider.calls).toHaveLength(1);
+
+  expect(await db.conceptVersion.count()).toBe(0);
+
+  const invocation = await db.modelInvocation.findUniqueOrThrow({
+    where: {
+      id: b.options.requestId,
+    },
+  });
+
+  expect(invocation.status).toBe('SUCCEEDED');
+
+  const repository = new ConceptGenerationRepository(db);
+
+  const checkpoint = await repository.outputCheckpointForRequest(b.options.requestId);
+
+  expect(checkpoint).not.toBeNull();
+
+  const costCountBeforeRecovery = await db.costEntry.count();
+
+  const invocationCountBeforeRecovery = await db.modelInvocation.count();
+
+  const secondClaim = await leases.claimJob('ai', 'checkpoint-worker-two');
+
+  expect(secondClaim).not.toBeNull();
+  expect(secondClaim!.id).toBe(job.id);
+  expect(secondClaim!.leaseToken).not.toBeNull();
+
+  const recovered = await application.service.applyCreatorCheckpoint(b.options, checkpoint, {
+    leases,
+    jobId: job.id,
+    leaseToken: secondClaim!.leaseToken!,
+  });
+
+  expect(recovered.versions).toHaveLength(1);
+
+  expect(provider.calls).toHaveLength(1);
+
+  expect(await db.costEntry.count()).toBe(costCountBeforeRecovery);
+
+  expect(await db.modelInvocation.count()).toBe(invocationCountBeforeRecovery);
+
+  expect(
+    await db.modelInvocationAttempt.count({
+      where: {
+        modelInvocationId: b.options.requestId,
+      },
+    }),
+  ).toBe(1);
+
+  expect(
+    await db.auditEvent.count({
+      where: {
+        action: 'ModelInvocation.applied',
+        subjectType: 'ModelInvocation',
+        subjectId: b.options.requestId,
+      },
+    }),
+  ).toBe(1);
+
+  const finishedJob = await db.jobAttempt.findUniqueOrThrow({
+    where: {
+      id: job.id,
+    },
+  });
+
+  expect(finishedJob.status).toBe('SUCCEEDED');
+
+  expect(recovered.versions[0]!.creatorModelInvocationId).toBe(b.options.requestId);
+});
+
+it('runs the Creator job success lifecycle callback atomically with durable content', async () => {
+  const b = await setup();
+
+  await db.brief.update({
+    where: { id: b.brief.briefId },
+    data: { status: 'GENERATING' },
+  });
+
+  const workflow = await persistence.transaction(human, async (unit) => {
+    const row = await unit.createWorkflow({
+      workflowType: 'CONCEPT_GENERATION',
+      rootEntityType: 'Brief',
+      rootEntityId: b.brief.briefId,
+    });
+    await unit.transitionWorkflow(row.id, 'PENDING', 'RUNNING', 'generating');
+    return row;
+  });
+
+  const leases = new Leases(
+    db,
+    { durationMs: 60_000, heartbeatIntervalMs: 10_000 },
+    { AI: 'SAFE_RETRY' },
+  );
+
+  const job = await persistence.transaction(human, (unit) =>
+    unit.enqueueJob({
+      workflowRunId: workflow.id,
+      queueName: 'ai',
+      jobType: 'AI',
+      operationId: b.options.requestId,
+      attemptNumber: 1,
+    }),
+  );
+
+  const claim = await leases.claimJob('ai', 'lifecycle-worker');
+  expect(claim?.id).toBe(job.id);
+  expect(claim?.leaseToken).not.toBeNull();
+
+  const result = await b.service.createConcepts(b.options, policy, budget, {
+    leases,
+    jobId: job.id,
+    leaseToken: claim!.leaseToken!,
+    onSuccess: async (unit) => {
+      await unit.transitionWorkflow(workflow.id, 'RUNNING', 'WAITING', 'concept_review');
+      await unit.transitionBrief(b.brief.briefId, 'GENERATING', 'ACTIVE');
+    },
+  });
+
+  expect(result.versions).toHaveLength(1);
+  expect(await db.jobAttempt.findUniqueOrThrow({ where: { id: job.id } })).toHaveProperty(
+    'status',
+    'SUCCEEDED',
+  );
+  expect(await db.workflowRun.findUniqueOrThrow({ where: { id: workflow.id } })).toMatchObject({
+    status: 'WAITING',
+    currentStep: 'concept_review',
+  });
+  expect(await db.brief.findUniqueOrThrow({ where: { id: b.brief.briefId } })).toHaveProperty(
+    'status',
+    'ACTIVE',
+  );
+});
+
+it('rolls back Creator content and job completion when the lifecycle callback fails', async () => {
+  const b = await setup();
+
+  await db.brief.update({
+    where: { id: b.brief.briefId },
+    data: { status: 'GENERATING' },
+  });
+
+  const workflow = await persistence.transaction(human, async (unit) => {
+    const row = await unit.createWorkflow({
+      workflowType: 'CONCEPT_GENERATION',
+      rootEntityType: 'Brief',
+      rootEntityId: b.brief.briefId,
+    });
+    await unit.transitionWorkflow(row.id, 'PENDING', 'RUNNING', 'generating');
+    return row;
+  });
+
+  const leases = new Leases(
+    db,
+    { durationMs: 60_000, heartbeatIntervalMs: 10_000 },
+    { AI: 'SAFE_RETRY' },
+  );
+
+  const job = await persistence.transaction(human, (unit) =>
+    unit.enqueueJob({
+      workflowRunId: workflow.id,
+      queueName: 'ai',
+      jobType: 'AI',
+      operationId: b.options.requestId,
+      attemptNumber: 1,
+    }),
+  );
+
+  const claim = await leases.claimJob('ai', 'rollback-worker');
+  expect(claim?.id).toBe(job.id);
+  expect(claim?.leaseToken).not.toBeNull();
+
+  await expect(
+    b.service.createConcepts(b.options, policy, budget, {
+      leases,
+      jobId: job.id,
+      leaseToken: claim!.leaseToken!,
+      onSuccess: async (unit) => {
+        await unit.transitionBrief(b.brief.briefId, 'READY', 'ACTIVE');
+      },
+    }),
+  ).rejects.toThrow('STALE_STATE');
+
+  expect(await db.conceptVersion.count()).toBe(0);
+  expect(
+    await db.auditEvent.count({
+      where: {
+        action: 'ModelInvocation.applied',
+        subjectId: b.options.requestId,
+      },
+    }),
+  ).toBe(0);
+  expect(await db.jobAttempt.findUniqueOrThrow({ where: { id: job.id } })).toHaveProperty(
+    'status',
+    'RUNNING',
+  );
+  expect(await db.workflowRun.findUniqueOrThrow({ where: { id: workflow.id } })).toMatchObject({
+    status: 'RUNNING',
+    currentStep: 'generating',
+  });
+  expect(await db.brief.findUniqueOrThrow({ where: { id: b.brief.briefId } })).toHaveProperty(
+    'status',
+    'GENERATING',
+  );
+  expect(
+    await db.modelInvocation.findUniqueOrThrow({ where: { id: b.options.requestId } }),
+  ).toHaveProperty('status', 'SUCCEEDED');
+  expect(await db.costEntry.count()).toBe(1);
 });

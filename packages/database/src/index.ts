@@ -27,3 +27,4 @@ export { WeeklyAnalysisRepository, DEFAULT_WEEKLY_ANALYSIS_LEASE } from './weekl
 
 export { parseBudget, costAmount, boundedModelPolicy } from './budgets.js';
 export { InvocationBudgetReader } from './budget-read.js';
+export { ConceptGenerationRepository } from './concept-generation.js';
