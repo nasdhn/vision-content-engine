@@ -3,6 +3,7 @@ import {
   parseConfig,
   assertLocalBootstrap,
   isRealProviderActivationEnabled,
+  isCaptureActivationEnabled,
 } from '../../packages/shared/src/index.js';
 import { configFixture } from '../support/config.js';
 
@@ -98,4 +99,35 @@ it('validates finite capacity configuration with conservative local defaults', (
   expect(parseConfig({ ...configFixture, VCE_MAX_UPLOAD_BYTES: '1024' }).VCE_MAX_UPLOAD_BYTES).toBe(
     1024,
   );
+});
+
+describe('Phase 11 Capture activation decision', () => {
+  it('enables Capture only in explicitly unpaused STAGING_CAPTURE', () => {
+    const local = parseConfig({
+      ...configFixture,
+      PAUSE_CAPTURE: 'false',
+    });
+
+    const stagingPaused = parseConfig({
+      ...configFixture,
+      VCE_ENV: 'STAGING_CAPTURE',
+    });
+
+    const stagingActive = parseConfig({
+      ...configFixture,
+      VCE_ENV: 'STAGING_CAPTURE',
+      PAUSE_CAPTURE: 'false',
+    });
+
+    const production = parseConfig({
+      ...configFixture,
+      VCE_ENV: 'PRODUCTION',
+      PAUSE_CAPTURE: 'false',
+    });
+
+    expect(isCaptureActivationEnabled(local)).toBe(false);
+    expect(isCaptureActivationEnabled(stagingPaused)).toBe(false);
+    expect(isCaptureActivationEnabled(stagingActive)).toBe(true);
+    expect(isCaptureActivationEnabled(production)).toBe(false);
+  });
 });

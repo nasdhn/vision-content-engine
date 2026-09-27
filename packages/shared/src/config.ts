@@ -89,6 +89,17 @@ export function isRealProviderActivationEnabled(config: RuntimeConfig): boolean 
   return config.VCE_ENV !== 'LOCAL' && config.VCE_REAL_PROVIDERS_ENABLED === 'true';
 }
 
+/**
+ * Phase 11 Capture activation decision.
+ *
+ * Authenticated V1 product capture is restricted to the dedicated
+ * STAGING_CAPTURE environment and requires the capture kill switch
+ * to be explicitly unpaused.
+ */
+export function isCaptureActivationEnabled(config: RuntimeConfig): boolean {
+  return config.VCE_ENV === 'STAGING_CAPTURE' && config.PAUSE_CAPTURE === false;
+}
+
 /** Phase 0 has no production auth or remote providers; only loopback dependencies are allowed. */
 export function assertLocalBootstrap(config: RuntimeConfig): void {
   const endpoints = [config.DATABASE_URL, config.REDIS_URL, config.S3_ENDPOINT];

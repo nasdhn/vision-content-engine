@@ -5,3 +5,4 @@ export * from './orchestrator.js';
 export * from './recovery.js';
 
 export * from './runtime.js';
+export * from './auth.js';
