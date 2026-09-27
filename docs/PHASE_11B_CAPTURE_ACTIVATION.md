@@ -1,6 +1,6 @@
 # Phase 11B — Product Capture Progressive Activation
 
-**Status:** 11B-1 COMPLETE — fail-closed authenticated Capture boundary.
+**Status:** 11B-2A COMPLETE — dry-run Capture canary harness; real authenticated canary not started.
 
 11B-1 adds the runtime security boundary required before authenticated Product Capture can be activated.
 
@@ -30,4 +30,53 @@ Phase status:
 - real authenticated Capture canary: NOT STARTED
 - Rendering activation: NOT STARTED
 
-Next: 11B-2 may prepare an explicit one-shot Capture canary harness. The real remote canary remains a separate side effect and must not be part of ordinary CI.
+## 11B-2A — dry-run Capture canary harness
+
+11B-2A prepares the one-shot Capture canary envelope without executing
+any external browser activity.
+
+The selected canary is the immutable `PRICING_PAGE` scenario:
+
+- scenario version `018f3000-0000-7000-8000-000000000004`;
+- environment `VISION_CAPTURE_DEMO`;
+- base URL `https://capture-demo.urvision.fr`;
+- auth profile `VISION_CAPTURE_ACCOUNT_V1`;
+- fixture mode `PREPARED_STATE`;
+- `resetBeforeRun=false`;
+- no scenario input;
+- step sequence `NAVIGATE, ASSERT, VISUAL_SETTLE, SCREENSHOT`;
+- one required `pricing` screenshot output.
+
+The dry-run validates an ephemeral Capture activation envelope equivalent
+to `STAGING_CAPTURE` with Capture unpaused, while requiring persistent
+configuration to remain `LOCAL`, Capture paused and real providers
+disabled.
+
+The 11B-2A harness intentionally cannot execute the remote canary.
+`--execute` fails with `CANARY_EXECUTION_NOT_IMPLEMENTED_11B2A`.
+
+Dry-run evidence is required to remain:
+
+- `credentialResolved=false`;
+- `browserLaunched=false`;
+- `networkCalled=false`;
+- `externalSideEffect=false`.
+
+No real storage-state credential is resolved.
+No browser is launched.
+No request is made to `capture-demo.urvision.fr`.
+No CaptureRun is created.
+No external side effect is performed.
+
+Phase status:
+
+- Generation durable path: DONE
+- 11B-1 Capture authentication safety boundary: DONE
+- 11B-2A dry-run Capture canary harness: DONE
+- real authenticated Capture canary: NOT STARTED
+- Rendering activation: NOT STARTED
+
+Next: 11B-2B may add the explicit execution path for a single reviewed
+remote canary. Running that path remains a separate external side effect
+and requires a dedicated runtime-mounted storage state plus explicit
+human authorization. It must not run in ordinary CI.

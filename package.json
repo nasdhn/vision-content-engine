@@ -64,7 +64,9 @@
     "canary:ai:groq": "tsx scripts/phase11a3-groq-canary.ts",
     "check:phase11a4a": "pnpm check:phase11a2 && pnpm exec vitest run tests/unit/worker-ai-generation-runtime.test.ts",
     "check:phase11a4b": "pnpm check:phase11a4a && pnpm exec vitest run tests/unit/concept-generation-worker-runtime.test.ts tests/contracts/phase11a4b-closure.test.ts && pnpm exec vitest run --config vitest.postgres.config.ts tests/postgres/concept-generation.test.ts tests/postgres/concept-generation-worker.test.ts tests/postgres/persistence.test.ts",
-    "check:phase11b1": "pnpm check:phase11a4b && pnpm exec vitest run tests/unit/config.test.ts tests/unit/capture-auth-state.test.ts tests/contracts/phase11b1-closure.test.ts && pnpm test:browser tests/browser/product-capture-safety.spec.ts"
+    "check:phase11b1": "pnpm check:phase11a4b && pnpm exec vitest run tests/unit/config.test.ts tests/unit/capture-auth-state.test.ts tests/contracts/phase11b1-closure.test.ts && pnpm test:browser tests/browser/product-capture-safety.spec.ts",
+    "canary:capture": "tsx scripts/phase11b2-capture-canary.ts",
+    "check:phase11b2a": "pnpm check:phase11b1 && pnpm exec vitest run tests/unit/capture-canary-harness.test.ts && pnpm exec tsx scripts/phase11b2-capture-canary.ts --dry-run"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
