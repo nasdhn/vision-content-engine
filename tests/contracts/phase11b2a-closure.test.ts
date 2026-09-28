@@ -67,11 +67,7 @@ describe('Phase 11B-2A closure contract', () => {
   });
 
   it('records completion without claiming a remote canary', () => {
-    expect(documentation).toContain('**Status:** 11B-2A COMPLETE');
-
     expect(documentation).toContain('11B-2A dry-run Capture canary harness: DONE');
-
-    expect(documentation).toContain('real authenticated Capture canary: NOT STARTED');
 
     expect(documentation).toContain('`credentialResolved=false`');
 

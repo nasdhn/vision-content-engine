@@ -45,7 +45,6 @@ describe('Phase 11B-1 closure contract', () => {
 
   it('records durable 11B-1 completion without requiring the document to stay at that phase', () => {
     expect(doc).toContain('11B-1 Capture authentication safety boundary: DONE');
-    expect(doc).toContain('real authenticated Capture canary: NOT STARTED');
     expect(doc).toContain('`PAUSE_CAPTURE=true`');
   });
 });

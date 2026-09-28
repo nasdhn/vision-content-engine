@@ -1,6 +1,6 @@
 # Phase 11B — Product Capture Progressive Activation
 
-**Status:** 11B-2A COMPLETE — dry-run Capture canary harness; real authenticated canary not started.
+**Status:** 11B-2B COMPLETE — explicit reviewed execution command; real authenticated canary NOT STARTED.
 
 11B-1 adds the runtime security boundary required before authenticated Product Capture can be activated.
 
@@ -76,7 +76,38 @@ Phase status:
 - real authenticated Capture canary: NOT STARTED
 - Rendering activation: NOT STARTED
 
-Next: 11B-2B may add the explicit execution path for a single reviewed
-remote canary. Running that path remains a separate external side effect
-and requires a dedicated runtime-mounted storage state plus explicit
-human authorization. It must not run in ordinary CI.
+## 11B-2B — explicit reviewed execution command
+
+11B-2B adds a separate command dedicated to the single reviewed
+`PRICING_PAGE` remote canary. The existing 11B-2A dry-run command remains
+unchanged and keeps its own `--execute` path unavailable.
+
+The real execution command requires all of the following simultaneously:
+
+- runtime `VCE_ENV=STAGING_CAPTURE`;
+- runtime `PAUSE_CAPTURE=false`;
+- `VCE_REAL_PROVIDERS_ENABLED=false`;
+- exact CLI confirmation `EXECUTE_PRICING_PAGE_CAPTURE_DEMO`;
+- an absolute runtime-mounted Playwright storage-state path;
+- the existing `MountedCaptureAuthStateProvider` checks;
+- immutable `PRICING_PAGE`;
+- `PREPARED_STATE`, `marketing-v1`, no reset and no scenario input.
+
+The command writes a non-secret `canary-evidence.json` beside the output
+and fails unless the required `pricing` screenshot exists.
+
+11B-2B implementation tests inject a fake Capture executor. They validate
+authorization, credential preflight, fixture policy, required output and
+evidence generation without Chromium or network access.
+
+Phase status:
+
+- Generation durable path: DONE
+- 11B-1 Capture authentication safety boundary: DONE
+- 11B-2A dry-run Capture canary harness: DONE
+- 11B-2B explicit execution command: DONE
+- real authenticated Capture canary: NOT STARTED
+- Rendering activation: NOT STARTED
+
+Next after code closure: provision the dedicated storage state outside
+Git and explicitly authorize exactly one remote `PRICING_PAGE` canary.
