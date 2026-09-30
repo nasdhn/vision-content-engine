@@ -1,6 +1,6 @@
 # Phase 11C — Rendering Progressive Activation
 
-**Status:** 11C-2A COMPLETE — deterministic dry-run Rendering canary harness; real reviewed canary NOT STARTED.
+**Status:** 11C-2B COMPLETE — explicit reviewed local Render execution command; real reviewed canary NOT STARTED.
 
 Phase 11C progressively enables the already implemented Video Engine after
 the reviewed Product Capture canary.
@@ -44,6 +44,7 @@ Phase status:
 - Product Capture first reviewed real canary: DONE
 - 11C-1 Rendering activation safety boundary: DONE
 - 11C-2A dry-run Rendering canary harness: DONE
+- 11C-2B explicit reviewed execution command: DONE
 - reviewed real Rendering canary: NOT STARTED
 - durable real Render execution: NOT STARTED
 - Human Review activation: NOT STARTED
@@ -92,3 +93,51 @@ Next: 11C-2B adds a separate explicit reviewed command that performs one
 local synthetic Render canary, retains the resulting master and evidence
 for human review, and still performs no publication or external
 AI-provider call.
+
+## 11C-2B — explicit reviewed local Render execution command
+
+11C-2B adds a separate execution command for exactly one reviewed local
+synthetic Render canary.
+
+Execution requires all of the following simultaneously:
+
+- `VCE_ENV=STAGING_CAPTURE`;
+- `PAUSE_RENDERING=false`;
+- `PAUSE_CAPTURE=true`;
+- `PAUSE_AI_GENERATION=true`;
+- `PAUSE_ALL_PUBLISHING=true`;
+- `PAUSE_ANALYTICS_COLLECTION=true`;
+- `VCE_REAL_PROVIDERS_ENABLED=false`;
+- exact confirmation `EXECUTE_SYNTHETIC_RENDER_CANARY`.
+
+The execution path reuses the existing `phase5-media-v1` regression flow
+instead of implementing a second renderer.
+
+The regression flow creates only synthetic local media, runs the existing
+Remotion/FFmpeg Video Engine, executes the existing technical QA, and may
+retain the reviewed output only when the execution harness supplies its
+dedicated absolute output directory.
+
+A successful reviewed execution retains:
+
+- `master.mp4`;
+- `canary-evidence.json`.
+
+The evidence manifest contains the final media probe, technical QA outcome,
+runtime renderer diagnostics, file size and SHA-256 digest. It does not
+store database credentials, object-storage credentials or provider
+credentials.
+
+The execution harness has no database adapter, object-storage adapter,
+AI-provider adapter or publishing adapter. The renderer's local asset
+server remains part of the existing Remotion render path.
+
+The 11C-2B unit tests inject a fake regression runner. Therefore the code
+closure gate does not execute the reviewed real Render canary.
+
+Code closure does not claim that the reviewed real canary has run.
+
+Next after code closure: explicitly execute exactly one synthetic local
+Render canary, inspect `canary-evidence.json`, open `master.mp4`, and
+perform human visual/audio review before any durable Render worker
+activation.

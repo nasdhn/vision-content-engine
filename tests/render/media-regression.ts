@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { mkdtemp, rm, stat } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { promisify } from 'node:util';
 
 import fixtureSpec from '../fixtures/media/phase5-media-fixtures.json' with { type: 'json' };
@@ -303,25 +303,42 @@ try {
     JSON.stringify(rendered.diagnostics),
   );
 
-  console.log(
-    JSON.stringify(
-      {
-        result: 'PASS',
-        fixtureVersion: fixtureSpec.fixtureVersion,
-        generatedFixtures: {
-          product: productProbe,
-          presenter: presenterProbe,
-          voice: voiceProbe,
-          catastrophic,
-        },
-        finalMaster: outputProbe,
-        technicalQa: qa.result,
-        chromaExecuted: true,
-      },
-      null,
-      2,
-    ),
-  );
+  const result = {
+    result: 'PASS',
+    fixtureVersion: fixtureSpec.fixtureVersion,
+    generatedFixtures: {
+      product: productProbe,
+      presenter: presenterProbe,
+      voice: voiceProbe,
+      catastrophic,
+    },
+    finalMaster: outputProbe,
+    technicalQa: qa.result,
+    chromaExecuted: true,
+    fileSizeBytes: outputStat.size,
+    diagnostics: rendered.diagnostics,
+  } as const;
+
+  const retainOutputDir = process.env.RENDER_CANARY_OUTPUT_DIR;
+
+  if (retainOutputDir) {
+    assert.ok(isAbsolute(retainOutputDir), 'RENDER_CANARY_OUTPUT_DIR_MUST_BE_ABSOLUTE');
+
+    await mkdir(retainOutputDir, {
+      recursive: true,
+      mode: 0o700,
+    });
+
+    await copyFile(rendered.outputPath, join(retainOutputDir, 'master.mp4'));
+
+    await writeFile(
+      join(retainOutputDir, 'media-regression-evidence.json'),
+      `${JSON.stringify(result, null, 2)}\n`,
+      { mode: 0o600 },
+    );
+  }
+
+  console.log(JSON.stringify(result, null, 2));
 } finally {
   await rm(dir, { recursive: true, force: true });
 }

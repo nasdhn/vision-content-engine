@@ -71,7 +71,9 @@
     "check:phase11b2b": "pnpm check:phase11b2a && pnpm exec vitest run tests/unit/capture-canary-execute.test.ts tests/contracts/phase11b2b-closure.test.ts",
     "check:phase11c1": "pnpm check:phase11b2b && pnpm exec vitest run tests/unit/config.test.ts tests/contracts/phase11c1-closure.test.ts && pnpm exec tsx tests/render/remotion-smoke.ts",
     "canary:render": "tsx scripts/phase11c2-render-canary.ts",
-    "check:phase11c2a": "pnpm check:phase11c1 && pnpm exec vitest run tests/unit/render-canary-harness.test.ts tests/contracts/phase11c2a-closure.test.ts && pnpm exec tsx scripts/phase11c2-render-canary.ts --dry-run"
+    "check:phase11c2a": "pnpm check:phase11c1 && pnpm exec vitest run tests/unit/render-canary-harness.test.ts tests/contracts/phase11c2a-closure.test.ts && pnpm exec tsx scripts/phase11c2-render-canary.ts --dry-run",
+    "canary:render:execute": "tsx scripts/phase11c2-render-canary-execute.ts",
+    "check:phase11c2b": "pnpm check:phase11c2a && pnpm exec vitest run tests/unit/render-canary-execute.test.ts tests/contracts/phase11c2b-closure.test.ts && pnpm exec tsx tests/render/media-regression.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
