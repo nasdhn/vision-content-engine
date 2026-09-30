@@ -73,7 +73,8 @@
     "canary:render": "tsx scripts/phase11c2-render-canary.ts",
     "check:phase11c2a": "pnpm check:phase11c1 && pnpm exec vitest run tests/unit/render-canary-harness.test.ts tests/contracts/phase11c2a-closure.test.ts && pnpm exec tsx scripts/phase11c2-render-canary.ts --dry-run",
     "canary:render:execute": "tsx scripts/phase11c2-render-canary-execute.ts",
-    "check:phase11c2b": "pnpm check:phase11c2a && pnpm exec vitest run tests/unit/render-canary-execute.test.ts tests/contracts/phase11c2b-closure.test.ts && pnpm exec tsx tests/render/media-regression.ts"
+    "check:phase11c2b": "pnpm check:phase11c2a && pnpm exec vitest run tests/unit/render-canary-execute.test.ts tests/contracts/phase11c2b-closure.test.ts && pnpm exec tsx tests/render/media-regression.ts",
+    "check:phase11c2c": "pnpm check:phase11c2b && pnpm exec vitest run tests/contracts/phase11c2c-closure.test.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

@@ -31,9 +31,8 @@ describe('Phase 11C-2A closure contract', () => {
     expect(pkg.scripts['check:phase11c2a']).toContain('phase11c2-render-canary.ts --dry-run');
   });
 
-  it('records 11C-2A without claiming real Render execution', () => {
+  it('records durable 11C-2A closure', () => {
     expect(doc).toContain('- 11C-2A dry-run Rendering canary harness: DONE');
-    expect(doc).toContain('reviewed real Rendering canary: NOT STARTED');
     expect(doc).toContain('durable real Render execution: NOT STARTED');
   });
 

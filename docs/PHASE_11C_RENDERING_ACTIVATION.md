@@ -1,6 +1,6 @@
 # Phase 11C — Rendering Progressive Activation
 
-**Status:** 11C-2B COMPLETE — explicit reviewed local Render execution command; real reviewed canary NOT STARTED.
+**Status:** 11C-2C COMPLETE — reviewed local synthetic Render canary validated; durable Render worker execution NOT STARTED.
 
 Phase 11C progressively enables the already implemented Video Engine after
 the reviewed Product Capture canary.
@@ -45,7 +45,7 @@ Phase status:
 - 11C-1 Rendering activation safety boundary: DONE
 - 11C-2A dry-run Rendering canary harness: DONE
 - 11C-2B explicit reviewed execution command: DONE
-- reviewed real Rendering canary: NOT STARTED
+- 11C-2C reviewed local synthetic Rendering canary: DONE
 - durable real Render execution: NOT STARTED
 - Human Review activation: NOT STARTED
 
@@ -141,3 +141,29 @@ Next after code closure: explicitly execute exactly one synthetic local
 Render canary, inspect `canary-evidence.json`, open `master.mp4`, and
 perform human visual/audio review before any durable Render worker
 activation.
+
+## 11C-2C — reviewed local synthetic Rendering canary
+
+The explicit reviewed local Render canary was executed successfully on
+2026-09-30 using the real Remotion/FFmpeg renderer and synthetic
+`phase5-media-v1` inputs.
+
+Result:
+
+- renderer invocation: SUCCEEDED;
+- technical QA: PASS;
+- chroma preprocessing: executed;
+- human visual/audio review: PASS FOR SYNTHETIC FIXTURE;
+- durable database-backed Render worker: NOT STARTED;
+- object-storage persistence: NOT STARTED;
+- publishing: NOT STARTED;
+- external provider cost: USD 0.
+
+The synthetic appearance and audio are intentional test inputs and are not
+a creative-quality approval for production content.
+
+Detailed non-secret evidence is frozen in
+`docs/PHASE_11C_RENDER_CANARY_EVIDENCE.md`.
+
+Next: inspect and prepare the durable controlled Render-worker activation
+path before Human Review activation.
