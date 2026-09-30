@@ -100,6 +100,19 @@ export function isCaptureActivationEnabled(config: RuntimeConfig): boolean {
   return config.VCE_ENV === 'STAGING_CAPTURE' && config.PAUSE_CAPTURE === false;
 }
 
+/**
+ * Phase 11 Rendering activation decision.
+ *
+ * The first reviewed real-render path is restricted to the controlled
+ * STAGING_CAPTURE environment and requires the rendering kill switch
+ * to be explicitly unpaused.
+ *
+ * PRODUCTION remains fail-closed until a later Phase 11C approval.
+ */
+export function isRenderingActivationEnabled(config: RuntimeConfig): boolean {
+  return config.VCE_ENV === 'STAGING_CAPTURE' && config.PAUSE_RENDERING === false;
+}
+
 /** Phase 0 has no production auth or remote providers; only loopback dependencies are allowed. */
 export function assertLocalBootstrap(config: RuntimeConfig): void {
   const endpoints = [config.DATABASE_URL, config.REDIS_URL, config.S3_ENDPOINT];

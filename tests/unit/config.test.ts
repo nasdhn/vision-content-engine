@@ -4,6 +4,7 @@ import {
   assertLocalBootstrap,
   isRealProviderActivationEnabled,
   isCaptureActivationEnabled,
+  isRenderingActivationEnabled,
 } from '../../packages/shared/src/index.js';
 import { configFixture } from '../support/config.js';
 
@@ -129,5 +130,36 @@ describe('Phase 11 Capture activation decision', () => {
     expect(isCaptureActivationEnabled(stagingPaused)).toBe(false);
     expect(isCaptureActivationEnabled(stagingActive)).toBe(true);
     expect(isCaptureActivationEnabled(production)).toBe(false);
+  });
+});
+
+describe('Phase 11 Rendering activation decision', () => {
+  it('enables Rendering only in explicitly unpaused STAGING_CAPTURE', () => {
+    const local = parseConfig({
+      ...configFixture,
+      PAUSE_RENDERING: 'false',
+    });
+
+    const stagingPaused = parseConfig({
+      ...configFixture,
+      VCE_ENV: 'STAGING_CAPTURE',
+    });
+
+    const stagingActive = parseConfig({
+      ...configFixture,
+      VCE_ENV: 'STAGING_CAPTURE',
+      PAUSE_RENDERING: 'false',
+    });
+
+    const production = parseConfig({
+      ...configFixture,
+      VCE_ENV: 'PRODUCTION',
+      PAUSE_RENDERING: 'false',
+    });
+
+    expect(isRenderingActivationEnabled(local)).toBe(false);
+    expect(isRenderingActivationEnabled(stagingPaused)).toBe(false);
+    expect(isRenderingActivationEnabled(stagingActive)).toBe(true);
+    expect(isRenderingActivationEnabled(production)).toBe(false);
   });
 });
