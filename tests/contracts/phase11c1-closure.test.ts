@@ -51,8 +51,8 @@ describe('Phase 11C-1 closure contract', () => {
     expect(pkg.scripts['check:phase11c1']).toContain('tests/render/remotion-smoke.ts');
   });
 
-  it('records code closure without enabling production Rendering', () => {
-    expect(doc).toContain('11C-1 COMPLETE — Rendering activation safety boundary');
+  it('records durable 11C-1 closure without requiring the document to stay at that phase', () => {
+    expect(doc).toContain('- 11C-1 Rendering activation safety boundary: DONE');
     expect(doc).toContain('`PAUSE_RENDERING=true`');
     expect(doc).toContain('`LOCAL` and `PRODUCTION` remain disabled');
     expect(doc).toContain('durable real Render execution: NOT STARTED');
