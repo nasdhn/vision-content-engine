@@ -70,11 +70,9 @@ describe('Phase 11B-2B closure contract', () => {
     expect(pkg.scripts['check:phase11b2b']).toContain('tests/contracts/phase11b2b-closure.test.ts');
   });
 
-  it('records code closure without claiming the real canary ran', () => {
-    expect(doc).toContain('**Status:** 11B-2B COMPLETE');
-
+  it('records durable 11B-2B code closure', () => {
     expect(doc).toContain('11B-2B explicit execution command: DONE');
 
-    expect(doc).toContain('real authenticated Capture canary: NOT STARTED');
+    expect(doc).toContain('## 11B-2B — explicit reviewed execution command');
   });
 });

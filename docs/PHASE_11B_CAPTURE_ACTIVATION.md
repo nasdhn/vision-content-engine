@@ -1,6 +1,6 @@
 # Phase 11B — Product Capture Progressive Activation
 
-**Status:** 11B-2B COMPLETE — explicit reviewed execution command; real authenticated canary NOT STARTED.
+**Status:** 11B-2C COMPLETE — reviewed authenticated PRICING_PAGE Capture canary validated; evidence frozen.
 
 11B-1 adds the runtime security boundary required before authenticated Product Capture can be activated.
 
@@ -106,8 +106,45 @@ Phase status:
 - 11B-1 Capture authentication safety boundary: DONE
 - 11B-2A dry-run Capture canary harness: DONE
 - 11B-2B explicit execution command: DONE
-- real authenticated Capture canary: NOT STARTED
-- Rendering activation: NOT STARTED
+- 11B-2C reviewed authenticated Capture canary: DONE
 
-Next after code closure: provision the dedicated storage state outside
-Git and explicitly authorize exactly one remote `PRICING_PAGE` canary.
+## 11B-2C — reviewed authenticated Capture canary
+
+The explicitly authorized `PRICING_PAGE` Capture canary was executed
+successfully against the dedicated controlled Capture environment.
+
+Result:
+
+- scenario: `PRICING_PAGE`;
+- scenario version: `018f3000-0000-7000-8000-000000000004`;
+- environment: `VISION_CAPTURE_DEMO`;
+- authentication profile: `VISION_CAPTURE_ACCOUNT_V1`;
+- execution result: `SUCCEEDED`;
+- executed steps: `4`;
+- required locator `pricing-primary-card`: visible;
+- console errors: `0`;
+- page errors: `0`;
+- request failures: `0`;
+- required screenshot `pricing.png`: produced;
+- screenshot size: `106133` bytes;
+- screenshot SHA-256:
+  `18738b4e43dd5215a9e24249d571fb0c6d9600765ccd9b7b92c8fd3a8effa778`;
+- credential material committed to Git: `false`;
+- external provider cost: `USD 0`.
+
+The Playwright storage state remained outside Git and was used only through
+the reviewed secret-backed authentication boundary.
+
+Human visual inspection confirmed the expected pricing-page result.
+
+Important limitation: `/tarifs` is a public route. Therefore this canary
+proves that the reviewed authenticated browser context and Capture execution
+path work against the dedicated environment, but it does not by itself prove
+access to protected-session-only product content.
+
+No customer data or real customer mission was used.
+
+Detailed non-secret evidence is frozen in
+`docs/PHASE_11B_CAPTURE_CANARY_EVIDENCE.md`.
+
+Phase 11B Capture activation evidence is complete.
