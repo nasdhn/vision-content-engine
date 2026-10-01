@@ -1,6 +1,6 @@
 # Phase 11C — Rendering Progressive Activation
 
-**Status:** 11C-3B COMPLETE — explicit disposable durable Render execution command; reviewed durable canary NOT STARTED.
+**Status:** 11C-3C COMPLETE — reviewed disposable durable Render canary validated; Human Review activation NOT STARTED.
 
 Phase 11C progressively enables the already implemented Video Engine after
 the reviewed Product Capture canary.
@@ -48,8 +48,8 @@ Phase status:
 - 11C-2C reviewed local synthetic Rendering canary: DONE
 - 11C-3A durable Render canary dry-run boundary: DONE
 - 11C-3B explicit disposable durable Render execution command: DONE
-- reviewed disposable durable Render canary: NOT STARTED
-- durable real Render execution: NOT STARTED
+- 11C-3C reviewed disposable durable Render canary: DONE
+- persistent Render worker activation: NOT STARTED
 - Human Review activation: NOT STARTED
 
 ## 11C-2A — deterministic dry-run Rendering canary harness
@@ -266,3 +266,52 @@ Code closure does not claim that the disposable durable canary has run.
 Next after code closure: explicitly execute one reviewed disposable durable
 Render canary and freeze its non-secret evidence before any persistent
 Render-worker activation.
+
+## 11C-3C — reviewed disposable durable Render canary
+
+The disposable durable Render canary was executed successfully on
+2026-10-01.
+
+This execution crossed the canonical durable Render path:
+
+- disposable LOCAL PostgreSQL;
+- disposable LOCAL private S3 bucket;
+- persisted READY input Assets;
+- Render / RenderAttempt / JobAttempt lineage;
+- `RenderWorkerOrchestrator`;
+- private input materialization;
+- real Remotion/FFmpeg rendering;
+- technical QA;
+- immutable private Render output upload;
+- output Asset readiness;
+- durable JobAttempt and RenderAttempt success;
+- private-object readback and SHA-256 verification;
+- disposable database, bucket and worker-temp destruction.
+
+Result:
+
+- Render: `CREATIVE_QA`;
+- RenderAttempt: `SUCCEEDED`;
+- JobAttempt: `SUCCEEDED`;
+- output Asset: `READY`;
+- technical QA: `PASS`;
+- private object verification: `PASS`;
+- cleanup: `PASS`;
+- external provider cost: `USD 0`;
+- remote side effect: `false`.
+
+The master SHA-256 is identical to the previously reviewed isolated
+synthetic Render canary. This is expected because both executions use the
+same deterministic synthetic fixture and composition.
+
+The repeated synthetic visual appearance and 440 Hz tone are intentional.
+This evidence validates durable Rendering mechanics and determinism, not
+creative production quality.
+
+Detailed non-secret evidence is frozen in
+`docs/PHASE_11C_DURABLE_RENDER_CANARY_EVIDENCE.md`.
+
+Phase 11C Rendering validation is complete for the reviewed V1 activation
+sequence. Persistent Render worker activation remains fail-closed.
+
+Next canonical phase: Human Review.

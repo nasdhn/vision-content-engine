@@ -63,7 +63,5 @@ describe('Phase 11C-2B closure contract', () => {
     expect(doc).toContain('- 11C-2B explicit reviewed execution command: DONE');
 
     expect(doc).toContain('Code closure does not claim that the reviewed real canary has run.');
-
-    expect(doc).toContain('durable real Render execution: NOT STARTED');
   });
 });

@@ -78,7 +78,8 @@
     "canary:render:durable": "tsx scripts/phase11c3-durable-render-canary.ts",
     "check:phase11c3a": "pnpm check:phase11c2c && pnpm exec vitest run tests/unit/durable-render-canary-harness.test.ts tests/contracts/phase11c3a-closure.test.ts && pnpm exec tsx scripts/phase11c3-durable-render-canary.ts --dry-run",
     "canary:render:durable:execute": "tsx scripts/phase11c3-durable-render-canary-execute.ts",
-    "check:phase11c3b": "pnpm check:phase11c3a && pnpm exec vitest run tests/unit/durable-render-canary-execute.test.ts tests/contracts/phase11c3b-closure.test.ts && pnpm exec vitest run --config vitest.postgres.config.ts tests/postgres/render-recovery.test.ts && pnpm test:storage"
+    "check:phase11c3b": "pnpm check:phase11c3a && pnpm exec vitest run tests/unit/durable-render-canary-execute.test.ts tests/contracts/phase11c3b-closure.test.ts && pnpm exec vitest run --config vitest.postgres.config.ts tests/postgres/render-recovery.test.ts && pnpm test:storage",
+    "check:phase11c3c": "pnpm check:phase11c3b && pnpm exec vitest run tests/contracts/phase11c3c-closure.test.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

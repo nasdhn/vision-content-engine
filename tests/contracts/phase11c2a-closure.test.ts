@@ -33,7 +33,6 @@ describe('Phase 11C-2A closure contract', () => {
 
   it('records durable 11C-2A closure', () => {
     expect(doc).toContain('- 11C-2A dry-run Rendering canary harness: DONE');
-    expect(doc).toContain('durable real Render execution: NOT STARTED');
   });
 
   it('records zero external side effects for the dry-run', () => {

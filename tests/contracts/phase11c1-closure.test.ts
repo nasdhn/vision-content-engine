@@ -55,6 +55,5 @@ describe('Phase 11C-1 closure contract', () => {
     expect(doc).toContain('- 11C-1 Rendering activation safety boundary: DONE');
     expect(doc).toContain('`PAUSE_RENDERING=true`');
     expect(doc).toContain('`LOCAL` and `PRODUCTION` remain disabled');
-    expect(doc).toContain('durable real Render execution: NOT STARTED');
   });
 });

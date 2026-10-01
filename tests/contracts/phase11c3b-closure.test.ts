@@ -39,10 +39,8 @@ describe('Phase 11C-3B durable Render execution closure', () => {
     expect(s3FixtureSource).toContain('track(key: string)');
   });
 
-  it('records code closure without claiming the durable canary ran', () => {
+  it('records durable 11C-3B code closure', () => {
     expect(doc).toContain('- 11C-3B explicit disposable durable Render execution command: DONE');
-
-    expect(doc).toContain('reviewed disposable durable Render canary: NOT STARTED');
 
     expect(doc).toContain(
       'Code closure does not claim that the disposable durable canary has run.',

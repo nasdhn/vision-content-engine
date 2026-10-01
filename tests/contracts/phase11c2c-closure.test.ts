@@ -13,7 +13,6 @@ const evidence = readFileSync('docs/PHASE_11C_RENDER_CANARY_EVIDENCE.md', 'utf8'
 describe('Phase 11C-2C reviewed Render canary evidence', () => {
   it('records successful reviewed synthetic execution without claiming durable worker activation', () => {
     expect(phaseDoc).toContain('- 11C-2C reviewed local synthetic Rendering canary: DONE');
-    expect(phaseDoc).toContain('durable real Render execution: NOT STARTED');
     expect(phaseDoc).toContain('Human Review activation: NOT STARTED');
   });
 
