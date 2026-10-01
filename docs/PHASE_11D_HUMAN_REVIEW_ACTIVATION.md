@@ -1,6 +1,6 @@
 # Phase 11D — Human Review Progressive Activation
 
-**Status:** 11D-1 COMPLETE — existing Human Review boundary frozen; durable human-decision canary NOT STARTED.
+**Status:** COMPLETE — durable Human Review path validated; publishing remains disabled.
 
 Phase 11D is the fourth progressive production-enablement step.
 
@@ -112,5 +112,95 @@ Phase status:
 - Capture activation evidence: DONE
 - Rendering activation evidence: DONE
 - 11D-1 Human Review safety boundary: DONE
-- reviewed durable Human Review canary: NOT STARTED
+- 11D-2A disposable Human Review execution command: DONE
+- reviewed durable Human Review canary: DONE
+- Human Review activation: DONE
 - TikTok manual handoff activation: NOT STARTED
+
+## 11D-2A — explicit disposable Human Review approval command
+
+11D-2A adds a separate reviewed execution command for exactly one
+disposable LOCAL Human Review approval canary.
+
+The command requires the exact human confirmation:
+
+`APPROVE_DISPOSABLE_HUMAN_REVIEW_CANARY`
+
+The canary uses only:
+
+- disposable LOCAL PostgreSQL;
+- disposable LOCAL private S3;
+- a deterministic local private master;
+- a deterministic zero-cost Creative QA fixture;
+- canonical `applyCreativeQa`;
+- canonical `RenderReviewService`;
+- a USER actor for the final approval.
+
+It exercises:
+
+`CREATIVE_QA -> READY_FOR_REVIEW -> private media verification -> APPROVED`
+
+The deterministic Creative QA fixture exists only to prove the persistence
+transition into the Human Review gate. No real Creative QA provider is
+called and no provider cost is incurred.
+
+The final approval remains an explicit human-authorized action. The client
+does not choose the approved Asset; Human Review resolves the exact eligible
+Asset from canonical Render lineage.
+
+The canary asserts that Publication count is zero both before and after the
+human decision.
+
+It does not invoke Capture, Rendering, Analytics, Distribution or any
+publishing adapter.
+
+All persistent work classes remain paused and real providers remain disabled.
+
+The 11D-2A closure gate never executes the approval canary.
+
+Code closure does not claim that the reviewed durable Human Review canary
+has run.
+
+## Reviewed durable Human Review canary
+
+Executed successfully on 2026-10-01.
+
+Observed durable transition:
+
+`CREATIVE_QA -> READY_FOR_REVIEW -> APPROVED`
+
+Verified:
+
+- review queue contained the exact Render;
+- decision was allowed only at `READY_FOR_REVIEW`;
+- private master was read successfully;
+- persisted SHA-256 matched the private master;
+- exact canonical output Asset was approved;
+- human Approval was persisted;
+- final Render status was `APPROVED`;
+- Publication count remained exactly `0`;
+- publishing adapter was not invoked;
+- Capture was not invoked;
+- Renderer was not invoked;
+- Analytics was not invoked;
+- real Creative QA provider was not invoked;
+- external provider cost was `USD 0`;
+- remote side effect was `false`.
+
+Fixture master:
+
+- size: `2911` bytes;
+- SHA-256:
+  `fb09272d15d9c1961c7d5fe9a5857c38c834ce40822959efc2217ddc55a8630c`;
+- canvas: `1080x1920`;
+- duration: `400 ms`;
+- frame rate: `30 fps`.
+
+The synthetic master was used only to validate Human Review mechanics.
+Creative video quality will now be validated using real content rather than
+additional synthetic canaries.
+
+Phase 11D Human Review is complete.
+
+Next product milestone: produce one real end-to-end Vision video and improve
+the resulting edit until it is genuinely publishable.

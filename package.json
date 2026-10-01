@@ -81,7 +81,9 @@
     "check:phase11c3b": "pnpm check:phase11c3a && pnpm exec vitest run tests/unit/durable-render-canary-execute.test.ts tests/contracts/phase11c3b-closure.test.ts && pnpm exec vitest run --config vitest.postgres.config.ts tests/postgres/render-recovery.test.ts && pnpm test:storage",
     "check:phase11c3c": "pnpm check:phase11c3b && pnpm exec vitest run tests/contracts/phase11c3c-closure.test.ts",
     "check:phase11b2c": "pnpm check:phase11b2b && pnpm exec vitest run tests/contracts/phase11b2c-closure.test.ts",
-    "check:phase11d1": "pnpm check:phase11c3c && pnpm exec vitest run tests/contracts/phase11b2c-closure.test.ts tests/contracts/phase11d1-closure.test.ts tests/integration/render-review-api.test.ts && pnpm exec vitest run --config vitest.postgres.config.ts tests/postgres/render-review.test.ts && pnpm test:browser tests/browser/render-review.spec.ts && pnpm build:web"
+    "check:phase11d1": "pnpm check:phase11c3c && pnpm exec vitest run tests/contracts/phase11b2c-closure.test.ts tests/contracts/phase11d1-closure.test.ts tests/integration/render-review-api.test.ts && pnpm exec vitest run --config vitest.postgres.config.ts tests/postgres/render-review.test.ts && pnpm test:browser tests/browser/render-review.spec.ts && pnpm build:web",
+    "canary:review:execute": "tsx scripts/phase11d2-human-review-canary-execute.ts",
+    "check:phase11d2a": "pnpm check:phase11d1 && pnpm exec vitest run tests/unit/human-review-canary-execute.test.ts tests/contracts/phase11d2a-closure.test.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
