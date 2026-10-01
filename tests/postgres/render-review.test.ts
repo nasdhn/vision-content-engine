@@ -233,6 +233,7 @@ it('requires a structured dashboard rejection reason and persists reason plus co
     reasonCode: 'CUTS_TOO_MECHANICAL',
     comment: 'Les cuts doivent respirer davantage.',
   });
+  expect(await db.publication.count()).toBe(0);
 });
 
 it('approves only the latest successful QA-reviewed output and never accepts an older output', async () => {
@@ -257,4 +258,5 @@ it('approves only the latest successful QA-reviewed output and never accepts an 
   expect(approvedDetail.decisionAllowed).toBe(false);
   expect(approvedDetail.lineage.outputAssetId).toBe(latest.output.id);
   expect(approvedDetail.lineage.approvedAssetId).toBe(latest.output.id);
+  expect(await db.publication.count()).toBe(0);
 });
