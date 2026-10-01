@@ -1,6 +1,6 @@
 # Phase 11C — Rendering Progressive Activation
 
-**Status:** 11C-3A COMPLETE — durable Render canary dry-run boundary; durable execution NOT STARTED.
+**Status:** 11C-3B COMPLETE — explicit disposable durable Render execution command; reviewed durable canary NOT STARTED.
 
 Phase 11C progressively enables the already implemented Video Engine after
 the reviewed Product Capture canary.
@@ -47,6 +47,8 @@ Phase status:
 - 11C-2B explicit reviewed execution command: DONE
 - 11C-2C reviewed local synthetic Rendering canary: DONE
 - 11C-3A durable Render canary dry-run boundary: DONE
+- 11C-3B explicit disposable durable Render execution command: DONE
+- reviewed disposable durable Render canary: NOT STARTED
 - durable real Render execution: NOT STARTED
 - Human Review activation: NOT STARTED
 
@@ -208,3 +210,59 @@ creates disposable LOCAL Postgres/S3 resources, builds one synthetic
 durable Render lineage, executes exactly one real Render worker attempt,
 verifies the resulting private Asset/object/QA lineage, records sanitized
 evidence and destroys the disposable infrastructure.
+
+## 11C-3B — explicit disposable durable Render execution command
+
+11C-3B adds a separate explicit command for exactly one disposable LOCAL
+durable Render canary.
+
+The persistent runtime remains fail-closed. The command requires:
+
+- `VCE_ENV=LOCAL`;
+- loopback-only PostgreSQL and S3 endpoints;
+- `PAUSE_RENDERING=true`;
+- `PAUSE_CAPTURE=true`;
+- `PAUSE_AI_GENERATION=true`;
+- `PAUSE_ALL_PUBLISHING=true`;
+- `PAUSE_ANALYTICS_COLLECTION=true`;
+- `VCE_REAL_PROVIDERS_ENABLED=false`;
+- exact confirmation `EXECUTE_DISPOSABLE_DURABLE_RENDER_CANARY`;
+- an absolute empty local evidence directory.
+
+The execution command does not start the persistent Render worker process.
+It explicitly invokes exactly one `RenderWorkerOrchestrator` attempt inside
+a test-only disposable topology.
+
+The reviewed execution path will:
+
+1. create one disposable LOCAL PostgreSQL database;
+2. create one disposable LOCAL private S3 bucket;
+3. generate three synthetic local inputs;
+4. persist the three READY input Assets into the disposable bucket/database;
+5. create canonical approved content lineage and a validated EditingPlanVersion;
+6. request and queue one Render and one RenderAttempt/JobAttempt;
+7. execute the existing real `RenderWorkerOrchestrator`;
+8. materialize the private input Assets from S3;
+9. execute the real Remotion/FFmpeg renderer;
+10. run technical QA;
+11. upload the immutable private Render output;
+12. verify JobAttempt, RenderAttempt, Asset and Render durable state;
+13. read the private object back and verify size plus SHA-256;
+14. destroy the disposable bucket, database and worker temporary directory;
+15. retain only a local reviewed `master.mp4` and sanitized
+    `canary-evidence.json`.
+
+The S3 test fixture tracks the worker-created Render object key so cleanup
+can delete the output before deleting its disposable bucket.
+
+No VPS, application database, production bucket, external AI provider,
+Capture run, Analytics collection or publishing adapter is used.
+
+The 11C-3B closure gate does not call
+`canary:render:durable:execute`.
+
+Code closure does not claim that the disposable durable canary has run.
+
+Next after code closure: explicitly execute one reviewed disposable durable
+Render canary and freeze its non-secret evidence before any persistent
+Render-worker activation.

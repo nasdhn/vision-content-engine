@@ -37,6 +37,9 @@ export async function s3Fixture(env: NodeJS.ProcessEnv) {
       keys.add(key);
       return key;
     },
+    track(key: string) {
+      keys.add(key);
+    },
     async close() {
       try {
         for (const key of keys)
