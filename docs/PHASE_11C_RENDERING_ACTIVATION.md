@@ -1,6 +1,6 @@
 # Phase 11C — Rendering Progressive Activation
 
-**Status:** 11C-2C COMPLETE — reviewed local synthetic Render canary validated; durable Render worker execution NOT STARTED.
+**Status:** 11C-3A COMPLETE — durable Render canary dry-run boundary; durable execution NOT STARTED.
 
 Phase 11C progressively enables the already implemented Video Engine after
 the reviewed Product Capture canary.
@@ -46,6 +46,7 @@ Phase status:
 - 11C-2A dry-run Rendering canary harness: DONE
 - 11C-2B explicit reviewed execution command: DONE
 - 11C-2C reviewed local synthetic Rendering canary: DONE
+- 11C-3A durable Render canary dry-run boundary: DONE
 - durable real Render execution: NOT STARTED
 - Human Review activation: NOT STARTED
 
@@ -167,3 +168,43 @@ Detailed non-secret evidence is frozen in
 
 Next: inspect and prepare the durable controlled Render-worker activation
 path before Human Review activation.
+
+## 11C-3A — durable Render canary dry-run boundary
+
+Inspection confirms that the durable Render pipeline already exists.
+
+`RenderWorkerOrchestrator` owns the canonical path from the durable Render
+Job/RenderAttempt through private input materialization, deterministic
+rendering, technical QA, immutable private output upload, Asset readiness
+and durable Job success.
+
+11C-3 does not rebuild this pipeline.
+
+The future reviewed durable canary is restricted to:
+
+- a disposable local Postgres database created specifically for the run;
+- a disposable local S3 bucket created specifically for the run;
+- synthetic fixture-owned inputs only;
+- direct execution of exactly one `RenderWorkerOrchestrator` attempt;
+- all external AI providers disabled;
+- all publishing disabled;
+- no Capture execution;
+- no Analytics collection.
+
+No VPS, production database or application bucket is used.
+
+This local disposable test topology is intentionally distinct from the
+`STAGING_CAPTURE` product-runtime activation boundary. It does not enable
+the persistent Render worker process in LOCAL or PRODUCTION.
+
+11C-3A itself creates no database, bucket, Render job or media object.
+The dry-run performs no DB, S3, renderer, AI, publishing or remote side
+effect.
+
+`--execute` remains unavailable in 11C-3A.
+
+Next: 11C-3B adds a separate explicit reviewed execution command that
+creates disposable LOCAL Postgres/S3 resources, builds one synthetic
+durable Render lineage, executes exactly one real Render worker attempt,
+verifies the resulting private Asset/object/QA lineage, records sanitized
+evidence and destroys the disposable infrastructure.
